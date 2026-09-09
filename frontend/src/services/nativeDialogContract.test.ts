@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 const nativeDialogCall = /(?<![\w$.])(?:(?:window|globalThis)\s*\.\s*)?(?:alert|confirm|prompt)\s*\(/;
 
@@ -14,7 +15,7 @@ for (const receiver of ['', 'window.', 'globalThis.']) {
 }
 
 test('frontend product flows do not use browser alert confirm or prompt', () => {
-    const root = path.resolve(new URL('../', import.meta.url).pathname);
+    const root = fileURLToPath(new URL('../', import.meta.url));
     const files: string[] = [];
     const walk = (directory: string) => {
         for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {

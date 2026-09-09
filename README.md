@@ -1,3 +1,5 @@
+> **NAS 单容器部署：** 前端、后端与 PostgreSQL 打包为一个镜像，支持 x86_64 / ARM64，由 GitHub Actions 自动构建发布。请使用 [NAS 部署指南](deploy/nas/README.md)；下文原有安装步骤适用于分体部署。
+
 <div align="center">
   <img src="backend/logo.png" alt="TG Vault Logo" width="150" />
 

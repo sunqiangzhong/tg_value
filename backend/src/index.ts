@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import { isSameOriginRequest, mountFrontend } from './services/frontend.js';
 
 import filesRouter from './routes/files.js';
 import scopedFolderOperationsRouter from './routes/folderOperations.js';
@@ -140,7 +141,7 @@ app.use((req, res, next) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
     const origin = req.headers.origin;
     if (!origin) return next();
-    if (!allowAnyOrigin && !allowedOrigins.includes(origin)) {
+    if (!allowAnyOrigin && !allowedOrigins.includes(origin) && !(process.env.FRONTEND_DIR && isSameOriginRequest(req))) {
         return res.status(403).json({ error: 'Origin not allowed' });
     }
     next();
@@ -157,6 +158,7 @@ app.use(helmet({
             "connect-src": ["'self'", "https:"],
             "style-src": ["'self'", "'unsafe-inline'"],
             "script-src": ["'self'"],
+            "upgrade-insecure-requests": null,
         },
     },
     crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -227,6 +229,8 @@ app.get('/deepz', async (_req, res) => {
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+if (process.env.FRONTEND_DIR) mountFrontend(app, process.env.FRONTEND_DIR);
 
 // 错误处理
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

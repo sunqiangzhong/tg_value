@@ -14,7 +14,7 @@ import {
 } from './telegram.js';
 import { buildBotCommandMenu } from '../utils/telegramCommandRegistry.js';
 
-const bot = fs.readFileSync(new URL('../services/telegramBot.ts', import.meta.url), 'utf8');
+const bot = fs.readFileSync(new URL('../services/telegramBot.ts', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const schema = fs.readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('../db/migrations/2026090101_telegram_user_locale.sql', import.meta.url), 'utf8');
 const russianMigration = fs.readFileSync(new URL('../db/migrations/2026090201_add_russian_locale.sql', import.meta.url), 'utf8');

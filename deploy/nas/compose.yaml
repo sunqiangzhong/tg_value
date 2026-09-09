@@ -1,0 +1,26 @@
+name: tg-vault
+services:
+  tg-vault:
+    image: ${TG_VAULT_IMAGE:?Set TG_VAULT_IMAGE in .env}
+    pull_policy: always
+    ports:
+      - "${WEB_PORT:-8080}:51947"
+    environment:
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      CORS_ORIGIN: ${PUBLIC_URL:-}
+      OAUTH_CALLBACK_BASE_URL: ${PUBLIC_URL:-}
+      OAUTH_FRONTEND_ORIGIN: ${PUBLIC_URL:-}
+      TRUST_PROXY: ${TRUST_PROXY:-loopback}
+      UPDATE_CHECK_ENABLED: "false"
+    volumes:
+      - vault-data:/data
+    restart: unless-stopped
+    stop_grace_period: 60s
+    shm_size: 128mb
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  vault-data:

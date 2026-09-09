@@ -446,7 +446,7 @@ function testTaskCardUsesScopedPauseEvenWhenGlobalQueueIsRunning() {
 }
 
 async function testCanonicalNameIsComputedBeforeQueueDisplay() {
-    const uploadSource = fs.readFileSync(new URL('./telegramUpload.ts', import.meta.url), 'utf8');
+    const uploadSource = fs.readFileSync(new URL('./telegramUpload.ts', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
     const canonicalize = uploadSource.indexOf("if (file.generatedName !== false) {\n        file.fileName = await getCanonicalTelegramFileName");
     const displayName = uploadSource.indexOf('const taskDisplayName = queue?.folderName');
     assert(canonicalize >= 0 && displayName > canonicalize);

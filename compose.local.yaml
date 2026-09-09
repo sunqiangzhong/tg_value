@@ -1,0 +1,27 @@
+name: tg-vault-local
+services:
+  tg-vault:
+    image: tg-vault:local
+    build:
+      context: .
+    pull_policy: never
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:51947"
+    environment:
+      COOKIE_SECURE: "false"
+      CORS_ORIGIN: http://localhost:${WEB_PORT:-8080}
+      OAUTH_CALLBACK_BASE_URL: http://localhost:${WEB_PORT:-8080}
+      OAUTH_FRONTEND_ORIGIN: http://localhost:${WEB_PORT:-8080}
+      UPDATE_CHECK_ENABLED: "false"
+    volumes:
+      - vault-data:/data
+    restart: unless-stopped
+    stop_grace_period: 60s
+    shm_size: 128mb
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  vault-data:

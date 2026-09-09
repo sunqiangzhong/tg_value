@@ -12,6 +12,7 @@ services:
       OAUTH_FRONTEND_ORIGIN: ${PUBLIC_URL:-}
       TRUST_PROXY: ${TRUST_PROXY:-loopback}
       UPDATE_CHECK_ENABLED: "false"
+      PROXY_HOST: ${PROXY_HOST:-}
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1}

@@ -6,6 +6,21 @@ export PGHOST=/run/postgresql
 export PGPORT=5432
 export DATABASE_URL='postgresql://tgvault@localhost/tgvault?host=/run/postgresql'
 export PORT=51947
+
+# A single Clash/Mihomo mixed-port address can proxy both HTTPS Bot API calls
+# and GramJS MTProto connections. Explicit variables still take precedence.
+if [[ -n "${PROXY_HOST:-}" ]]; then
+    proxy_endpoint="${PROXY_HOST#*://}"
+    export HTTP_PROXY="${HTTP_PROXY:-http://$proxy_endpoint}"
+    export HTTPS_PROXY="${HTTPS_PROXY:-http://$proxy_endpoint}"
+    export http_proxy="${http_proxy:-$HTTP_PROXY}"
+    export https_proxy="${https_proxy:-$HTTPS_PROXY}"
+    export TELEGRAM_PROXY_URL="${TELEGRAM_PROXY_URL:-socks5://$proxy_endpoint}"
+    export NODE_USE_ENV_PROXY="${NODE_USE_ENV_PROXY:-1}"
+    export NO_PROXY="${NO_PROXY:-localhost,127.0.0.1,::1}"
+    export no_proxy="${no_proxy:-$NO_PROXY}"
+fi
+
 mkdir -p "$PGDATA" "$PGHOST" /data/{uploads,thumbnails,previews,chunks,secrets,logs}
 # Only fix directory ownership; avoid scanning potentially terabytes of uploads.
 chown node:node /data /data/{uploads,thumbnails,previews,chunks,secrets,logs}

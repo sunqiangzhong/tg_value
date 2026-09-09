@@ -3,6 +3,7 @@ import path from 'path';
 import readline from 'readline';
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
+import { getTelegramProxy } from '../services/telegramProxy.js';
 
 async function main() {
   const apiId = parseInt(process.env.TELEGRAM_API_ID || '0');
@@ -22,6 +23,7 @@ async function main() {
   const ask = (question: string) => new Promise<string>(resolve => rl.question(question, resolve));
 
   const client = new TelegramClient(new StringSession(''), apiId, apiHash, {
+    proxy: getTelegramProxy(),
     connectionRetries: 5,
     useWSS: false,
   });

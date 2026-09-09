@@ -14,6 +14,7 @@ import {
     upsertTelegramUserAccountWithoutRuntimeRefresh,
 } from './telegramUserClientPool.js';
 import { initializeTelegramMultiAccountRuntime } from './telegramMultiAccountRuntime.js';
+import { getTelegramProxy } from './telegramProxy.js';
 
 export const TELEGRAM_USER_SESSION_SETTING = 'telegram_user_session';
 const TELEGRAM_USER_ENABLED_SETTING = 'telegram_user_download_enabled';
@@ -57,6 +58,7 @@ export async function migrateLegacyTelegramUserSession(): Promise<string> {
 
 function makeClient(session: string, credentials: { apiId: number; apiHash: string }): TelegramClient {
     return new TelegramClient(new StringSession(session), credentials.apiId, credentials.apiHash, {
+        proxy: getTelegramProxy(),
         connectionRetries: 15,
         retryDelay: 2000,
         useWSS: false,

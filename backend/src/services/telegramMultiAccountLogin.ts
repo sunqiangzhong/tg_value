@@ -2,6 +2,7 @@ import { Api, TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import { Raw } from 'telegram/events/index.js';
 import { getEffectiveTelegramBotConfig } from './telegramBotConfig.js';
+import { getTelegramProxy } from './telegramProxy.js';
 import {
     TelegramMultiAccountLoginFlows,
     type TelegramLoginCredentials,
@@ -41,6 +42,7 @@ async function getCredentials(): Promise<TelegramLoginCredentials | null> {
 
 function makeClient(credentials: TelegramLoginCredentials): TelegramClient {
     return new TelegramClient(new StringSession(''), credentials.apiId, credentials.apiHash, {
+        proxy: getTelegramProxy(),
         connectionRetries: 15,
         retryDelay: 2000,
         useWSS: false,

@@ -38,6 +38,7 @@ import { query } from '../db/index.js';
 import { getConfiguredTelegramAllowedUsers, addTelegramAllowedUser, countAuthenticatedTelegramUsers, shouldAutoAllowFirstTelegramUser, verifyTelegramPin } from '../utils/authSettings.js';
 import { assertPublicHttpUrl } from '../utils/networkSecurity.js';
 import { consumeOrGetTelegramTargetState } from '../utils/telegramTargetStateStore.js';
+import { getTelegramProxy } from './telegramProxy.js';
 import { BOT_COMMANDS, buildBotCommandMenu, normalizeBotCommandText } from '../utils/telegramCommandRegistry.js';
 import { buildCommandHomePage } from './telegramCommandDispatcher.js';
 import { rememberRecentTelegramPathPersistent, buildPathPreviewLine, applyPendingTelegramPathInputPersistent, getPendingTelegramPathInput, clearPendingTelegramPathInput } from '../utils/telegramPathSettings.js';
@@ -1511,6 +1512,7 @@ export async function initTelegramBot(credentialsOverride?: TelegramBotCredentia
 
     try {
         client = new TelegramClient(new StringSession(''), apiId, apiHash, {
+            proxy: getTelegramProxy(),
             connectionRetries: 5,
             reconnectRetries: 5,
             retryDelay: 1000,

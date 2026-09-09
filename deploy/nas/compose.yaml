@@ -12,6 +12,11 @@ services:
       OAUTH_FRONTEND_ORIGIN: ${PUBLIC_URL:-}
       TRUST_PROXY: ${TRUST_PROXY:-loopback}
       UPDATE_CHECK_ENABLED: "false"
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1}
+      NODE_USE_ENV_PROXY: ${NODE_USE_ENV_PROXY:-1}
+      TELEGRAM_PROXY_URL: ${TELEGRAM_PROXY_URL:-}
     volumes:
       - vault-data:/data
     restart: unless-stopped

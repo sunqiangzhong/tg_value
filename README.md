@@ -157,6 +157,12 @@ docker compose -f compose.local.yaml stop
 docker build -t tg-vault:test .
 ```
 
+### 原项目的源码分体部署
+
+仓库仍保留 `docker-compose.yml` 和 `deploy/install.sh`，供需要分别运行前端、后端与数据库的开发或生产环境使用。安装向导对新手只需填写（2 项）：前端公网地址和后端 API 公网地址，其余 OAuth 地址会自动推导。
+
+Telegram Bot Token、API ID、API Hash、Bot PIN 和用户账号登录信息应在 Web 的“设置 → Telegram”中配置，不要把这些内容写入 `.env`。本 README 开头的 NAS 单容器方案不需要运行该安装向导。
+
 ## 修改后推送并发布镜像
 
 工作流位于 [`.github/workflows/docker-all-in-one.yml`](.github/workflows/docker-all-in-one.yml)。首次使用前，在 GitHub 的 **Settings → Secrets and variables → Actions** 添加：

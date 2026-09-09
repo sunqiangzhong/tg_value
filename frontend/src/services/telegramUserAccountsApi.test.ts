@@ -3,6 +3,7 @@ import { after, test } from 'node:test';
 
 const listeners = new Map<string, Set<(event: Event) => void>>();
 const storage = new Map<string, string>();
+storage.set('tg-vault.locale', 'zh-CN');
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) } });
 Object.defineProperty(globalThis, 'window', { configurable: true, value: {
     setTimeout, clearTimeout,

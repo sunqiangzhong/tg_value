@@ -26,6 +26,8 @@ git push -u origin docker-hub
 - `用户名/tg-vault:latest`
 - `用户名/tg-vault:完整提交SHA`（用于固定版本）
 
+AMD64 通过测试后会优先发布；ARM64 构建暂时失败不会阻断 x86 NAS 更新。ARM64 成功时，相同的 `latest`、`docker-hub` 和提交标签会自动成为双架构清单。
+
 PR 只构建测试。手动运行 workflow 时选择 `docker-hub` 分支才会发布。
 原有 `docker-publish.yml` 仍用于 main/master 的分体镜像，不发布这里的一体镜像。
 

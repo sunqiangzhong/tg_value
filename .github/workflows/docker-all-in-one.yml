@@ -39,9 +39,12 @@ jobs:
         include:
           - runner: ubuntu-latest
             arch: amd64
+            allow_failure: false
           - runner: ubuntu-24.04-arm
             arch: arm64
+            allow_failure: true
     runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.allow_failure }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
@@ -91,7 +94,13 @@ jobs:
           IMAGE: ${{ secrets.DOCKER_USERNAME }}/tg-vault
           REVISION: ${{ github.sha }}
         run: |
+          sources=("$IMAGE:$REVISION-amd64")
+          if docker buildx imagetools inspect "$IMAGE:$REVISION-arm64" >/dev/null 2>&1; then
+            sources+=("$IMAGE:$REVISION-arm64")
+          else
+            echo 'ARM64 image is unavailable; publishing tested AMD64 image first.'
+          fi
           docker buildx imagetools create \
             -t "$IMAGE:docker-hub" -t "$IMAGE:latest" -t "$IMAGE:$REVISION" \
-            "$IMAGE:$REVISION-amd64" "$IMAGE:$REVISION-arm64"
+            "${sources[@]}"
           docker buildx imagetools inspect "$IMAGE:$REVISION"

@@ -4,8 +4,10 @@ import { after, test } from 'node:test';
 const listeners = new Map<string, Set<(event: Event) => void>>();
 const storage = new Map<string, string>();
 storage.set('tg-vault.locale', 'zh-CN');
-Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) } });
+const localStorage = { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) };
+Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: localStorage });
 Object.defineProperty(globalThis, 'window', { configurable: true, value: {
+    localStorage,
     setTimeout, clearTimeout,
     addEventListener: (type: string, listener: (event: Event) => void) => { const set = listeners.get(type) ?? new Set(); set.add(listener); listeners.set(type, set); },
     removeEventListener: (type: string, listener: (event: Event) => void) => listeners.get(type)?.delete(listener),

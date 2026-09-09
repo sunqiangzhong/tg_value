@@ -32,6 +32,7 @@ test('integrated frontend serves SPA routes without swallowing API and missing a
         assert.equal((await fetch(base + '/origin', { method: 'POST', headers: { Origin: base } })).status, 204);
         assert.equal((await fetch(base + '/origin', { method: 'POST', headers: { Origin: 'https://evil.example' } })).status, 403);
     } finally {
+        server.closeAllConnections();
         await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
         rmSync(root, { recursive: true, force: true });
     }

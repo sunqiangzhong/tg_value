@@ -691,7 +691,7 @@ router.post('/config/telegram-allowed-users', requireAuth, async (req: Request, 
                 : '允许列表已保存。',
         });
     } catch (error) {
-        console.error('更新 Telegram 允许用户列表失败:', error);
+        console.error(`更新 Telegram 允许用户列表失败 [request=${res.locals.requestId || 'unknown'}]:`, error);
         res.status(500).json({ error: '更新 Telegram 允许用户列表失败' });
     }
 });

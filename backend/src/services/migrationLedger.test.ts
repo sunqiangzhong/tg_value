@@ -8,6 +8,7 @@ const init = fs.readFileSync(new URL('../../../init.sql', import.meta.url), 'utf
 const trigram = fs.readFileSync(new URL('../db/migrations/2026082901_file_search_trigram.sql', import.meta.url), 'utf8');
 const dockerfile = fs.readFileSync(new URL('../../Dockerfile', import.meta.url), 'utf8');
 const durableDerivatives = fs.readFileSync(new URL('../db/migrations/2026082903_durable_media_derivatives.sql', import.meta.url), 'utf8');
+const telegramAuthRepair = fs.readFileSync(new URL('../db/migrations/2026091001_ensure_telegram_auth.sql', import.meta.url), 'utf8');
 
 test('database startup uses immutable incremental migrations under an advisory lock', () => {
     assert.match(schema, /CREATE TABLE IF NOT EXISTS schema_migrations/);
@@ -46,4 +47,9 @@ test('durable media derivative migration persists recovery metadata and a pendin
     assert.match(durableDerivatives, /derivative_source_path/);
     assert.match(durableDerivatives, /derivative_cleanup_source/);
     assert.match(durableDerivatives, /idx_files_derivative_pending/);
+});
+
+test('legacy databases receive the Telegram authorization table through a migration', () => {
+    assert.match(telegramAuthRepair, /CREATE TABLE IF NOT EXISTS telegram_auth/);
+    assert.match(telegramAuthRepair, /user_id BIGINT PRIMARY KEY/);
 });

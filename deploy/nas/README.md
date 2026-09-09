@@ -31,6 +31,28 @@ AMD64 通过测试后会优先发布；ARM64 构建暂时失败不会阻断 x86 
 PR 只构建测试。手动运行 workflow 时选择 `docker-hub` 分支才会发布。
 原有 `docker-publish.yml` 仍用于 main/master 的分体镜像，不发布这里的一体镜像。
 
+## 修改完成后发布新镜像
+
+在项目根目录确认当前位于 `docker-hub` 分支，然后提交并推送全部修改：
+
+```bash
+git switch docker-hub
+git status
+git add -A
+git commit -m "描述本次修改"
+git push origin docker-hub
+```
+
+推送会自动运行 GitHub Actions 的 `Publish single-container NAS image`。在仓库的 **Actions** 页面等待 `verify`、`build (amd64)` 和 `publish` 完成；成功后 Docker Hub 的 `sunqz/tg-vault:latest` 会更新。NAS 端执行：
+
+```bash
+docker compose pull
+docker compose up -d
+docker compose logs --tail=100
+```
+
+如果 `git status` 显示没有修改，就不需要创建空提交。需要手动重新发布当前提交时，在 GitHub Actions 页面选择该工作流和 `docker-hub` 分支，再点击 **Run workflow**。
+
 ## NAS 启动
 
 NAS 只需要本目录的 `compose.yaml` 和 `env.example`，不需要源码或本地构建。
@@ -52,6 +74,23 @@ docker compose up -d
 Compose 会自动拉取镜像并选择匹配架构；私有镜像先执行 `docker login`。
 此配置默认用于局域网 HTTP。使用 NAS HTTPS 反向代理时，把目标设为 NAS 的 8080 端口，设置 `PUBLIC_URL=https://你的域名` 和 `COOKIE_SECURE=true`；代理应保留 Host 并设置 X-Forwarded-Proto，`TRUST_PROXY` 填代理的 IP 或可信子网。
 云盘 OAuth 需要填写 `PUBLIC_URL`（完整访问 origin，不带末尾 `/`），并在服务商配置对应回调地址。
+
+### 容器使用代理
+
+Clash/Mihomo 开启“允许局域网连接”，并使用 mixed 端口时，只需在 `.env` 设置：
+
+```dotenv
+PROXY_HOST=192.168.5.199:7890
+```
+
+容器会自动把这个地址用于 HTTP/HTTPS 请求和 Telegram MTProto。Telegram Bot、用户账号登录、频道扫描以及图片和视频分片下载都会使用该代理。修改后重新创建容器：
+
+```bash
+docker compose up -d --force-recreate
+docker compose logs --tail=100
+```
+
+需要分别指定代理时，可以使用 `HTTP_PROXY`、`HTTPS_PROXY` 和 `TELEGRAM_PROXY_URL=socks5://主机:端口` 覆盖自动配置。
 
 ## 更新和备份
 

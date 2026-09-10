@@ -4,6 +4,13 @@ import test from 'node:test';
 
 const bot = fs.readFileSync(new URL('./telegramBot.ts', import.meta.url), 'utf8');
 
+test('comments keyboard rebinds the wizard to the newly sent message', () => {
+    const start = bot.indexOf("state.step = state.includeComments !== undefined");
+    const branch = bot.slice(start, bot.indexOf('return true;', start));
+    assert.match(branch, /const reply = await message\.reply\(/);
+    assert.match(branch, /refreshTelegramWizardState\(senderId, chatKey, state, (?:\(reply as Api\.Message\)|reply)\.id\)/);
+});
+
 test('Telegram channel wizards use chat-bound expiring interaction state', () => {
     assert.match(bot, /new TelegramInteractionStore<TelegramWizardState>/);
     assert.match(bot, /messageChatKey\(message, senderId\)/);

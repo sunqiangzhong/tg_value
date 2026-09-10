@@ -7,6 +7,19 @@ interface WizardPayload {
     step: string;
 }
 
+test('moving to a new comments message accepts its buttons and rejects the old keyboard', () => {
+    const store = new TelegramInteractionStore<WizardPayload>();
+    store.set({ userId: 7, chatKey: '7', kind: 'date', step: 'path', originMessageId: 11, value: { kind: 'date', step: 'path' } });
+    store.update(7, '7', { kind: 'date', step: 'comments', originMessageId: 22, value: { kind: 'date', step: 'comments' } });
+    for (const action of ['comments_on', 'comments_off']) {
+        const input = { userId: 7, chatKey: '7', messageId: 22, action, allowedActions: ['comments_on', 'comments_off'] };
+        assert.equal(store.validateCallback(input).ok, true);
+        assert.deepEqual(store.validateCallback({ ...input, messageId: 11 }), { ok: false, reason: 'message-mismatch' });
+        assert.equal(store.validateCallback({ ...input, userId: 8 }).ok, false);
+        assert.equal(store.validateCallback({ ...input, chatKey: '8' }).ok, false);
+    }
+});
+
 test('interaction state is isolated by user and canonical chat key', () => {
     const store = new TelegramInteractionStore<WizardPayload>({ ttlMs: 15 * 60_000, maxEntries: 10, now: () => 1_000 });
     store.set({ userId: 7, chatKey: '100', kind: 'wizard', step: 'source', originMessageId: 11, value: { kind: 'date', step: 'source' } });

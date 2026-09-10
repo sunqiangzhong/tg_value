@@ -7,7 +7,7 @@ services:
       - "${WEB_PORT:-8080}:51947"
     environment:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      CORS_ORIGIN: ${PUBLIC_URL:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-${PUBLIC_URL:-}}
       OAUTH_CALLBACK_BASE_URL: ${PUBLIC_URL:-}
       OAUTH_FRONTEND_ORIGIN: ${PUBLIC_URL:-}
       TRUST_PROXY: ${TRUST_PROXY:-loopback}

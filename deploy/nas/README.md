@@ -3,6 +3,10 @@
 镜像包含 React 网页、Node API、PostgreSQL 17 和 ffmpeg，只启动一个容器。
 支持 `linux/amd64`（Intel/AMD x86_64）和 `linux/arm64`（64 位 ARM），不支持 ARMv7/32 位系统。
 
+镜像将生产依赖单独构建，只复制运行所需的依赖目录，不携带安装缓存；Google API SDK 的类型声明仅保留在构建阶段。图片处理使用 Sharp 自带的平台库，不重复安装系统 libvips。PostgreSQL、数据库扩展和 ffmpeg 保留。两种架构的容器测试包含图片缩放/WebP 编码和 Google Drive SDK 加载检查。
+
+2026-09-10 本地对照构建：Docker 报告的 AMD64 镜像大小从 182.7 MB 降至 156.8 MB（约减少 14.2%）；容器内 `node_modules` 从 354 MiB 降至 194 MiB。AMD64 和 ARM64 均通过构建及容器测试，其中 ARM64 使用 Docker Desktop 模拟运行；GitHub 原生 ARM runner 仍需在推送后验证。镜像大小会随基础镜像和系统软件包更新而变化。
+
 ## 一次性配置 GitHub Actions
 
 1. 在你有推送权限的 GitHub 仓库中保存这些代码（也可以先 Fork）。
@@ -26,7 +30,7 @@ git push -u origin docker-hub
 - `用户名/tg-vault:latest`
 - `用户名/tg-vault:完整提交SHA`（用于固定版本）
 
-AMD64 通过测试后会优先发布；ARM64 构建暂时失败不会阻断 x86 NAS 更新。ARM64 成功时，相同的 `latest`、`docker-hub` 和提交标签会自动成为双架构清单。
+AMD64 和 ARM64 都必须构建并通过容器测试后才会发布，避免 ARM64 失败时仍把仅有 AMD64 的镜像标记为成功。两种架构共享 `latest`、`docker-hub` 和提交标签。ARM64 依赖需要的 Python/C++ 编译工具仅存在于构建阶段，不会增加最终镜像体积。
 
 PR 只构建测试。手动运行 workflow 时选择 `docker-hub` 分支才会发布。
 原有 `docker-publish.yml` 仍用于 main/master 的分体镜像，不发布这里的一体镜像。
@@ -43,7 +47,7 @@ git commit -m "描述本次修改"
 git push origin docker-hub
 ```
 
-推送会自动运行 GitHub Actions 的 `Publish single-container NAS image`。在仓库的 **Actions** 页面等待 `verify`、`build (amd64)` 和 `publish` 完成；成功后 Docker Hub 的 `sunqz/tg-vault:latest` 会更新。NAS 端执行：
+推送会自动运行 GitHub Actions 的 `Publish single-container NAS image`。在仓库的 **Actions** 页面等待 `verify`、两种架构的 `build` 和 `publish` 完成；成功后 Docker Hub 的 `sunqz/tg-vault:latest` 会更新。NAS 端执行：
 
 ```bash
 docker compose pull
@@ -74,6 +78,30 @@ docker compose up -d
 Compose 会自动拉取镜像并选择匹配架构；私有镜像先执行 `docker login`。
 此配置默认用于局域网 HTTP。使用 NAS HTTPS 反向代理时，把目标设为 NAS 的 8080 端口，设置 `PUBLIC_URL=https://你的域名` 和 `COOKIE_SECURE=true`；代理应保留 Host 并设置 X-Forwarded-Proto，`TRUST_PROXY` 填代理的 IP 或可信子网。
 云盘 OAuth 需要填写 `PUBLIC_URL`（完整访问 origin，不带末尾 `/`），并在服务商配置对应回调地址。
+
+### 飞牛公网 / Cloudflare Tunnel 登录出现 403
+
+`Origin not allowed` 表示浏览器访问地址没有通过后端的来源校验。隧道的内部 HTTP 地址可能和浏览器使用的 HTTPS 域名不同；飞牛公网入口还可能使用不同端口。
+
+在 NAS 的 `.env` 中明确填写浏览器地址栏里的入口，例如：
+
+```dotenv
+PUBLIC_URL=https://cloud.example.com
+CORS_ORIGIN=https://cloud.example.com,https://nas.example.com:8443
+COOKIE_SECURE=true
+```
+
+替换为自己的真实地址，保留实际端口，不带路径或末尾 `/`。`PUBLIC_URL` 只填一个主入口，用于 OAuth；`CORS_ORIGIN` 可用英文逗号分隔多个入口，留空时沿用 `PUBLIC_URL`。不要使用 `*` 解决登录问题。HTTPS Cookie 需要通过 HTTPS 入口使用。
+
+更新本目录的 `compose.yaml` 后重新创建容器，使 `.env` 生效：
+
+```bash
+docker compose up -d --force-recreate
+```
+
+如果通过飞牛界面直接创建容器，请在容器环境变量中直接设置 `CORS_ORIGIN`，仅设置 `PUBLIC_URL` 不会自动转换为应用配置。
+
+显式允许的入口不依赖代理是否保留 Host。若使用自动同源识别，则 `TRUST_PROXY` 必须包含实际连接容器的代理 IP 或可信子网；代理需要覆盖 `X-Forwarded-Proto`，保留原始 Host 或设置包含公网端口的 `X-Forwarded-Host`。默认 `loopback` 不包含其他 Docker 容器或局域网代理。
 
 ### 容器使用代理
 

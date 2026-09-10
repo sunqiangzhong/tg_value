@@ -4,8 +4,15 @@ import path from 'node:path';
 
 export function isSameOriginRequest(req: express.Request): boolean {
     const origin = req.headers.origin;
-    if (!origin || !req.get('host')) return false;
-    return origin === `${req.protocol}://${req.get('host')}`;
+    if (!origin) return false;
+    let host = req.get('host');
+    const trust = req.app.get('trust proxy fn');
+    // Match Express's protocol/hostname trust boundary, but retain the public port.
+    if (req.socket.remoteAddress && trust?.(req.socket.remoteAddress, 0)) {
+        host = req.get('x-forwarded-host')?.split(',')[0].trim() || host;
+    }
+    if (!host) return false;
+    return origin === `${req.protocol}://${host}`;
 }
 
 export function mountFrontend(app: express.Express, directory: string): void {

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+image="${TG_VAULT_TEST_IMAGE:-tg-vault:test}"
 container="tg-vault-smoke-$RANDOM"
 volume="$container-data"
 cleanup() {
@@ -10,7 +11,7 @@ cleanup() {
 trap cleanup EXIT
 docker volume create "$volume" >/dev/null
 docker run -d --name "$container" -p 127.0.0.1:18080:51947 \
-    -e UPDATE_CHECK_ENABLED=false -v "$volume:/data" tg-vault:test
+    -e UPDATE_CHECK_ENABLED=false -v "$volume:/data" "$image"
 wait_ready() {
     for ((i=0; i<90; i++)); do
         [[ "$(docker inspect -f '{{.State.Running}}' "$container")" == true ]] || return 1
@@ -20,6 +21,16 @@ wait_ready() {
     return 1
 }
 wait_ready
+# Exercise the prebuilt image library after removing the duplicate system libvips.
+docker exec -w /app "$container" node --input-type=module -e '
+    import sharp from "sharp";
+    import { google } from "googleapis";
+    const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: "red" } }).png().toBuffer();
+    const result = await sharp(image).resize(4, 4).webp().toBuffer();
+    const metadata = await sharp(result).metadata();
+    if (metadata.width !== 4 || metadata.format !== "webp") throw new Error("Image processing failed");
+    google.drive({ version: "v3", auth: new google.auth.OAuth2() });
+'
 curl -fsS http://127.0.0.1:18080/ | grep -q '<html'
 curl -fsS http://127.0.0.1:18080/settings | grep -q '<html'
 [[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/api/not-a-route)" == 404 ]]
@@ -30,7 +41,7 @@ docker stop -t 60 "$container"
 [[ "$(docker inspect -f '{{.State.ExitCode}}' "$container")" == 0 ]]
 docker rm "$container"
 docker run -d --name "$container" -p 127.0.0.1:18080:51947 \
-    -e UPDATE_CHECK_ENABLED=false -v "$volume:/data" tg-vault:test
+    -e UPDATE_CHECK_ENABLED=false -v "$volume:/data" "$image"
 wait_ready
 [[ "$(docker exec -u postgres "$container" psql -h /run/postgresql -d tgvault -Atc 'SELECT value FROM nas_smoke')" == persisted ]]
 [[ "$(docker exec "$container" cat /data/uploads/smoke.txt)" == persisted ]]

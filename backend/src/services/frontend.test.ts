@@ -6,6 +6,34 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { mountFrontend, isSameOriginRequest } from './frontend.js';
 
+test('origin checks use forwarded host only from a trusted proxy and preserve ports', async () => {
+    const app = express();
+    app.set('trust proxy', 'loopback');
+    app.post('/login', (req, res) => res.sendStatus(isSameOriginRequest(req) ? 204 : 403));
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise<void>(resolve => server.once('listening', resolve));
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    const headers = {
+        Origin: 'https://nas.example:8443',
+        'X-Forwarded-Host': 'nas.example:8443',
+        'X-Forwarded-Proto': 'https',
+    };
+    try {
+        assert.equal((await fetch(base + '/login', { method: 'POST', headers })).status, 204);
+        assert.equal((await fetch(base + '/login', {
+            method: 'POST', headers: { ...headers, Origin: 'https://evil.example' },
+        })).status, 403);
+        assert.equal((await fetch(base + '/login', {
+            method: 'POST', headers: { ...headers, Origin: 'https://nas.example' },
+        })).status, 403);
+        app.set('trust proxy', false);
+        assert.equal((await fetch(base + '/login', { method: 'POST', headers })).status, 403);
+    } finally {
+        server.closeAllConnections();
+        await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
+});
+
 test('integrated frontend serves SPA routes without swallowing API and missing assets', async () => {
     const root = mkdtempSync(path.join(tmpdir(), 'vault-ui-'));
     mkdirSync(path.join(root, 'assets'));

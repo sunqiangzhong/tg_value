@@ -7,12 +7,24 @@ COPY frontend/ ./
 ENV VITE_API_URL=""
 RUN npm run build
 
-FROM node:22-alpine3.22 AS backend-build
+FROM node:22-alpine3.22 AS backend-toolchain
+# ARM64 native dependencies such as utf-8-validate need a source-build fallback.
+RUN apk add --no-cache python3 make g++
+
+FROM backend-toolchain AS backend-build
 WORKDIR /build/backend
 COPY backend/package*.json ./
 RUN npm ci
 COPY backend/ ./
 RUN npm run build
+
+FROM backend-toolchain AS backend-deps
+WORKDIR /app
+COPY backend/package*.json ./
+# Keep target-platform native addons; only discard Google SDK compile-time declarations.
+RUN npm ci --omit=dev --include=optional \
+    && find node_modules/googleapis -type f -name '*.d.ts' -delete \
+    && node -e "require('sharp'); const {google}=require('googleapis'); google.drive({version:'v3'}); new google.auth.OAuth2()"
 
 FROM node:22-alpine3.22
 ARG SOURCE_REVISION=unknown
@@ -21,10 +33,10 @@ ARG SOURCE_URL=https://github.com/hicocos/tg-vault
 LABEL org.opencontainers.image.revision=$SOURCE_REVISION \
       org.opencontainers.image.version=$SOURCE_VERSION \
       org.opencontainers.image.source=$SOURCE_URL
-RUN apk add --no-cache postgresql17 postgresql17-contrib ffmpeg vips ca-certificates su-exec tini bash
+RUN apk add --no-cache postgresql17 postgresql17-contrib ffmpeg ca-certificates su-exec tini bash
 WORKDIR /app
 COPY backend/package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=backend-deps /app/node_modules ./node_modules
 COPY --from=backend-build /build/backend/dist ./dist
 COPY --from=frontend-build /build/frontend/dist ./public
 COPY deploy/all-in-one-entrypoint.sh /usr/local/bin/tg-vault-entrypoint

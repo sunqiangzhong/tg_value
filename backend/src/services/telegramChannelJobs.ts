@@ -23,6 +23,7 @@ import { annotateTelegramMediaGroup } from '../utils/telegramMediaGroup.js';
 import { lockStorageAccountForUse } from './storageAccountLifecycle.js';
 import { resolveTelegramWriteCommittedWithQuery, claimTelegramWriteReconciliations, resolveClaimedTelegramWrite } from './telegramWriteReconciliation.js';
 import { parseDateOnlyStrict, parseTelegramDateRange } from './telegramDateRange.js';
+import { normalizeTelegramChannelSource } from './telegramChannelSource.js';
 import { enqueueTelegramNotification } from './telegramNotificationDelivery.js';
 import { resolveSubscriptionTarget } from './telegramSubscriptionManagement.js';
 import { compactTelegramDownloadHistory } from './telegramDownloadHistoryPolicy.js';
@@ -102,8 +103,7 @@ function requireUserClient(locale: TelegramLocale = DEFAULT_LOCALE): TelegramCli
 function normalizeSource(source: string, locale: TelegramLocale = DEFAULT_LOCALE): string {
     const trimmed = source.trim();
     if (!trimmed) throw new Error(t(locale, 'channels.errors.sourceRequired'));
-    if (trimmed.startsWith('@') || /^-?\d+$/.test(trimmed) || /^https?:\/\//i.test(trimmed)) return trimmed;
-    return `@${trimmed}`;
+    return normalizeTelegramChannelSource(trimmed);
 }
 
 export function parseTelegramPrivateInviteHash(source: string): string | null {

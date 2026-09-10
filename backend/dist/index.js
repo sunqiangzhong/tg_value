@@ -63,15 +63,15 @@ __export(db_exports, {
   query: () => query
 });
 import pg from "pg";
-import fs from "node:fs/promises";
-import path from "node:path";
+import fs2 from "node:fs/promises";
+import path2 from "node:path";
 import dotenv from "dotenv";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 async function listMigrations() {
   let entries;
   try {
-    entries = await fs.readdir(MIGRATIONS_DIR);
+    entries = await fs2.readdir(MIGRATIONS_DIR);
   } catch (error) {
     if (error?.code === "ENOENT") return [];
     throw error;
@@ -80,7 +80,7 @@ async function listMigrations() {
     const separator = fileName.indexOf("_");
     const version2 = Number(fileName.slice(0, separator));
     if (!Number.isSafeInteger(version2)) throw new Error(`invalid migration version: ${fileName}`);
-    const sql = await fs.readFile(path.join(MIGRATIONS_DIR, fileName), "utf8");
+    const sql = await fs2.readFile(path2.join(MIGRATIONS_DIR, fileName), "utf8");
     return {
       version: version2,
       name: fileName.slice(separator + 1, -4),
@@ -127,8 +127,8 @@ async function applyMigrations(client2) {
   }
 }
 async function bootstrapNewDatabase(client2) {
-  const schemaPath = path.join(__dirname, "schema.sql");
-  const schemaSql = await fs.readFile(schemaPath, "utf8");
+  const schemaPath = path2.join(__dirname, "schema.sql");
+  const schemaSql = await fs2.readFile(schemaPath, "utf8");
   await client2.query("BEGIN");
   try {
     await client2.query(schemaSql);
@@ -165,8 +165,8 @@ var init_db = __esm({
     "use strict";
     init_dbLogging();
     __filename = fileURLToPath(import.meta.url);
-    __dirname = path.dirname(__filename);
-    MIGRATIONS_DIR = path.join(__dirname, "migrations");
+    __dirname = path2.dirname(__filename);
+    MIGRATIONS_DIR = path2.join(__dirname, "migrations");
     MIGRATION_LOCK_KEY = 1413961281;
     dotenv.config();
     ({ Pool } = pg);
@@ -200,22 +200,22 @@ var init_db = __esm({
 
 // src/utils/secretStore.ts
 import crypto2 from "crypto";
-import fs2 from "fs";
-import path2 from "path";
+import fs3 from "fs";
+import path3 from "path";
 function getCandidateSecretDirs() {
   const dirs = [];
   if (process.env.TG_VAULT_SECRET_DIR?.trim()) {
     dirs.push(process.env.TG_VAULT_SECRET_DIR.trim());
   }
   const uploadDir = process.env.UPLOAD_DIR || "./data/uploads";
-  dirs.push(path2.join(path2.dirname(path2.resolve(uploadDir)), "secrets"));
-  dirs.push(path2.join(process.cwd(), "data", "secrets"));
-  return [...new Set(dirs.map((dir) => path2.resolve(dir)))];
+  dirs.push(path3.join(path3.dirname(path3.resolve(uploadDir)), "secrets"));
+  dirs.push(path3.join(process.cwd(), "data", "secrets"));
+  return [...new Set(dirs.map((dir) => path3.resolve(dir)))];
 }
 function readSecretFile(filePath) {
   try {
-    if (!fs2.existsSync(filePath)) return "";
-    return fs2.readFileSync(filePath, "utf8").trim();
+    if (!fs3.existsSync(filePath)) return "";
+    return fs3.readFileSync(filePath, "utf8").trim();
   } catch (error) {
     console.warn(`[SecretStore] Failed to read ${filePath}:`, error);
     return "";
@@ -223,11 +223,11 @@ function readSecretFile(filePath) {
 }
 function tryWriteSecretFile(filePath, value) {
   try {
-    fs2.mkdirSync(path2.dirname(filePath), { recursive: true, mode: 448 });
-    fs2.writeFileSync(filePath, `${value}
+    fs3.mkdirSync(path3.dirname(filePath), { recursive: true, mode: 448 });
+    fs3.writeFileSync(filePath, `${value}
 `, { mode: 384 });
     try {
-      fs2.chmodSync(filePath, 384);
+      fs3.chmodSync(filePath, 384);
     } catch {
     }
     return true;
@@ -238,14 +238,14 @@ function tryWriteSecretFile(filePath, value) {
 }
 function getExistingPersistentSecret(fileName) {
   for (const dir of getCandidateSecretDirs()) {
-    const value = readSecretFile(path2.join(dir, fileName));
+    const value = readSecretFile(path3.join(dir, fileName));
     if (value) return value;
   }
   return "";
 }
 function persistSecretWithFallback(envName, fileName, value) {
   for (const dir of getCandidateSecretDirs()) {
-    const filePath = path2.join(dir, fileName);
+    const filePath = path3.join(dir, fileName);
     if (tryWriteSecretFile(filePath, value)) {
       console.log(`[SecretStore] Persisted ${envName} to ${filePath}`);
       return filePath;
@@ -428,6 +428,494 @@ var init_settings = __esm({
   }
 });
 
+// src/services/scopedInteractionMap.ts
+var ScopedInteractionMap;
+var init_scopedInteractionMap = __esm({
+  "src/services/scopedInteractionMap.ts"() {
+    "use strict";
+    ScopedInteractionMap = class {
+      entries = /* @__PURE__ */ new Map();
+      ttlMs;
+      maxEntries;
+      now;
+      constructor(options = {}) {
+        this.ttlMs = Math.max(1, options.ttlMs ?? 15 * 6e4);
+        this.maxEntries = Math.max(1, options.maxEntries ?? 1e3);
+        this.now = options.now ?? Date.now;
+      }
+      evictForCapacity() {
+        this.cleanup();
+        while (this.entries.size >= this.maxEntries) {
+          let oldest;
+          let oldestTime = Number.POSITIVE_INFINITY;
+          for (const [key, entry] of this.entries) {
+            if (entry.createdAt < oldestTime) {
+              oldest = key;
+              oldestTime = entry.createdAt;
+            }
+          }
+          if (oldest === void 0) break;
+          this.entries.delete(oldest);
+        }
+      }
+      set(key, value) {
+        const now = this.now();
+        if (!this.entries.has(key)) this.evictForCapacity();
+        this.entries.set(key, { value, createdAt: now, expiresAt: now + this.ttlMs });
+        return this;
+      }
+      get(key) {
+        const entry = this.entries.get(key);
+        if (!entry) return void 0;
+        if (entry.expiresAt <= this.now()) {
+          this.entries.delete(key);
+          return void 0;
+        }
+        return entry.value;
+      }
+      has(key) {
+        return this.get(key) !== void 0;
+      }
+      touch(key) {
+        const value = this.get(key);
+        if (value === void 0) return false;
+        const entry = this.entries.get(key);
+        entry.expiresAt = this.now() + this.ttlMs;
+        return true;
+      }
+      delete(key) {
+        return this.entries.delete(key);
+      }
+      keys() {
+        this.cleanup();
+        return this.entries.keys();
+      }
+      values() {
+        this.cleanup();
+        return Array.from(this.entries.values(), (entry) => entry.value).values();
+      }
+      entriesIterator() {
+        this.cleanup();
+        return Array.from(this.entries, ([key, entry]) => [key, entry.value]).values();
+      }
+      cleanup() {
+        const now = this.now();
+        let removed = 0;
+        for (const [key, entry] of this.entries) {
+          if (entry.expiresAt <= now) {
+            this.entries.delete(key);
+            removed += 1;
+          }
+        }
+        return removed;
+      }
+      clear() {
+        this.entries.clear();
+      }
+      get size() {
+        this.cleanup();
+        return this.entries.size;
+      }
+    };
+  }
+});
+
+// src/services/telegramState.ts
+var telegramState_exports = {};
+__export(telegramState_exports, {
+  TelegramUserState: () => TelegramUserState,
+  authenticatedUsers: () => authenticatedUsers,
+  isAuthenticated: () => isAuthenticated,
+  isAuthenticatedAsync: () => isAuthenticatedAsync,
+  loadAuthenticatedUsers: () => loadAuthenticatedUsers,
+  passwordInputState: () => passwordInputState,
+  persistAuthenticatedUser: () => persistAuthenticatedUser,
+  reconcileTelegramAllowedUsers: () => reconcileTelegramAllowedUsers,
+  revokeAuthenticatedUser: () => revokeAuthenticatedUser,
+  userStates: () => userStates
+});
+async function revokeAuthenticatedUser(userId, dependencies = {}) {
+  const runQuery = dependencies.query || query;
+  const cache = dependencies.cache || authenticatedUsers;
+  await runQuery("DELETE FROM telegram_auth WHERE user_id = $1", [userId]);
+  cache.delete(userId);
+}
+async function reconcileTelegramAllowedUsers(userIds, dependencies = {}) {
+  const allowed = [...new Set(userIds.filter((id) => Number.isSafeInteger(id) && id > 0))].sort((a, b) => a - b);
+  const runQuery = dependencies.query || query;
+  const cache = dependencies.cache || authenticatedUsers;
+  const existing = await runQuery("SELECT user_id FROM telegram_auth ORDER BY user_id");
+  const authenticated = existing.rows.map((row) => Number(row.user_id)).filter(Number.isSafeInteger);
+  const allowedSet = new Set(allowed);
+  const authenticatedSet = new Set(authenticated);
+  const added = allowed.filter((id) => !authenticatedSet.has(id));
+  const removed = authenticated.filter((id) => !allowedSet.has(id)).sort((a, b) => a - b);
+  const revokedResult = await runQuery(
+    `DELETE FROM telegram_auth
+         WHERE NOT (user_id = ANY($1::bigint[]))
+         RETURNING user_id`,
+    [allowed]
+  );
+  const revoked = revokedResult.rows.map((row) => Number(row.user_id)).filter(Number.isSafeInteger).sort((a, b) => a - b);
+  for (const userId of /* @__PURE__ */ new Set([...removed, ...revoked])) cache.delete(userId);
+  const recipients = [...cache.keys()].filter((id) => allowedSet.has(id)).sort((a, b) => a - b);
+  return { allowed, added, removed, revoked, recipients };
+}
+async function loadAuthenticatedUsers() {
+  try {
+    const allowedUsers = await getConfiguredTelegramAllowedUsers();
+    const result = await query("SELECT user_id, authenticated_at FROM telegram_auth");
+    for (const row of result.rows) {
+      const userId = Number(row.user_id);
+      if (allowedUsers.length > 0 && !allowedUsers.includes(userId)) {
+        await revokeAuthenticatedUser(userId);
+        continue;
+      }
+      authenticatedUsers.set(userId, { authenticatedAt: new Date(row.authenticated_at) });
+    }
+    console.log(`\u{1F916} \u5DF2\u4ECE\u6570\u636E\u5E93\u8F7D\u5165 ${authenticatedUsers.size} \u4E2A\u6388\u6743\u7528\u6237`);
+  } catch (error) {
+    console.error("\u{1F916} \u8F7D\u5165\u5DF2\u9A8C\u8BC1\u7528\u6237\u5931\u8D25:", error);
+  }
+}
+async function persistAuthenticatedUser(userId) {
+  try {
+    await query("INSERT INTO telegram_auth (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING", [userId]);
+    authenticatedUsers.set(userId, { authenticatedAt: /* @__PURE__ */ new Date() });
+    console.log(`\u{1F916} \u7528\u6237 ${userId} \u5DF2\u6301\u4E45\u5316\u5230\u6570\u636E\u5E93`);
+  } catch (error) {
+    console.error("\u{1F916} \u6301\u4E45\u5316\u7528\u6237\u5931\u8D25:", error);
+  }
+}
+function isAuthenticated(userId) {
+  return authenticatedUsers.has(userId);
+}
+async function isAuthenticatedAsync(userId) {
+  const allowedUsers = await getConfiguredTelegramAllowedUsers();
+  if (allowedUsers.length > 0 && !allowedUsers.includes(userId)) {
+    if (authenticatedUsers.has(userId)) await revokeAuthenticatedUser(userId);
+    return false;
+  }
+  return authenticatedUsers.has(userId);
+}
+var TelegramUserState, INTERACTION_TTL_MS, INTERACTION_MAX_ENTRIES, userStates, authenticatedUsers, passwordInputState;
+var init_telegramState = __esm({
+  "src/services/telegramState.ts"() {
+    "use strict";
+    init_db();
+    init_authSettings();
+    init_scopedInteractionMap();
+    TelegramUserState = /* @__PURE__ */ ((TelegramUserState2) => {
+      TelegramUserState2["IDLE"] = "IDLE";
+      TelegramUserState2["WAITING_2FA_LOGIN"] = "WAITING_2FA_LOGIN";
+      TelegramUserState2["WAITING_2FA_SETUP"] = "WAITING_2FA_SETUP";
+      return TelegramUserState2;
+    })(TelegramUserState || {});
+    INTERACTION_TTL_MS = Math.max(6e4, Number.parseInt(process.env.TELEGRAM_INTERACTION_TTL_MS || "900000", 10) || 9e5);
+    INTERACTION_MAX_ENTRIES = Math.max(10, Number.parseInt(process.env.TELEGRAM_INTERACTION_MAX_ENTRIES || "1000", 10) || 1e3);
+    userStates = new ScopedInteractionMap({ ttlMs: INTERACTION_TTL_MS, maxEntries: INTERACTION_MAX_ENTRIES });
+    authenticatedUsers = /* @__PURE__ */ new Map();
+    passwordInputState = new ScopedInteractionMap({ ttlMs: INTERACTION_TTL_MS, maxEntries: INTERACTION_MAX_ENTRIES });
+  }
+});
+
+// src/utils/authSettings.ts
+var authSettings_exports = {};
+__export(authSettings_exports, {
+  TelegramPinChangeError: () => TelegramPinChangeError,
+  addTelegramAllowedUser: () => addTelegramAllowedUser,
+  changeTelegramPin: () => changeTelegramPin,
+  changeTelegramPinWithClient: () => changeTelegramPinWithClient,
+  changeWebPasswordAndRevokeSessions: () => changeWebPasswordAndRevokeSessions,
+  changeWebPasswordAndRevokeSessionsWithClient: () => changeWebPasswordAndRevokeSessionsWithClient,
+  countAuthenticatedTelegramUsers: () => countAuthenticatedTelegramUsers,
+  createInitialAdminCredentials: () => createInitialAdminCredentials,
+  createInitialAdminCredentialsWithClient: () => createInitialAdminCredentialsWithClient,
+  ensureTelegramPinConfigured: () => ensureTelegramPinConfigured,
+  getConfiguredTelegramAllowedUsers: () => getConfiguredTelegramAllowedUsers,
+  getStoredTelegramAllowedUsers: () => getStoredTelegramAllowedUsers,
+  getStoredWebPasswordHash: () => getStoredWebPasswordHash,
+  isInitialSetupRequired: () => isInitialSetupRequired,
+  isTelegramPinConfigured: () => isTelegramPinConfigured,
+  parseTelegramAllowedUserIds: () => parseTelegramAllowedUserIds,
+  serializeTelegramAllowedUserIds: () => serializeTelegramAllowedUserIds,
+  setTelegramAllowedUsers: () => setTelegramAllowedUsers,
+  setTelegramAllowedUsersAndReconcile: () => setTelegramAllowedUsersAndReconcile,
+  shouldAutoAllowFirstTelegramUser: () => shouldAutoAllowFirstTelegramUser,
+  validateTelegramPin: () => validateTelegramPin,
+  validateWebPassword: () => validateWebPassword,
+  verifyTelegramPin: () => verifyTelegramPin,
+  verifyWebPassword: () => verifyWebPassword
+});
+import crypto6 from "crypto";
+function hashSecret(secret) {
+  const salt = crypto6.randomBytes(16).toString("base64url");
+  const derived = crypto6.scryptSync(secret, salt, 64).toString("base64url");
+  return `${SCRYPT_PREFIX}:${salt}:${derived}`;
+}
+function safeEqualText(a, b) {
+  try {
+    const left = Buffer.from(a);
+    const right = Buffer.from(b);
+    return left.length === right.length && crypto6.timingSafeEqual(left, right);
+  } catch {
+    return false;
+  }
+}
+function verifySecret(secret, stored) {
+  if (!stored) return false;
+  if (stored.startsWith(`${SCRYPT_PREFIX}:`)) {
+    const [, , salt, expected] = stored.split(":");
+    if (!salt || !expected) return false;
+    const actual = crypto6.scryptSync(secret, salt, 64).toString("base64url");
+    return safeEqualText(actual, expected);
+  }
+  if (/^[a-f0-9]{64}$/i.test(stored)) {
+    const actual = crypto6.createHash("sha256").update(secret).digest("hex");
+    return safeEqualText(actual, stored.toLowerCase());
+  }
+  return false;
+}
+async function getStoredWebPasswordHash() {
+  const stored = await getSetting(WEB_PASSWORD_KEY, "");
+  return stored || "";
+}
+async function isInitialSetupRequired() {
+  return !await getStoredWebPasswordHash();
+}
+async function verifyWebPassword(password) {
+  return verifySecret(password, await getStoredWebPasswordHash());
+}
+async function verifyTelegramPin(pin) {
+  const stored = await getSetting(TELEGRAM_PIN_KEY, "");
+  return typeof stored === "string" && stored.length > 0 && verifySecret(pin, stored);
+}
+async function isTelegramPinConfigured() {
+  const stored = await getSettingStrict(TELEGRAM_PIN_KEY);
+  return stored.found && typeof stored.value === "string" && stored.value.length > 0;
+}
+async function ensureTelegramPinConfigured(pin) {
+  if (await isTelegramPinConfigured()) return;
+  const error = validateTelegramPin(pin);
+  if (error) throw new Error(error);
+  await setSetting(TELEGRAM_PIN_KEY, hashSecret(pin));
+}
+async function changeTelegramPinWithClient(client2, verificationMethod, verificationSecret, newPin) {
+  if (verificationMethod !== "current_pin" && verificationMethod !== "web_password") {
+    throw new TelegramPinChangeError("\u8BF7\u9009\u62E9\u5F53\u524D PIN \u6216\u7F51\u9875\u7BA1\u7406\u5458\u5BC6\u7801\u8FDB\u884C\u9A8C\u8BC1");
+  }
+  if (typeof verificationSecret !== "string" || verificationSecret.length === 0) {
+    throw new TelegramPinChangeError("\u8BF7\u8F93\u5165\u9A8C\u8BC1\u4FE1\u606F");
+  }
+  const pinError = validateTelegramPin(newPin);
+  if (pinError) throw new TelegramPinChangeError(pinError);
+  await client2.query(`SELECT pg_advisory_xact_lock(hashtext('tg-vault:telegram-pin-change'))`);
+  const current3 = await client2.query(
+    "SELECT key, value FROM system_settings WHERE key = ANY($1::text[]) FOR UPDATE",
+    [[TELEGRAM_PIN_KEY, WEB_PASSWORD_KEY]]
+  );
+  const values = new Map(current3.rows.map((row) => [String(row.key), String(row.value || "")]));
+  const storedPin = values.get(TELEGRAM_PIN_KEY) || "";
+  if (!storedPin && verificationMethod !== "web_password") {
+    throw new TelegramPinChangeError("\u9996\u6B21\u8BBE\u7F6E PIN \u5FC5\u987B\u4F7F\u7528\u7F51\u9875\u7BA1\u7406\u5458\u5BC6\u7801\u9A8C\u8BC1", 400);
+  }
+  const verificationKey = verificationMethod === "current_pin" ? TELEGRAM_PIN_KEY : WEB_PASSWORD_KEY;
+  const storedVerification = values.get(verificationKey) || "";
+  const decryptedVerification = decryptSettingValue(verificationKey, storedVerification);
+  if (!verifySecret(verificationSecret, decryptedVerification)) {
+    throw new TelegramPinChangeError("\u5F53\u524D PIN \u6216\u7F51\u9875\u7BA1\u7406\u5458\u5BC6\u7801\u4E0D\u6B63\u786E", 403);
+  }
+  const decryptedCurrentPin = storedPin ? decryptSettingValue(TELEGRAM_PIN_KEY, storedPin) : "";
+  if (storedPin && verifySecret(newPin, decryptedCurrentPin)) {
+    throw new TelegramPinChangeError("\u65B0 PIN \u4E0D\u80FD\u4E0E\u5F53\u524D PIN \u76F8\u540C");
+  }
+  await client2.query(
+    `INSERT INTO system_settings (key, value, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+    [TELEGRAM_PIN_KEY, encryptSettingValue(TELEGRAM_PIN_KEY, hashSecret(newPin))]
+  );
+  await client2.query("DELETE FROM telegram_auth");
+}
+async function changeTelegramPin(verificationMethod, verificationSecret, newPin) {
+  const client2 = await pool.connect();
+  try {
+    await client2.query("BEGIN");
+    await changeTelegramPinWithClient(client2, verificationMethod, verificationSecret, newPin);
+    await client2.query("COMMIT");
+  } catch (error) {
+    await client2.query("ROLLBACK").catch(() => void 0);
+    throw error;
+  } finally {
+    client2.release();
+  }
+  const { authenticatedUsers: authenticatedUsers3, passwordInputState: passwordInputState2, userStates: userStates2 } = await Promise.resolve().then(() => (init_telegramState(), telegramState_exports));
+  authenticatedUsers3.clear();
+  passwordInputState2.clear();
+  userStates2.clear();
+}
+function validateWebPassword(password) {
+  if (typeof password !== "string" || password.length < 8) {
+    return "\u7F51\u9875\u7BA1\u7406\u5458\u5BC6\u7801\u81F3\u5C11\u9700\u8981 8 \u4F4D";
+  }
+  if (password.length > 256) {
+    return "\u7F51\u9875\u7BA1\u7406\u5458\u5BC6\u7801\u8FC7\u957F";
+  }
+  return null;
+}
+function validateTelegramPin(pin) {
+  if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
+    return "Telegram Bot \u5BC6\u7801\u5FC5\u987B\u662F 4 \u4F4D\u6570\u5B57";
+  }
+  return null;
+}
+async function createInitialAdminCredentialsWithClient(client2, webPassword, telegramPin) {
+  const webError = validateWebPassword(webPassword);
+  if (webError) throw new Error(webError);
+  if (telegramPin !== void 0) {
+    const pinError = validateTelegramPin(telegramPin);
+    if (pinError) throw new Error(pinError);
+  }
+  if (telegramPin !== void 0 && webPassword === telegramPin) {
+    throw new Error("\u7F51\u9875\u5BC6\u7801\u4E0D\u80FD\u4E0E Telegram Bot 4 \u4F4D\u5BC6\u7801\u76F8\u540C");
+  }
+  await client2.query(`SELECT pg_advisory_xact_lock(hashtext('tg-vault:initial-admin-setup'))`);
+  const existing = await client2.query("SELECT value FROM system_settings WHERE key = $1 FOR UPDATE", [WEB_PASSWORD_KEY]);
+  if ((existing.rowCount || 0) > 0 && existing.rows[0]?.value) {
+    throw new Error("\u7BA1\u7406\u5458\u5BC6\u7801\u5DF2\u521B\u5EFA\uFF0C\u4E0D\u80FD\u91CD\u590D\u521D\u59CB\u5316");
+  }
+  await client2.query(
+    "INSERT INTO system_settings (key, value) VALUES ($1, $2)",
+    [WEB_PASSWORD_KEY, hashSecret(webPassword)]
+  );
+  if (telegramPin !== void 0) {
+    await client2.query(
+      "INSERT INTO system_settings (key, value) VALUES ($1, $2)",
+      [TELEGRAM_PIN_KEY, hashSecret(telegramPin)]
+    );
+  }
+}
+async function createInitialAdminCredentials(webPassword, telegramPin) {
+  const client2 = await pool.connect();
+  try {
+    await client2.query("BEGIN");
+    await createInitialAdminCredentialsWithClient(client2, webPassword, telegramPin);
+    await client2.query("COMMIT");
+  } catch (error) {
+    await client2.query("ROLLBACK").catch(() => void 0);
+    throw error;
+  } finally {
+    client2.release();
+  }
+}
+async function changeWebPasswordAndRevokeSessionsWithClient(client2, currentPassword, newPassword) {
+  await client2.query(`SELECT pg_advisory_xact_lock(hashtext('tg-vault:web-password-change'))`);
+  const current3 = await client2.query("SELECT value FROM system_settings WHERE key = $1 FOR UPDATE", [WEB_PASSWORD_KEY]);
+  const storedHash = decryptSettingValue(WEB_PASSWORD_KEY, String(current3.rows[0]?.value || ""));
+  if (!verifySecret(currentPassword, storedHash)) throw new Error("\u5F53\u524D\u5BC6\u7801\u4E0D\u6B63\u786E");
+  await client2.query(
+    `UPDATE system_settings SET value = $2, updated_at = NOW() WHERE key = $1`,
+    [WEB_PASSWORD_KEY, encryptSettingValue(WEB_PASSWORD_KEY, hashSecret(newPassword))]
+  );
+  await client2.query("DELETE FROM web_sessions");
+}
+async function changeWebPasswordAndRevokeSessions(currentPassword, newPassword) {
+  const validationError = validateWebPassword(newPassword);
+  if (validationError) throw new Error(validationError);
+  if (currentPassword === newPassword) throw new Error("\u65B0\u5BC6\u7801\u4E0D\u80FD\u4E0E\u5F53\u524D\u5BC6\u7801\u76F8\u540C");
+  const client2 = await pool.connect();
+  try {
+    await client2.query("BEGIN");
+    await changeWebPasswordAndRevokeSessionsWithClient(client2, currentPassword, newPassword);
+    await client2.query("COMMIT");
+  } catch (error) {
+    await client2.query("ROLLBACK").catch(() => void 0);
+    throw error;
+  } finally {
+    client2.release();
+  }
+}
+function parseTelegramAllowedUserIds(value) {
+  if (!value) return [];
+  return [...new Set(String(value).split(/[\s,]+/).map((item) => Number(item.trim())).filter((item) => Number.isSafeInteger(item) && item > 0))].sort((a, b) => a - b);
+}
+function serializeTelegramAllowedUserIds(userIds) {
+  return parseTelegramAllowedUserIds(userIds.join(",")).join(",");
+}
+function shouldAutoAllowFirstTelegramUser(allowedUsers, authenticatedUserCount) {
+  return allowedUsers.length === 0 && authenticatedUserCount === 0;
+}
+async function getStoredTelegramAllowedUsers() {
+  const stored = await getSetting(TELEGRAM_ALLOWED_USERS_KEY, "");
+  return parseTelegramAllowedUserIds(stored || "");
+}
+async function getConfiguredTelegramAllowedUsers() {
+  const envUsers = parseTelegramAllowedUserIds(process.env.TELEGRAM_ALLOWED_USER_IDS || "");
+  if (envUsers.length > 0) return envUsers;
+  return getStoredTelegramAllowedUsers();
+}
+async function countAuthenticatedTelegramUsers() {
+  const result = await pool.query("SELECT COUNT(*)::int AS count FROM telegram_auth");
+  return Number(result.rows[0]?.count || 0);
+}
+async function setTelegramAllowedUsersAndReconcile(userIds) {
+  const previous = await getConfiguredTelegramAllowedUsers();
+  const users = parseTelegramAllowedUserIds(userIds.join(","));
+  const client2 = await pool.connect();
+  try {
+    await client2.query("BEGIN");
+    await client2.query(`SELECT pg_advisory_xact_lock(hashtext('tg-vault:telegram-allowlist'))`);
+    await client2.query(
+      `INSERT INTO system_settings (key, value, updated_at)
+             VALUES ($1, $2, NOW())
+             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [TELEGRAM_ALLOWED_USERS_KEY, users.join(",")]
+    );
+    const { reconcileTelegramAllowedUsers: reconcileTelegramAllowedUsers2 } = await Promise.resolve().then(() => (init_telegramState(), telegramState_exports));
+    const reconciliation = await reconcileTelegramAllowedUsers2(users, { query: client2.query.bind(client2) });
+    await client2.query("COMMIT");
+    const previousSet = new Set(previous);
+    return {
+      ...reconciliation,
+      added: users.filter((id) => !previousSet.has(id))
+    };
+  } catch (error) {
+    await client2.query("ROLLBACK").catch(() => void 0);
+    throw error;
+  } finally {
+    client2.release();
+  }
+}
+async function setTelegramAllowedUsers(userIds) {
+  return (await setTelegramAllowedUsersAndReconcile(userIds)).allowed;
+}
+async function addTelegramAllowedUser(userId) {
+  const users = await getStoredTelegramAllowedUsers();
+  if (!users.includes(userId)) users.push(userId);
+  return setTelegramAllowedUsers(users);
+}
+var WEB_PASSWORD_KEY, TELEGRAM_PIN_KEY, TELEGRAM_ALLOWED_USERS_KEY, SCRYPT_PREFIX, TelegramPinChangeError;
+var init_authSettings = __esm({
+  "src/utils/authSettings.ts"() {
+    "use strict";
+    init_db();
+    init_settings();
+    init_credentialCrypto();
+    WEB_PASSWORD_KEY = "admin_password_hash";
+    TELEGRAM_PIN_KEY = "telegram_pin_hash";
+    TELEGRAM_ALLOWED_USERS_KEY = "telegram_allowed_user_ids";
+    SCRYPT_PREFIX = "scrypt:v1";
+    TelegramPinChangeError = class extends Error {
+      constructor(message, statusCode = 400) {
+        super(message);
+        this.statusCode = statusCode;
+        this.name = "TelegramPinChangeError";
+      }
+      statusCode;
+    };
+  }
+});
+
 // src/utils/storageProbe.ts
 function safeErrorCode(value) {
   const code = String(value ?? "").trim();
@@ -459,7 +947,7 @@ var init_storageProbe = __esm({
 });
 
 // src/services/mediaProxyError.ts
-function errorText(error) {
+function errorText2(error) {
   if (error instanceof Error) return error.message;
   try {
     return JSON.stringify(error);
@@ -476,7 +964,7 @@ function classifyMediaProxyError(error) {
       reason: error.reason
     };
   }
-  const text = errorText(error).toLowerCase();
+  const text = errorText2(error).toLowerCase();
   if (text.includes("downloadquotaexceeded") || text.includes("download quota")) {
     return {
       status: 429,
@@ -533,26 +1021,26 @@ var init_contracts = __esm({
 });
 
 // src/utils/localPath.ts
-import fs3 from "fs";
-import path3 from "path";
+import fs5 from "fs";
+import path5 from "path";
 function isPathInside(baseDir, targetPath) {
-  const resolvedBase = path3.resolve(baseDir);
-  const resolvedTarget = path3.resolve(targetPath);
-  return resolvedTarget === resolvedBase || resolvedTarget.startsWith(resolvedBase + path3.sep);
+  const resolvedBase = path5.resolve(baseDir);
+  const resolvedTarget = path5.resolve(targetPath);
+  return resolvedTarget === resolvedBase || resolvedTarget.startsWith(resolvedBase + path5.sep);
 }
 function safeJoin(baseDir, ...segments) {
-  const resolvedBase = path3.resolve(baseDir);
-  const resolvedTarget = path3.resolve(resolvedBase, ...segments);
+  const resolvedBase = path5.resolve(baseDir);
+  const resolvedTarget = path5.resolve(resolvedBase, ...segments);
   if (!isPathInside(resolvedBase, resolvedTarget)) {
     throw new Error("Unsafe path outside storage directory");
   }
   return resolvedTarget;
 }
 function getRelativeStoragePath(baseDir, targetPath) {
-  const resolvedBase = path3.resolve(baseDir);
-  const resolvedTarget = path3.resolve(targetPath);
+  const resolvedBase = path5.resolve(baseDir);
+  const resolvedTarget = path5.resolve(targetPath);
   if (!isPathInside(resolvedBase, resolvedTarget)) return null;
-  return path3.relative(resolvedBase, resolvedTarget).split(path3.sep).join("/");
+  return path5.relative(resolvedBase, resolvedTarget).split(path5.sep).join("/");
 }
 async function safeUnlink(filePath, baseDir) {
   if (!filePath) return false;
@@ -560,8 +1048,8 @@ async function safeUnlink(filePath, baseDir) {
     console.warn(`Refusing to delete path outside storage directory: ${filePath}`);
     return false;
   }
-  if (!fs3.existsSync(filePath)) return false;
-  await fs3.promises.unlink(filePath);
+  if (!fs5.existsSync(filePath)) return false;
+  await fs5.promises.unlink(filePath);
   return true;
 }
 var init_localPath = __esm({
@@ -571,8 +1059,8 @@ var init_localPath = __esm({
 });
 
 // src/services/storage/localStorageProvider.ts
-import fs4 from "node:fs";
-import path4 from "node:path";
+import fs6 from "node:fs";
+import path6 from "node:path";
 var LocalStorageProvider;
 var init_localStorageProvider = __esm({
   "src/services/storage/localStorageProvider.ts"() {
@@ -583,28 +1071,28 @@ var init_localStorageProvider = __esm({
       name = "local";
       uploadDir;
       constructor(uploadDir = process.env.UPLOAD_DIR || "./data/uploads") {
-        this.uploadDir = path4.resolve(uploadDir);
-        if (!fs4.existsSync(this.uploadDir)) {
-          fs4.mkdirSync(this.uploadDir, { recursive: true });
+        this.uploadDir = path6.resolve(uploadDir);
+        if (!fs6.existsSync(this.uploadDir)) {
+          fs6.mkdirSync(this.uploadDir, { recursive: true });
         }
       }
       async probe() {
-        const stats = await fs4.promises.stat(this.uploadDir);
+        const stats = await fs6.promises.stat(this.uploadDir);
         if (!stats.isDirectory()) throw new StorageProbeError(this.name, "\u672C\u5730\u5B58\u50A8\u8DEF\u5F84\u4E0D\u662F\u76EE\u5F55");
-        await fs4.promises.access(this.uploadDir, fs4.constants.R_OK | fs4.constants.W_OK);
+        await fs6.promises.access(this.uploadDir, fs6.constants.R_OK | fs6.constants.W_OK);
       }
       async saveFile(tempPath, fileName, _mimeType, folder) {
         const destDir = folder ? safeJoin(this.uploadDir, folder) : this.uploadDir;
-        if (!fs4.existsSync(destDir)) {
-          fs4.mkdirSync(destDir, { recursive: true });
+        if (!fs6.existsSync(destDir)) {
+          fs6.mkdirSync(destDir, { recursive: true });
         }
         const destPath = safeJoin(destDir, fileName);
         try {
-          await fs4.promises.rename(tempPath, destPath);
+          await fs6.promises.rename(tempPath, destPath);
         } catch (error) {
           if (error.code === "EXDEV") {
-            await fs4.promises.copyFile(tempPath, destPath);
-            await fs4.promises.unlink(tempPath);
+            await fs6.promises.copyFile(tempPath, destPath);
+            await fs6.promises.unlink(tempPath);
           } else {
             throw error;
           }
@@ -612,25 +1100,25 @@ var init_localStorageProvider = __esm({
         return destPath;
       }
       async getFileStream(storedPath) {
-        const safePath = safeJoin(this.uploadDir, path4.relative(this.uploadDir, storedPath));
-        if (safePath !== path4.resolve(storedPath)) {
+        const safePath = safeJoin(this.uploadDir, path6.relative(this.uploadDir, storedPath));
+        if (safePath !== path6.resolve(storedPath)) {
           throw new Error("Unsafe local file path");
         }
-        if (!fs4.existsSync(safePath)) {
+        if (!fs6.existsSync(safePath)) {
           throw new Error(`File not found: ${safePath}`);
         }
-        return fs4.createReadStream(safePath);
+        return fs6.createReadStream(safePath);
       }
       async getPreviewUrl(storedPath) {
         return "";
       }
       async deleteFile(storedPath) {
-        const safePath = safeJoin(this.uploadDir, path4.relative(this.uploadDir, storedPath));
-        if (safePath !== path4.resolve(storedPath)) {
+        const safePath = safeJoin(this.uploadDir, path6.relative(this.uploadDir, storedPath));
+        if (safePath !== path6.resolve(storedPath)) {
           throw new Error("Unsafe local file path");
         }
-        if (fs4.existsSync(safePath)) {
-          await fs4.promises.unlink(safePath);
+        if (fs6.existsSync(safePath)) {
+          await fs6.promises.unlink(safePath);
         }
       }
       async createShareLink(storedPath, password, expiration) {
@@ -1081,23 +1569,23 @@ var init_networkSecurity = __esm({
 });
 
 // src/services/openListStorage.ts
-import fs5 from "node:fs";
+import fs7 from "node:fs";
 import os from "node:os";
-import crypto6 from "node:crypto";
-import path5 from "node:path";
+import crypto9 from "node:crypto";
+import path7 from "node:path";
 import { Readable } from "node:stream";
 function normalizeAddress(value) {
   return value.trim().replace(/\/+$/g, "");
 }
 function normalizeRoot(value) {
-  const normalized = path5.posix.normalize(`/${String(value || "/").replace(/\\/g, "/")}`);
+  const normalized = path7.posix.normalize(`/${String(value || "/").replace(/\\/g, "/")}`);
   return normalized === "." ? "/" : normalized;
 }
 function joinRemotePath(root, folder, name) {
   const segments = [root];
   if (folder) segments.push(String(folder).replace(/\\/g, "/"));
   if (name) segments.push(name);
-  return path5.posix.join(...segments);
+  return path7.posix.join(...segments);
 }
 function encodeFilePath(value) {
   return encodeURIComponent(value);
@@ -1306,10 +1794,10 @@ var init_openListStorage = __esm({
         const originalUploadTimeout = this.uploadTimeoutMs;
         this.requestTimeoutMs = Math.min(originalRequestTimeout, timeoutMs2);
         this.uploadTimeoutMs = Math.min(originalUploadTimeout, timeoutMs2);
-        const markerName = `.tgvault-probe-${crypto6.randomUUID()}.txt`;
-        const tempPath = path5.join(os.tmpdir(), markerName);
+        const markerName = `.tgvault-probe-${crypto9.randomUUID()}.txt`;
+        const tempPath = path7.join(os.tmpdir(), markerName);
         const expected = Buffer.from(`tg-vault-openlist-probe:${markerName}`, "utf8");
-        await fs5.promises.writeFile(tempPath, expected, { flag: "wx" });
+        await fs7.promises.writeFile(tempPath, expected, { flag: "wx" });
         let storedPath = null;
         try {
           storedPath = await this.saveFile(tempPath, markerName, "text/plain");
@@ -1320,7 +1808,7 @@ var init_openListStorage = __esm({
         } finally {
           try {
             if (storedPath) await this.deleteFile(storedPath).catch(() => void 0);
-            await fs5.promises.rm(tempPath, { force: true });
+            await fs7.promises.rm(tempPath, { force: true });
           } finally {
             this.requestTimeoutMs = originalRequestTimeout;
             this.uploadTimeoutMs = originalUploadTimeout;
@@ -1328,13 +1816,13 @@ var init_openListStorage = __esm({
         }
       }
       async saveFile(tempPath, fileName, mimeType, folder) {
-        const stats = await fs5.promises.stat(tempPath);
+        const stats = await fs7.promises.stat(tempPath);
         const remoteDirectory = joinRemotePath(this.rootPath, folder);
         const storedPath = joinRemotePath(remoteDirectory, null, fileName);
         await this.ensureDirectory(remoteDirectory);
         const uploadOnce = async () => {
           const token = await this.getToken();
-          const body = Readable.toWeb(fs5.createReadStream(tempPath));
+          const body = Readable.toWeb(fs7.createReadStream(tempPath));
           const response = await this.fetchWithTimeout("/api/fs/put", {
             method: "PUT",
             headers: {
@@ -1416,7 +1904,7 @@ var init_openListStorage = __esm({
         await this.api("/api/fs/remove", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dir: path5.posix.dirname(normalized), names: [path5.posix.basename(normalized)] })
+          body: JSON.stringify({ dir: path7.posix.dirname(normalized), names: [path7.posix.basename(normalized)] })
         });
       }
     };
@@ -1438,7 +1926,7 @@ __export(storage_exports, {
   isStorageQuotaCooldownError: () => isStorageQuotaCooldownError,
   storageManager: () => storageManager
 });
-import fs6 from "fs";
+import fs8 from "fs";
 import axios from "axios";
 import OSS from "ali-oss";
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
@@ -1654,11 +2142,11 @@ var init_storage = __esm({
       async saveFile(tempPath, fileName, mimeType, folder) {
         try {
           const objectKey = folder ? `${folder}/${fileName}` : fileName;
-          const stats = await fs6.promises.stat(tempPath);
+          const stats = await fs8.promises.stat(tempPath);
           const command = new PutObjectCommand({
             Bucket: this.bucket,
             Key: objectKey,
-            Body: fs6.createReadStream(tempPath),
+            Body: fs8.createReadStream(tempPath),
             ContentType: mimeType,
             ContentLength: stats.size
           });
@@ -1791,7 +2279,7 @@ var init_storage = __esm({
             );
           }
           await this.withRequestTimeout(
-            (signal) => this.client.putFileContents(`/${remotePath}`, fs6.createReadStream(tempPath), { signal }),
+            (signal) => this.client.putFileContents(`/${remotePath}`, fs8.createReadStream(tempPath), { signal }),
             "WebDAV upload",
             this.uploadTimeoutMs
           );
@@ -2018,7 +2506,7 @@ var init_storage = __esm({
        */
       async saveFile(tempPath, fileName, mimeType, folder) {
         const token = await this.getAccessToken();
-        const stats = await fs6.promises.stat(tempPath);
+        const stats = await fs8.promises.stat(tempPath);
         const fileSize = stats.size;
         console.log(`[OneDrive] Uploading file: ${fileName}, size: ${fileSize} bytes, type: ${mimeType}`);
         const uploadFolder = await this.ensureFolderExists(token, folder);
@@ -2026,7 +2514,7 @@ var init_storage = __esm({
         try {
           if (fileSize < 4 * 1024 * 1024) {
             console.log("[OneDrive] Using simple upload for small file");
-            const fileBuffer = await fs6.promises.readFile(tempPath);
+            const fileBuffer = await fs8.promises.readFile(tempPath);
             const response = await axios.put(
               `https://graph.microsoft.com/v1.0/me/drive/root:/${this.encodeOneDrivePath(targetPath)}:/content`,
               fileBuffer,
@@ -2066,7 +2554,7 @@ var init_storage = __esm({
             const CHUNK_SIZE = 320 * 1024 * 10;
             let uploadedBytes = 0;
             let lastResponse = null;
-            const fd = await fs6.promises.open(tempPath, "r");
+            const fd = await fs8.promises.open(tempPath, "r");
             try {
               while (uploadedBytes < fileSize) {
                 const chunkSize = Math.min(CHUNK_SIZE, fileSize - uploadedBytes);
@@ -2440,7 +2928,7 @@ var init_storage = __esm({
         };
         const media = {
           mimeType,
-          body: fs6.createReadStream(tempPath)
+          body: fs8.createReadStream(tempPath)
         };
         try {
           const file = await this.drive.files.create(this.withSharedDriveSupport({
@@ -3043,500 +3531,47 @@ var init_storage = __esm({
   }
 });
 
-// src/utils/authSettings.ts
-var authSettings_exports = {};
-__export(authSettings_exports, {
-  TelegramPinChangeError: () => TelegramPinChangeError,
-  addTelegramAllowedUser: () => addTelegramAllowedUser,
-  changeTelegramPin: () => changeTelegramPin,
-  changeTelegramPinWithClient: () => changeTelegramPinWithClient,
-  changeWebPasswordAndRevokeSessions: () => changeWebPasswordAndRevokeSessions,
-  changeWebPasswordAndRevokeSessionsWithClient: () => changeWebPasswordAndRevokeSessionsWithClient,
-  countAuthenticatedTelegramUsers: () => countAuthenticatedTelegramUsers,
-  createInitialAdminCredentials: () => createInitialAdminCredentials,
-  createInitialAdminCredentialsWithClient: () => createInitialAdminCredentialsWithClient,
-  ensureTelegramPinConfigured: () => ensureTelegramPinConfigured,
-  getConfiguredTelegramAllowedUsers: () => getConfiguredTelegramAllowedUsers,
-  getStoredTelegramAllowedUsers: () => getStoredTelegramAllowedUsers,
-  getStoredWebPasswordHash: () => getStoredWebPasswordHash,
-  isInitialSetupRequired: () => isInitialSetupRequired,
-  isTelegramPinConfigured: () => isTelegramPinConfigured,
-  parseTelegramAllowedUserIds: () => parseTelegramAllowedUserIds,
-  serializeTelegramAllowedUserIds: () => serializeTelegramAllowedUserIds,
-  setTelegramAllowedUsers: () => setTelegramAllowedUsers,
-  setTelegramAllowedUsersAndReconcile: () => setTelegramAllowedUsersAndReconcile,
-  shouldAutoAllowFirstTelegramUser: () => shouldAutoAllowFirstTelegramUser,
-  validateTelegramPin: () => validateTelegramPin,
-  validateWebPassword: () => validateWebPassword,
-  verifyTelegramPin: () => verifyTelegramPin,
-  verifyWebPassword: () => verifyWebPassword
-});
-import crypto7 from "crypto";
-function hashSecret(secret) {
-  const salt = crypto7.randomBytes(16).toString("base64url");
-  const derived = crypto7.scryptSync(secret, salt, 64).toString("base64url");
-  return `${SCRYPT_PREFIX}:${salt}:${derived}`;
-}
-function safeEqualText(a, b) {
-  try {
-    const left = Buffer.from(a);
-    const right = Buffer.from(b);
-    return left.length === right.length && crypto7.timingSafeEqual(left, right);
-  } catch {
-    return false;
-  }
-}
-function verifySecret(secret, stored) {
-  if (!stored) return false;
-  if (stored.startsWith(`${SCRYPT_PREFIX}:`)) {
-    const [, , salt, expected] = stored.split(":");
-    if (!salt || !expected) return false;
-    const actual = crypto7.scryptSync(secret, salt, 64).toString("base64url");
-    return safeEqualText(actual, expected);
-  }
-  if (/^[a-f0-9]{64}$/i.test(stored)) {
-    const actual = crypto7.createHash("sha256").update(secret).digest("hex");
-    return safeEqualText(actual, stored.toLowerCase());
-  }
-  return false;
-}
-async function getStoredWebPasswordHash() {
-  const stored = await getSetting(WEB_PASSWORD_KEY, "");
-  return stored || "";
-}
-async function isInitialSetupRequired() {
-  return !await getStoredWebPasswordHash();
-}
-async function verifyWebPassword(password) {
-  return verifySecret(password, await getStoredWebPasswordHash());
-}
-async function verifyTelegramPin(pin) {
-  const stored = await getSetting(TELEGRAM_PIN_KEY, "");
-  return typeof stored === "string" && stored.length > 0 && verifySecret(pin, stored);
-}
-async function isTelegramPinConfigured() {
-  const stored = await getSettingStrict(TELEGRAM_PIN_KEY);
-  return stored.found && typeof stored.value === "string" && stored.value.length > 0;
-}
-async function ensureTelegramPinConfigured(pin) {
-  if (await isTelegramPinConfigured()) return;
-  const error = validateTelegramPin(pin);
-  if (error) throw new Error(error);
-  await setSetting(TELEGRAM_PIN_KEY, hashSecret(pin));
-}
-async function changeTelegramPinWithClient(client2, verificationMethod, verificationSecret, newPin) {
-  if (verificationMethod !== "current_pin" && verificationMethod !== "web_password") {
-    throw new TelegramPinChangeError("\u8BF7\u9009\u62E9\u5F53\u524D PIN \u6216\u7F51\u9875\u7BA1\u7406\u5458\u5BC6\u7801\u8FDB\u884C\u9A8C\u8BC1");
-  }
-  if (typeof verificationSecret !== "string" || verificationSecret.length === 0) {
-    throw new TelegramPinChangeError("\u8BF7\u8F93\u5165\u9A8C\u8BC1\u4FE1\u606F");
-  }
-  const pinError = validateTelegramPin(newPin);
-  if (pinError) throw new TelegramPinChangeError(pinError);
-  await client2.query(`SELECT pg_advisory_xact_lock(hashtext('tg-vault:telegram-pin-change'))`);
-  const current3 = await client2.query(
-    "SELECT key, value FROM system_settings WHERE key = ANY($1::text[]) FOR UPDATE",
-    [[TELEGRAM_PIN_KEY, WEB_PASSWORD_KEY]]
-  );
-  const values = new Map(current3.rows.map((row) => [String(row.key), String(row.value || "")]));
-  const storedPin = values.get(TELEGRAM_PIN_KEY) || "";
-  if (!storedPin && verificationMethod !== "web_password") {
-    throw new TelegramPinChangeError("\u9996\u6B21\u8BBE\u7F6E PIN \u5FC5\u987B\u4F7F\u7528\u7F51\u9875\u7BA1\u7406\u5458\u5BC6\u7801\u9A8C\u8BC1", 400);
-  }
-  const verificationKey = verificationMethod === "current_pin" ? TELEGRAM_PIN_KEY : WEB_PASSWORD_KEY;
-  const storedVerification = values.get(verificationKey) || "";
-  const decryptedVerification = decryptSettingValue(verificationKey, storedVerification);
-  if (!verifySecret(verificationSecret, decryptedVerification)) {
-    throw new TelegramPinChangeError("\u5F53\u524D PIN \u6216\u7F51\u9875\u7BA1\u7406\u5458\u5BC6\u7801\u4E0D\u6B63\u786E", 403);
-  }
-  const decryptedCurrentPin = storedPin ? decryptSettingValue(TELEGRAM_PIN_KEY, storedPin) : "";
-  if (storedPin && verifySecret(newPin, decryptedCurrentPin)) {
-    throw new TelegramPinChangeError("\u65B0 PIN \u4E0D\u80FD\u4E0E\u5F53\u524D PIN \u76F8\u540C");
-  }
-  await client2.query(
-    `INSERT INTO system_settings (key, value, updated_at)
-         VALUES ($1, $2, NOW())
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [TELEGRAM_PIN_KEY, encryptSettingValue(TELEGRAM_PIN_KEY, hashSecret(newPin))]
-  );
-  await client2.query("DELETE FROM telegram_auth");
-}
-async function changeTelegramPin(verificationMethod, verificationSecret, newPin) {
-  const client2 = await pool.connect();
-  try {
-    await client2.query("BEGIN");
-    await changeTelegramPinWithClient(client2, verificationMethod, verificationSecret, newPin);
-    await client2.query("COMMIT");
-  } catch (error) {
-    await client2.query("ROLLBACK").catch(() => void 0);
-    throw error;
-  } finally {
-    client2.release();
-  }
-  const { authenticatedUsers: authenticatedUsers3, passwordInputState: passwordInputState2, userStates: userStates2 } = await Promise.resolve().then(() => (init_telegramState(), telegramState_exports));
-  authenticatedUsers3.clear();
-  passwordInputState2.clear();
-  userStates2.clear();
-}
-function validateWebPassword(password) {
-  if (typeof password !== "string" || password.length < 8) {
-    return "\u7F51\u9875\u7BA1\u7406\u5458\u5BC6\u7801\u81F3\u5C11\u9700\u8981 8 \u4F4D";
-  }
-  if (password.length > 256) {
-    return "\u7F51\u9875\u7BA1\u7406\u5458\u5BC6\u7801\u8FC7\u957F";
-  }
-  return null;
-}
-function validateTelegramPin(pin) {
-  if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
-    return "Telegram Bot \u5BC6\u7801\u5FC5\u987B\u662F 4 \u4F4D\u6570\u5B57";
-  }
-  return null;
-}
-async function createInitialAdminCredentialsWithClient(client2, webPassword, telegramPin) {
-  const webError = validateWebPassword(webPassword);
-  if (webError) throw new Error(webError);
-  if (telegramPin !== void 0) {
-    const pinError = validateTelegramPin(telegramPin);
-    if (pinError) throw new Error(pinError);
-  }
-  if (telegramPin !== void 0 && webPassword === telegramPin) {
-    throw new Error("\u7F51\u9875\u5BC6\u7801\u4E0D\u80FD\u4E0E Telegram Bot 4 \u4F4D\u5BC6\u7801\u76F8\u540C");
-  }
-  await client2.query(`SELECT pg_advisory_xact_lock(hashtext('tg-vault:initial-admin-setup'))`);
-  const existing = await client2.query("SELECT value FROM system_settings WHERE key = $1 FOR UPDATE", [WEB_PASSWORD_KEY]);
-  if ((existing.rowCount || 0) > 0 && existing.rows[0]?.value) {
-    throw new Error("\u7BA1\u7406\u5458\u5BC6\u7801\u5DF2\u521B\u5EFA\uFF0C\u4E0D\u80FD\u91CD\u590D\u521D\u59CB\u5316");
-  }
-  await client2.query(
-    "INSERT INTO system_settings (key, value) VALUES ($1, $2)",
-    [WEB_PASSWORD_KEY, hashSecret(webPassword)]
-  );
-  if (telegramPin !== void 0) {
-    await client2.query(
-      "INSERT INTO system_settings (key, value) VALUES ($1, $2)",
-      [TELEGRAM_PIN_KEY, hashSecret(telegramPin)]
-    );
-  }
-}
-async function createInitialAdminCredentials(webPassword, telegramPin) {
-  const client2 = await pool.connect();
-  try {
-    await client2.query("BEGIN");
-    await createInitialAdminCredentialsWithClient(client2, webPassword, telegramPin);
-    await client2.query("COMMIT");
-  } catch (error) {
-    await client2.query("ROLLBACK").catch(() => void 0);
-    throw error;
-  } finally {
-    client2.release();
-  }
-}
-async function changeWebPasswordAndRevokeSessionsWithClient(client2, currentPassword, newPassword) {
-  await client2.query(`SELECT pg_advisory_xact_lock(hashtext('tg-vault:web-password-change'))`);
-  const current3 = await client2.query("SELECT value FROM system_settings WHERE key = $1 FOR UPDATE", [WEB_PASSWORD_KEY]);
-  const storedHash = decryptSettingValue(WEB_PASSWORD_KEY, String(current3.rows[0]?.value || ""));
-  if (!verifySecret(currentPassword, storedHash)) throw new Error("\u5F53\u524D\u5BC6\u7801\u4E0D\u6B63\u786E");
-  await client2.query(
-    `UPDATE system_settings SET value = $2, updated_at = NOW() WHERE key = $1`,
-    [WEB_PASSWORD_KEY, encryptSettingValue(WEB_PASSWORD_KEY, hashSecret(newPassword))]
-  );
-  await client2.query("DELETE FROM web_sessions");
-}
-async function changeWebPasswordAndRevokeSessions(currentPassword, newPassword) {
-  const validationError = validateWebPassword(newPassword);
-  if (validationError) throw new Error(validationError);
-  if (currentPassword === newPassword) throw new Error("\u65B0\u5BC6\u7801\u4E0D\u80FD\u4E0E\u5F53\u524D\u5BC6\u7801\u76F8\u540C");
-  const client2 = await pool.connect();
-  try {
-    await client2.query("BEGIN");
-    await changeWebPasswordAndRevokeSessionsWithClient(client2, currentPassword, newPassword);
-    await client2.query("COMMIT");
-  } catch (error) {
-    await client2.query("ROLLBACK").catch(() => void 0);
-    throw error;
-  } finally {
-    client2.release();
-  }
-}
-function parseTelegramAllowedUserIds(value) {
-  if (!value) return [];
-  return [...new Set(String(value).split(/[\s,]+/).map((item) => Number(item.trim())).filter((item) => Number.isSafeInteger(item) && item > 0))].sort((a, b) => a - b);
-}
-function serializeTelegramAllowedUserIds(userIds) {
-  return parseTelegramAllowedUserIds(userIds.join(",")).join(",");
-}
-function shouldAutoAllowFirstTelegramUser(allowedUsers, authenticatedUserCount) {
-  return allowedUsers.length === 0 && authenticatedUserCount === 0;
-}
-async function getStoredTelegramAllowedUsers() {
-  const stored = await getSetting(TELEGRAM_ALLOWED_USERS_KEY, "");
-  return parseTelegramAllowedUserIds(stored || "");
-}
-async function getConfiguredTelegramAllowedUsers() {
-  const envUsers = parseTelegramAllowedUserIds(process.env.TELEGRAM_ALLOWED_USER_IDS || "");
-  if (envUsers.length > 0) return envUsers;
-  return getStoredTelegramAllowedUsers();
-}
-async function countAuthenticatedTelegramUsers() {
-  const result = await pool.query("SELECT COUNT(*)::int AS count FROM telegram_auth");
-  return Number(result.rows[0]?.count || 0);
-}
-async function setTelegramAllowedUsersAndReconcile(userIds) {
-  const previous = await getConfiguredTelegramAllowedUsers();
-  const users = parseTelegramAllowedUserIds(userIds.join(","));
-  const client2 = await pool.connect();
-  try {
-    await client2.query("BEGIN");
-    await client2.query(`SELECT pg_advisory_xact_lock(hashtext('tg-vault:telegram-allowlist'))`);
-    await client2.query(
-      `INSERT INTO system_settings (key, value, updated_at)
-             VALUES ($1, $2, NOW())
-             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [TELEGRAM_ALLOWED_USERS_KEY, users.join(",")]
-    );
-    const { reconcileTelegramAllowedUsers: reconcileTelegramAllowedUsers2 } = await Promise.resolve().then(() => (init_telegramState(), telegramState_exports));
-    const reconciliation = await reconcileTelegramAllowedUsers2(users, { query: client2.query.bind(client2) });
-    await client2.query("COMMIT");
-    const previousSet = new Set(previous);
-    return {
-      ...reconciliation,
-      added: users.filter((id) => !previousSet.has(id))
-    };
-  } catch (error) {
-    await client2.query("ROLLBACK").catch(() => void 0);
-    throw error;
-  } finally {
-    client2.release();
-  }
-}
-async function setTelegramAllowedUsers(userIds) {
-  return (await setTelegramAllowedUsersAndReconcile(userIds)).allowed;
-}
-async function addTelegramAllowedUser(userId) {
-  const users = await getStoredTelegramAllowedUsers();
-  if (!users.includes(userId)) users.push(userId);
-  return setTelegramAllowedUsers(users);
-}
-var WEB_PASSWORD_KEY, TELEGRAM_PIN_KEY, TELEGRAM_ALLOWED_USERS_KEY, SCRYPT_PREFIX, TelegramPinChangeError;
-var init_authSettings = __esm({
-  "src/utils/authSettings.ts"() {
-    "use strict";
-    init_db();
-    init_settings();
-    init_credentialCrypto();
-    WEB_PASSWORD_KEY = "admin_password_hash";
-    TELEGRAM_PIN_KEY = "telegram_pin_hash";
-    TELEGRAM_ALLOWED_USERS_KEY = "telegram_allowed_user_ids";
-    SCRYPT_PREFIX = "scrypt:v1";
-    TelegramPinChangeError = class extends Error {
-      constructor(message, statusCode = 400) {
-        super(message);
-        this.statusCode = statusCode;
-        this.name = "TelegramPinChangeError";
-      }
-      statusCode;
-    };
-  }
-});
-
-// src/services/scopedInteractionMap.ts
-var ScopedInteractionMap;
-var init_scopedInteractionMap = __esm({
-  "src/services/scopedInteractionMap.ts"() {
-    "use strict";
-    ScopedInteractionMap = class {
-      entries = /* @__PURE__ */ new Map();
-      ttlMs;
-      maxEntries;
-      now;
-      constructor(options = {}) {
-        this.ttlMs = Math.max(1, options.ttlMs ?? 15 * 6e4);
-        this.maxEntries = Math.max(1, options.maxEntries ?? 1e3);
-        this.now = options.now ?? Date.now;
-      }
-      evictForCapacity() {
-        this.cleanup();
-        while (this.entries.size >= this.maxEntries) {
-          let oldest;
-          let oldestTime = Number.POSITIVE_INFINITY;
-          for (const [key, entry] of this.entries) {
-            if (entry.createdAt < oldestTime) {
-              oldest = key;
-              oldestTime = entry.createdAt;
-            }
-          }
-          if (oldest === void 0) break;
-          this.entries.delete(oldest);
-        }
-      }
-      set(key, value) {
-        const now = this.now();
-        if (!this.entries.has(key)) this.evictForCapacity();
-        this.entries.set(key, { value, createdAt: now, expiresAt: now + this.ttlMs });
-        return this;
-      }
-      get(key) {
-        const entry = this.entries.get(key);
-        if (!entry) return void 0;
-        if (entry.expiresAt <= this.now()) {
-          this.entries.delete(key);
-          return void 0;
-        }
-        return entry.value;
-      }
-      has(key) {
-        return this.get(key) !== void 0;
-      }
-      touch(key) {
-        const value = this.get(key);
-        if (value === void 0) return false;
-        const entry = this.entries.get(key);
-        entry.expiresAt = this.now() + this.ttlMs;
-        return true;
-      }
-      delete(key) {
-        return this.entries.delete(key);
-      }
-      keys() {
-        this.cleanup();
-        return this.entries.keys();
-      }
-      values() {
-        this.cleanup();
-        return Array.from(this.entries.values(), (entry) => entry.value).values();
-      }
-      entriesIterator() {
-        this.cleanup();
-        return Array.from(this.entries, ([key, entry]) => [key, entry.value]).values();
-      }
-      cleanup() {
-        const now = this.now();
-        let removed = 0;
-        for (const [key, entry] of this.entries) {
-          if (entry.expiresAt <= now) {
-            this.entries.delete(key);
-            removed += 1;
-          }
-        }
-        return removed;
-      }
-      clear() {
-        this.entries.clear();
-      }
-      get size() {
-        this.cleanup();
-        return this.entries.size;
-      }
-    };
-  }
-});
-
-// src/services/telegramState.ts
-var telegramState_exports = {};
-__export(telegramState_exports, {
-  TelegramUserState: () => TelegramUserState,
-  authenticatedUsers: () => authenticatedUsers,
-  isAuthenticated: () => isAuthenticated,
-  isAuthenticatedAsync: () => isAuthenticatedAsync,
-  loadAuthenticatedUsers: () => loadAuthenticatedUsers,
-  passwordInputState: () => passwordInputState,
-  persistAuthenticatedUser: () => persistAuthenticatedUser,
-  reconcileTelegramAllowedUsers: () => reconcileTelegramAllowedUsers,
-  revokeAuthenticatedUser: () => revokeAuthenticatedUser,
-  userStates: () => userStates
-});
-async function revokeAuthenticatedUser(userId, dependencies = {}) {
-  const runQuery = dependencies.query || query;
-  const cache = dependencies.cache || authenticatedUsers;
-  await runQuery("DELETE FROM telegram_auth WHERE user_id = $1", [userId]);
-  cache.delete(userId);
-}
-async function reconcileTelegramAllowedUsers(userIds, dependencies = {}) {
-  const allowed = [...new Set(userIds.filter((id) => Number.isSafeInteger(id) && id > 0))].sort((a, b) => a - b);
-  const runQuery = dependencies.query || query;
-  const cache = dependencies.cache || authenticatedUsers;
-  const existing = await runQuery("SELECT user_id FROM telegram_auth ORDER BY user_id");
-  const authenticated = existing.rows.map((row) => Number(row.user_id)).filter(Number.isSafeInteger);
-  const allowedSet = new Set(allowed);
-  const authenticatedSet = new Set(authenticated);
-  const added = allowed.filter((id) => !authenticatedSet.has(id));
-  const removed = authenticated.filter((id) => !allowedSet.has(id)).sort((a, b) => a - b);
-  const revokedResult = await runQuery(
-    `DELETE FROM telegram_auth
-         WHERE NOT (user_id = ANY($1::bigint[]))
-         RETURNING user_id`,
-    [allowed]
-  );
-  const revoked = revokedResult.rows.map((row) => Number(row.user_id)).filter(Number.isSafeInteger).sort((a, b) => a - b);
-  for (const userId of /* @__PURE__ */ new Set([...removed, ...revoked])) cache.delete(userId);
-  const recipients = [...cache.keys()].filter((id) => allowedSet.has(id)).sort((a, b) => a - b);
-  return { allowed, added, removed, revoked, recipients };
-}
-async function loadAuthenticatedUsers() {
-  try {
-    const allowedUsers = await getConfiguredTelegramAllowedUsers();
-    const result = await query("SELECT user_id, authenticated_at FROM telegram_auth");
-    for (const row of result.rows) {
-      const userId = Number(row.user_id);
-      if (allowedUsers.length > 0 && !allowedUsers.includes(userId)) {
-        await revokeAuthenticatedUser(userId);
-        continue;
-      }
-      authenticatedUsers.set(userId, { authenticatedAt: new Date(row.authenticated_at) });
-    }
-    console.log(`\u{1F916} \u5DF2\u4ECE\u6570\u636E\u5E93\u8F7D\u5165 ${authenticatedUsers.size} \u4E2A\u6388\u6743\u7528\u6237`);
-  } catch (error) {
-    console.error("\u{1F916} \u8F7D\u5165\u5DF2\u9A8C\u8BC1\u7528\u6237\u5931\u8D25:", error);
-  }
-}
-async function persistAuthenticatedUser(userId) {
-  try {
-    await query("INSERT INTO telegram_auth (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING", [userId]);
-    authenticatedUsers.set(userId, { authenticatedAt: /* @__PURE__ */ new Date() });
-    console.log(`\u{1F916} \u7528\u6237 ${userId} \u5DF2\u6301\u4E45\u5316\u5230\u6570\u636E\u5E93`);
-  } catch (error) {
-    console.error("\u{1F916} \u6301\u4E45\u5316\u7528\u6237\u5931\u8D25:", error);
-  }
-}
-function isAuthenticated(userId) {
-  return authenticatedUsers.has(userId);
-}
-async function isAuthenticatedAsync(userId) {
-  const allowedUsers = await getConfiguredTelegramAllowedUsers();
-  if (allowedUsers.length > 0 && !allowedUsers.includes(userId)) {
-    if (authenticatedUsers.has(userId)) await revokeAuthenticatedUser(userId);
-    return false;
-  }
-  return authenticatedUsers.has(userId);
-}
-var TelegramUserState, INTERACTION_TTL_MS, INTERACTION_MAX_ENTRIES, userStates, authenticatedUsers, passwordInputState;
-var init_telegramState = __esm({
-  "src/services/telegramState.ts"() {
-    "use strict";
-    init_db();
-    init_authSettings();
-    init_scopedInteractionMap();
-    TelegramUserState = /* @__PURE__ */ ((TelegramUserState2) => {
-      TelegramUserState2["IDLE"] = "IDLE";
-      TelegramUserState2["WAITING_2FA_LOGIN"] = "WAITING_2FA_LOGIN";
-      TelegramUserState2["WAITING_2FA_SETUP"] = "WAITING_2FA_SETUP";
-      return TelegramUserState2;
-    })(TelegramUserState || {});
-    INTERACTION_TTL_MS = Math.max(6e4, Number.parseInt(process.env.TELEGRAM_INTERACTION_TTL_MS || "900000", 10) || 9e5);
-    INTERACTION_MAX_ENTRIES = Math.max(10, Number.parseInt(process.env.TELEGRAM_INTERACTION_MAX_ENTRIES || "1000", 10) || 1e3);
-    userStates = new ScopedInteractionMap({ ttlMs: INTERACTION_TTL_MS, maxEntries: INTERACTION_MAX_ENTRIES });
-    authenticatedUsers = /* @__PURE__ */ new Map();
-    passwordInputState = new ScopedInteractionMap({ ttlMs: INTERACTION_TTL_MS, maxEntries: INTERACTION_MAX_ENTRIES });
-  }
-});
-
 // src/index.ts
-import express from "express";
+import express2 from "express";
 import cors from "cors";
 import dotenv3 from "dotenv";
-import path24 from "path";
-import fs20 from "fs";
+import path25 from "path";
+import fs21 from "fs";
+
+// src/services/frontend.ts
+import express from "express";
+import fs from "node:fs";
+import path from "node:path";
+function isSameOriginRequest(req) {
+  const origin = req.headers.origin;
+  if (!origin) return false;
+  let host = req.get("host");
+  const trust = req.app.get("trust proxy fn");
+  if (req.socket.remoteAddress && trust?.(req.socket.remoteAddress, 0)) {
+    host = req.get("x-forwarded-host")?.split(",")[0].trim() || host;
+  }
+  if (!host) return false;
+  return origin === `${req.protocol}://${host}`;
+}
+function mountFrontend(app2, directory) {
+  const root = path.resolve(directory);
+  if (!fs.existsSync(path.join(root, "index.html"))) {
+    throw new Error(`Frontend build missing: ${root}/index.html`);
+  }
+  app2.use(["/api", "/uploads", "/thumbnails", "/previews"], (_req, res) => {
+    res.status(404).json({ error: "Not found" });
+  });
+  app2.use(express.static(root, {
+    setHeaders(res, filePath) {
+      res.setHeader("Cache-Control", filePath.includes(`${path.sep}assets${path.sep}`) ? "public, max-age=31536000, immutable" : "no-cache");
+    }
+  }));
+  app2.get("*", (req, res, next) => {
+    if (path.extname(req.path) || !req.accepts("html")) return next();
+    res.setHeader("Cache-Control", "no-cache");
+    res.sendFile(path.join(root, "index.html"));
+  });
+}
 
 // src/routes/files.ts
 import { Router as Router2 } from "express";
@@ -3580,8 +3615,8 @@ function buildStorageStatsPayload(input) {
 
 // src/routes/files.ts
 init_db();
-import fs13 from "fs";
-import path17 from "path";
+import fs14 from "fs";
+import path18 from "path";
 
 // src/middleware/signedUrl.ts
 import crypto20 from "crypto";
@@ -3744,27 +3779,2313 @@ import { UAParser } from "ua-parser-js";
 import axios2 from "axios";
 
 // src/services/telegramBot.ts
-init_storage();
-init_telegramState();
 import { TelegramClient as TelegramClient7, Api as Api9 } from "telegram";
-import { StringSession as StringSession4 } from "telegram/sessions/index.js";
-import { NewMessage } from "telegram/events/index.js";
-import { Raw as Raw2 } from "telegram/events/index.js";
-import fs12 from "fs";
-import path16 from "path";
-import crypto19 from "crypto";
 
-// src/services/telegramCommands.ts
+// src/services/telegramMessageLink.ts
+function parseTelegramMessageLink(input) {
+  const trimmed = input.trim();
+  const markdown = trimmed.match(/^\[[^\]]*\]\((https?:\/\/[^\s)]+)\)$/i);
+  const link = markdown?.[1] || trimmed;
+  const match = link.match(/^(?:https?:\/\/)?(?:www\.)?(?:t\.me|telegram\.me)\/(?:(c)\/(\d+)|(?:s\/)?([A-Za-z][A-Za-z0-9_]*))\/(\d+)\/?(?:[?#][^\s]*)?$/i);
+  if (!match || match[3] && ["c", "s", "joinchat"].includes(match[3].toLowerCase())) return null;
+  const messageId = Number(match[4]);
+  if (!Number.isSafeInteger(messageId) || messageId < 1 || messageId > 2147483647) return null;
+  if (match[1] && !/^[1-9]\d*$/.test(match[2])) return null;
+  return { source: match[1] ? `-100${match[2]}` : `@${match[3]}`, messageId };
+}
+async function runTelegramMessageLinkDownload(link, dependencies) {
+  await dependencies.assertSourceAllowed(link.source);
+  const target = await dependencies.getTarget();
+  return dependencies.download(link.source, [link.messageId], target);
+}
+
+// src/services/telegramUpload.ts
+import { Api as Api6 } from "telegram";
+
+// src/services/telegramAccountRepository.ts
 init_db();
-import { Api as Api8 } from "telegram";
-import { getPeerId as getPeerId2 } from "telegram/Utils.js";
-import checkDiskSpaceModule from "check-disk-space";
-import os2 from "os";
-import fs11 from "fs";
-import path15 from "path";
+init_credentialCrypto();
+function mapAccount(row) {
+  return {
+    id: String(row.id),
+    telegramUserId: String(row.telegram_user_id || ""),
+    username: row.username || null,
+    displayName: row.display_name || null,
+    session: String(row.session_ciphertext || ""),
+    enabled: Boolean(row.enabled),
+    healthState: row.health_state,
+    cooldownUntil: row.cooldown_until || null,
+    weight: Number(row.weight || 1),
+    priority: Number(row.priority || 0),
+    maxConnections: Number(row.max_connections || 1),
+    lastError: row.last_error || null,
+    isLegacy: Boolean(row.is_legacy)
+  };
+}
+function mapAccess(row) {
+  return {
+    accountId: String(row.account_id),
+    sourceKey: String(row.source_key),
+    scope: row.scope,
+    accessState: row.access_state,
+    lastError: row.last_error || null,
+    checkedAt: row.checked_at || null
+  };
+}
+var TelegramAccountRepository = class {
+  constructor(db = { query }) {
+    this.db = db;
+  }
+  db;
+  async migrateLegacySystemSettings() {
+    const result = await this.db.query(`
+            INSERT INTO telegram_user_accounts
+                (telegram_user_id, username, session_ciphertext, enabled, health_state, is_legacy)
+            SELECT
+                COALESCE(NULLIF(user_id.value, ''), 'legacy'),
+                NULLIF(username.value, ''),
+                session.value,
+                COALESCE(enabled.value, 'false') = 'true',
+                CASE WHEN COALESCE(enabled.value, 'false') = 'true' THEN 'degraded' ELSE 'healthy' END,
+                TRUE
+            FROM system_settings session
+            LEFT JOIN system_settings user_id ON user_id.key = 'telegram_user_id'
+            LEFT JOIN system_settings username ON username.key = 'telegram_user_username'
+            LEFT JOIN system_settings enabled ON enabled.key = 'telegram_user_download_enabled'
+            WHERE session.key = 'telegram_user_session' AND session.value <> ''
+              AND NOT EXISTS (
+                  SELECT 1 FROM telegram_user_accounts
+                  WHERE is_legacy = TRUE AND deleted_at IS NULL
+              )
+            ON CONFLICT (telegram_user_id) DO NOTHING
+            RETURNING id
+        `);
+    return result.rows[0]?.id ? String(result.rows[0].id) : null;
+  }
+  async upsertAccount(input) {
+    const result = await this.db.query(`
+            INSERT INTO telegram_user_accounts
+                (telegram_user_id, username, display_name, session_ciphertext, enabled, health_state, weight, priority, max_connections, is_legacy, last_error, session_expired_at)
+            VALUES ($1, $2, $3, $4, $5, 'healthy', $6, $7, $8, $9, NULL, NULL)
+            ON CONFLICT (telegram_user_id) DO UPDATE SET
+                username = EXCLUDED.username, display_name = EXCLUDED.display_name,
+                session_ciphertext = EXCLUDED.session_ciphertext, enabled = EXCLUDED.enabled,
+                health_state = 'healthy', weight = EXCLUDED.weight, priority = EXCLUDED.priority,
+                max_connections = EXCLUDED.max_connections, is_legacy = EXCLUDED.is_legacy, last_error = NULL,
+                session_expired_at = NULL, deleted_at = NULL, updated_at = NOW()
+            RETURNING *
+        `, [
+      input.telegramUserId,
+      input.username || null,
+      input.displayName || null,
+      encryptCredential(input.session),
+      input.enabled ?? true,
+      Math.max(0.01, input.weight ?? 1),
+      input.priority ?? 0,
+      Math.max(1, input.maxConnections ?? 4),
+      input.isLegacy ?? false
+    ]);
+    return mapAccount(result.rows[0]);
+  }
+  async listEnabledAccounts() {
+    const result = await this.db.query(`
+            SELECT * FROM telegram_user_accounts
+            WHERE enabled = TRUE AND deleted_at IS NULL
+            ORDER BY priority DESC, created_at, id
+        `);
+    return result.rows.map(mapAccount);
+  }
+  async listAccounts() {
+    const result = await this.db.query(`
+            SELECT * FROM telegram_user_accounts WHERE deleted_at IS NULL
+            ORDER BY priority DESC, created_at, id
+        `);
+    return result.rows.map(mapAccount);
+  }
+  async getAccount(accountId) {
+    const result = await this.db.query("SELECT * FROM telegram_user_accounts WHERE id = $1 AND deleted_at IS NULL", [accountId]);
+    return result.rows[0] ? mapAccount(result.rows[0]) : null;
+  }
+  async setEnabled(accountId, enabled) {
+    const result = await this.db.query(
+      `UPDATE telegram_user_accounts SET enabled = $2, updated_at = NOW()
+             WHERE id = $1 AND deleted_at IS NULL`,
+      [accountId, enabled]
+    );
+    return result.rowCount === 1;
+  }
+  async deleteAccount(accountId) {
+    await this.db.query("DELETE FROM telegram_account_source_access WHERE account_id = $1", [accountId]);
+    const result = await this.db.query(
+      `UPDATE telegram_user_accounts
+             SET enabled = FALSE, session_ciphertext = '', health_state = 'session_expired',
+                 cooldown_until = NULL, deleted_at = NOW(), updated_at = NOW()
+             WHERE id = $1 AND deleted_at IS NULL`,
+      [accountId]
+    );
+    return result.rowCount === 1;
+  }
+  async listAccessForAccount(accountId) {
+    const result = await this.db.query(`
+            SELECT * FROM telegram_account_source_access
+            WHERE account_id = $1 ORDER BY checked_at DESC NULLS LAST, source_key, scope
+        `, [accountId]);
+    return result.rows.map(mapAccess);
+  }
+  async getAccessSummaryForAccount(accountId) {
+    const result = await this.db.query(`
+            SELECT COUNT(*)::int AS total,
+                   COUNT(*) FILTER (WHERE access_state = 'allowed')::int AS allowed,
+                   COUNT(*) FILTER (WHERE access_state = 'denied')::int AS denied,
+                   COUNT(*) FILTER (WHERE access_state = 'unknown')::int AS unknown,
+                   MAX(checked_at) AS last_checked_at
+            FROM telegram_account_source_access
+            WHERE account_id = $1 AND scope = 'download'
+        `, [accountId]);
+    const row = result.rows[0] || {};
+    const total = Number(row.total || 0);
+    return { allowed: Number(row.allowed || 0), denied: Number(row.denied || 0), unknown: Number(row.unknown || 0), total, lastCheckedAt: row.last_checked_at || null };
+  }
+  async updateSession(accountId, session) {
+    const result = await this.db.query(`
+            UPDATE telegram_user_accounts SET session_ciphertext = $2, health_state = 'healthy',
+                session_expired_at = NULL, last_error = NULL, updated_at = NOW()
+            WHERE id = $1 AND deleted_at IS NULL
+        `, [accountId, encryptCredential(session)]);
+    return result.rowCount === 1;
+  }
+  async recordHealthy(accountId) {
+    const result = await this.db.query(`
+            UPDATE telegram_user_accounts SET health_state = 'healthy', last_error = NULL,
+                last_connected_at = NOW(), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL
+        `, [accountId]);
+    return result.rowCount === 1;
+  }
+  async recordFailure(accountId, error) {
+    const result = await this.db.query(`
+            UPDATE telegram_user_accounts SET health_state = 'degraded', last_error = $2,
+                last_failure_at = NOW(), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL
+        `, [accountId, error]);
+    return result.rowCount === 1;
+  }
+  async markCooldown(accountId, seconds, error = null) {
+    const cooldownSeconds = Number.isFinite(seconds) ? Math.max(1, Math.ceil(seconds)) : 60;
+    const result = await this.db.query(`
+            UPDATE telegram_user_accounts SET cooldown_until = NOW() + ($2::double precision * INTERVAL '1 second'),
+                health_state = 'degraded', last_error = $3, last_failure_at = NOW(), updated_at = NOW()
+            WHERE id = $1 AND deleted_at IS NULL
+        `, [accountId, cooldownSeconds, error]);
+    return result.rowCount === 1;
+  }
+  async markSessionExpired(accountId, error = null) {
+    const result = await this.db.query(`
+            UPDATE telegram_user_accounts SET health_state = 'session_expired', session_expired_at = NOW(),
+                cooldown_until = NULL, last_error = $2, last_failure_at = NOW(), updated_at = NOW()
+            WHERE id = $1 AND deleted_at IS NULL
+        `, [accountId, error]);
+    return result.rowCount === 1;
+  }
+  async markSourceAccess(accountId, sourceKey, scope, accessState, error = null) {
+    const result = await this.db.query(`
+            INSERT INTO telegram_account_source_access
+                (account_id, source_key, scope, access_state, last_error, checked_at)
+            VALUES ($1, $2, $3, $4, $5, NOW())
+            ON CONFLICT (account_id, source_key, scope) DO UPDATE SET
+                access_state = EXCLUDED.access_state, last_error = EXCLUDED.last_error,
+                checked_at = NOW(), updated_at = NOW()
+            RETURNING *
+        `, [accountId, sourceKey, scope, accessState, error]);
+    return mapAccess(result.rows[0]);
+  }
+  async probeSourceAccess(accountId, sourceKey, scope, accessState, error = null) {
+    return this.markSourceAccess(accountId, sourceKey, scope, accessState, error);
+  }
+  async getSourceAccess(accountId, sourceKey, scope) {
+    const result = await this.db.query(`
+            SELECT * FROM telegram_account_source_access
+            WHERE account_id = $1 AND source_key = $2 AND scope = $3
+        `, [accountId, sourceKey, scope]);
+    return result.rows[0] ? mapAccess(result.rows[0]) : null;
+  }
+  async listSourceAccess(sourceKey, scope) {
+    const result = await this.db.query(`
+            SELECT * FROM telegram_account_source_access
+            WHERE source_key = $1 AND scope = $2 ORDER BY checked_at DESC NULLS LAST, account_id
+        `, [sourceKey, scope]);
+    return result.rows.map(mapAccess);
+  }
+  async getLatestAccessCheckForAccount(accountId) {
+    const result = await this.db.query(
+      "SELECT MAX(checked_at) AS checked_at FROM telegram_account_source_access WHERE account_id = $1",
+      [accountId]
+    );
+    return result.rows[0]?.checked_at || null;
+  }
+  async startDownloadAttempt(input) {
+    const result = await this.db.query(`
+            INSERT INTO telegram_download_attempts
+                (account_id, source_key, scope, job_id, item_id, lease_token, status)
+            VALUES ($1, $2, $3, $4, $5, $6, 'running') RETURNING id
+        `, [input.accountId, input.sourceKey, input.scope || "download", input.jobId || null, input.itemId || null, input.leaseToken || null]);
+    return String(result.rows[0].id);
+  }
+  async finishDownloadAttempt(attemptId, status, error = null) {
+    const result = await this.db.query(`
+            UPDATE telegram_download_attempts SET status = $2, error = $3, finished_at = NOW()
+            WHERE id = $1 AND status = 'running'
+        `, [attemptId, status, error]);
+    return result.rowCount === 1;
+  }
+};
+var telegramAccountRepository = new TelegramAccountRepository();
+
+// src/services/telegramUserClientPool.ts
+init_credentialCrypto();
+import { TelegramClient } from "telegram";
+import { StringSession } from "telegram/sessions/index.js";
+
+// src/services/telegramProxy.ts
+function getTelegramProxy() {
+  const raw = process.env.TELEGRAM_PROXY_URL?.trim();
+  if (!raw) return void 0;
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("TELEGRAM_PROXY_URL \u683C\u5F0F\u65E0\u6548\uFF0C\u5E94\u4E3A socks5://\u4E3B\u673A:\u7AEF\u53E3");
+  }
+  const socksType = url.protocol === "socks5:" || url.protocol === "socks5h:" ? 5 : url.protocol === "socks4:" ? 4 : null;
+  const port = Number.parseInt(url.port, 10);
+  if (!socksType || !url.hostname || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("TELEGRAM_PROXY_URL \u4EC5\u652F\u6301 socks4:// \u6216 socks5://\uFF0C\u5E76\u4E14\u5FC5\u987B\u5305\u542B\u6709\u6548\u7AEF\u53E3");
+  }
+  return {
+    ip: url.hostname,
+    port,
+    socksType,
+    timeout: 15,
+    ...url.username ? { username: decodeURIComponent(url.username) } : {},
+    ...url.password ? { password: decodeURIComponent(url.password) } : {}
+  };
+}
+
+// src/services/telegramAccountScheduler.ts
+function selectWeightedLeastConnectedTelegramAccount(candidates, options = {}) {
+  const now = (options.now || /* @__PURE__ */ new Date()).getTime();
+  const excluded = new Set(options.excludeAccountIds || []);
+  const runnable = candidates.filter((candidate) => {
+    const cooldownUntil = candidate.cooldownUntil ? new Date(candidate.cooldownUntil).getTime() : 0;
+    return candidate.enabled && candidate.healthState !== "session_expired" && candidate.sourceAccessState !== "denied" && !excluded.has(candidate.accountId) && candidate.activeConnections < Math.max(1, candidate.maxConnections) && (!Number.isFinite(cooldownUntil) || cooldownUntil <= now);
+  });
+  runnable.sort((left, right) => {
+    const accessDifference = Number(right.sourceAccessState === "allowed") - Number(left.sourceAccessState === "allowed");
+    if (accessDifference) return accessDifference;
+    const leftLoad = (left.activeConnections + 1) / Math.max(Number.EPSILON, left.weight);
+    const rightLoad = (right.activeConnections + 1) / Math.max(Number.EPSILON, right.weight);
+    if (leftLoad !== rightLoad) return leftLoad - rightLoad;
+    const priorityDifference = (right.priority || 0) - (left.priority || 0);
+    if (priorityDifference) return priorityDifference;
+    return left.accountId.localeCompare(right.accountId);
+  });
+  return runnable[0] || null;
+}
+
+// src/services/telegramUserClientPool.ts
+function errorName(error) {
+  const value = error;
+  return String(value?.errorMessage || value?.message || error || "Telegram account connection failed");
+}
+function isTelegramSessionExpiredError(error) {
+  return /(AUTH_KEY_UNREGISTERED|SESSION_(REVOKED|EXPIRED)|USER_DEACTIVATED|SESSION_EXPIRED)/i.test(errorName(error));
+}
+var TelegramUserClientPool = class {
+  constructor(deps) {
+    this.deps = deps;
+  }
+  deps;
+  entries = /* @__PURE__ */ new Map();
+  credentials = null;
+  initializationTail = Promise.resolve();
+  async initialize(credentials) {
+    const run = this.initializationTail.then(async () => {
+      await this.shutdownEntries();
+      this.credentials = credentials;
+      await this.deps.repository.migrateLegacySystemSettings();
+      const accounts = await this.deps.repository.listEnabledAccounts();
+      await Promise.allSettled(accounts.map((account) => this.connectAccount(account)));
+    });
+    this.initializationTail = run.catch(() => void 0);
+    await run;
+  }
+  async refresh() {
+    if (!this.credentials) return;
+    await this.initialize(this.credentials);
+  }
+  async deactivateAccount(accountId) {
+    await this.runLifecycleOperation(() => this.expireEntry(accountId));
+  }
+  async activateAccount(accountId, reason, credentials) {
+    if (reason !== "login_complete" && reason !== "explicit_enable") throw new Error("TELEGRAM_USER_ACTIVATION_NOT_ALLOWED");
+    await this.runLifecycleOperation(async () => {
+      await this.expireEntry(accountId);
+      if (credentials) this.credentials = credentials;
+      if (!this.credentials) return;
+      const account = await this.deps.repository.getAccount(accountId);
+      if (!account) return;
+      await this.connectAccount(account);
+    });
+  }
+  async connectAccount(account) {
+    if (!this.credentials || !account.enabled || account.healthState === "session_expired") return;
+    let client2 = null;
+    try {
+      const session = this.deps.decryptSession(account.session);
+      client2 = this.deps.createClient(session, this.credentials, account.id);
+      await client2.connect();
+      if (!await client2.checkAuthorization()) throw new Error("SESSION_EXPIRED");
+      await client2.getMe();
+      const saved = this.deps.saveSession?.(client2) || session;
+      if (saved && saved !== session) await this.deps.repository.updateSession(account.id, saved);
+      await this.deps.repository.recordHealthy(account.id);
+      this.entries.set(account.id, {
+        account: { ...account, healthState: "healthy", lastError: null },
+        client: client2,
+        activeConnections: 0
+      });
+    } catch (error) {
+      if (client2) await this.closeClient(client2);
+      const message = errorName(error);
+      if (isTelegramSessionExpiredError(error)) await this.deps.repository.markSessionExpired(account.id, message);
+      else await this.deps.repository.recordFailure(account.id, message);
+    }
+  }
+  async select(sourceKey, options = {}) {
+    const scope = options.scope || "download";
+    const access = await this.deps.repository.listSourceAccess(sourceKey, scope);
+    const accessByAccount = new Map(access.map((row) => [row.accountId, row]));
+    const selected3 = selectWeightedLeastConnectedTelegramAccount([...this.entries.values()].map((entry2) => ({
+      accountId: entry2.account.id,
+      enabled: entry2.account.enabled,
+      healthState: entry2.account.healthState,
+      cooldownUntil: entry2.account.cooldownUntil,
+      weight: entry2.account.weight,
+      priority: entry2.account.priority,
+      activeConnections: entry2.activeConnections,
+      maxConnections: entry2.account.maxConnections,
+      sourceAccessState: accessByAccount.get(entry2.account.id)?.accessState || "unknown"
+    })), options);
+    if (!selected3) return null;
+    const entry = this.entries.get(selected3.accountId);
+    if (!entry) return null;
+    entry.activeConnections += 1;
+    let released = false;
+    return {
+      accountId: entry.account.id,
+      client: entry.client,
+      release: () => {
+        if (released) return;
+        released = true;
+        entry.activeConnections = Math.max(0, entry.activeConnections - 1);
+      }
+    };
+  }
+  getDefaultClient() {
+    return [...this.entries.values()].sort((left, right) => right.account.priority - left.account.priority || left.account.id.localeCompare(right.account.id))[0]?.client || null;
+  }
+  getAccountClient(accountId) {
+    return this.entries.get(accountId)?.client || null;
+  }
+  getActiveConnections(accountId) {
+    return this.entries.get(accountId)?.activeConnections || 0;
+  }
+  getReadyAccountIds() {
+    return [...this.entries.keys()];
+  }
+  getRuntimeState() {
+    return [...this.entries.values()].map((entry) => ({
+      accountId: entry.account.id,
+      connected: Boolean(entry.client.connected),
+      activeConnections: entry.activeConnections
+    }));
+  }
+  updateCooldown(accountId, cooldownUntil, error) {
+    const entry = this.entries.get(accountId);
+    if (entry) entry.account = { ...entry.account, cooldownUntil, healthState: "degraded", lastError: error };
+  }
+  updateSourceAccess(_accountId, _sourceKey, _scope, _state) {
+  }
+  async expireAccount(accountId) {
+    await this.runLifecycleOperation(() => this.expireEntry(accountId));
+  }
+  async expireEntry(accountId) {
+    const entry = this.entries.get(accountId);
+    this.entries.delete(accountId);
+    if (entry) await this.closeClient(entry.client);
+  }
+  async shutdown() {
+    await this.runLifecycleOperation(() => this.shutdownEntries());
+  }
+  async shutdownEntries() {
+    const entries = [...this.entries.values()];
+    this.entries.clear();
+    await Promise.all(entries.map((entry) => this.closeClient(entry.client)));
+  }
+  async runLifecycleOperation(operation) {
+    const run = this.initializationTail.then(operation);
+    this.initializationTail = run.then(() => void 0, () => void 0);
+    return await run;
+  }
+  async closeClient(client2) {
+    try {
+      await client2.disconnect();
+    } catch {
+    }
+    try {
+      await client2.destroy();
+    } catch {
+    }
+  }
+};
+var telegramUserClientPool = new TelegramUserClientPool({
+  repository: telegramAccountRepository,
+  decryptSession: decryptCredential,
+  createClient: (session, credentials) => new TelegramClient(
+    new StringSession(session),
+    credentials.apiId,
+    credentials.apiHash,
+    {
+      proxy: getTelegramProxy(),
+      connectionRetries: 15,
+      retryDelay: 2e3,
+      useWSS: false,
+      deviceModel: "TG Vault User Downloader",
+      systemVersion: "1.0.0",
+      appVersion: "1.0.0",
+      floodSleepThreshold: 120
+    }
+  ),
+  saveSession: (client2) => client2.session.save()
+});
+var currentCredentials = null;
+async function initializeTelegramUserClientPool(credentials) {
+  currentCredentials = credentials;
+  await telegramUserClientPool.initialize(credentials);
+}
+async function listTelegramUserAccounts() {
+  const accounts = await telegramAccountRepository.listAccounts();
+  const ready = new Set(telegramUserClientPool.getReadyAccountIds());
+  return accounts.map(({ session: _session, ...account }) => ({
+    ...account,
+    connected: ready.has(account.id),
+    activeConnections: telegramUserClientPool.getActiveConnections(account.id)
+  }));
+}
+async function upsertTelegramUserAccountWithoutRuntimeRefresh(input) {
+  const account = await telegramAccountRepository.upsertAccount(input);
+  const { session: _session, ...publicAccount } = account;
+  return {
+    ...publicAccount,
+    connected: telegramUserClientPool.getReadyAccountIds().includes(account.id),
+    activeConnections: telegramUserClientPool.getActiveConnections(account.id)
+  };
+}
+async function deleteTelegramUserAccount(accountId) {
+  await telegramUserClientPool.expireAccount(accountId);
+  return telegramAccountRepository.deleteAccount(accountId);
+}
+var getTelegramAccountSourceAccess = telegramAccountRepository.getSourceAccess.bind(telegramAccountRepository);
+var listTelegramAccountSourceAccess = telegramAccountRepository.listSourceAccess.bind(telegramAccountRepository);
+var probeTelegramAccountSourceAccess = telegramAccountRepository.probeSourceAccess.bind(telegramAccountRepository);
+var startTelegramDownloadAttempt = telegramAccountRepository.startDownloadAttempt.bind(telegramAccountRepository);
+var finishTelegramDownloadAttempt = telegramAccountRepository.finishDownloadAttempt.bind(telegramAccountRepository);
+
+// src/services/telegramMultiAccountLogin.ts
+import { Api, TelegramClient as TelegramClient2 } from "telegram";
+import { StringSession as StringSession2 } from "telegram/sessions/index.js";
+import { Raw } from "telegram/events/index.js";
+
+// src/services/telegramBotConfig.ts
+init_settings();
+
+// src/services/telegramBotStatus.ts
+var requiredOverride = null;
+function requiredFromEnv() {
+  if (requiredOverride !== null) return requiredOverride;
+  return /^(1|true|yes|on)$/i.test(process.env.TELEGRAM_REQUIRED || "false");
+}
+function setTelegramBotRequired(required) {
+  requiredOverride = required;
+  current = { ...current, required };
+}
+var current = {
+  status: "not_configured",
+  configured: false,
+  required: requiredFromEnv(),
+  degraded: false,
+  checkedAt: (/* @__PURE__ */ new Date()).toISOString(),
+  lastConnectedAt: null,
+  lastRecoveredAt: null,
+  lastError: null,
+  action: "\u914D\u7F6E TELEGRAM_BOT_TOKEN\u3001TELEGRAM_API_ID \u548C TELEGRAM_API_HASH",
+  reconnectCount: 0
+};
+function resetTelegramBotStatus(configured2, checkedAt = (/* @__PURE__ */ new Date()).toISOString()) {
+  current = {
+    status: configured2 ? "stopped" : "not_configured",
+    configured: configured2,
+    required: requiredFromEnv(),
+    degraded: false,
+    checkedAt,
+    lastConnectedAt: null,
+    lastRecoveredAt: null,
+    lastError: null,
+    action: configured2 ? "\u542F\u52A8 Telegram Bot" : "\u914D\u7F6E TELEGRAM_BOT_TOKEN\u3001TELEGRAM_API_ID \u548C TELEGRAM_API_HASH",
+    reconnectCount: 0
+  };
+}
+function getTelegramBotStatus() {
+  return { ...current, required: requiredFromEnv() };
+}
+function markTelegramBotStarting(checkedAt = (/* @__PURE__ */ new Date()).toISOString()) {
+  current = {
+    ...current,
+    configured: true,
+    required: requiredFromEnv(),
+    status: "starting",
+    degraded: false,
+    checkedAt,
+    lastError: null,
+    action: "\u7B49\u5F85 Telegram \u8FDE\u63A5\u5EFA\u7ACB"
+  };
+}
+function markTelegramBotReady(checkedAt = (/* @__PURE__ */ new Date()).toISOString()) {
+  const recovered = current.status === "reconnecting" || current.status === "auth_failed" || current.status === "error";
+  current = {
+    ...current,
+    configured: true,
+    required: requiredFromEnv(),
+    status: "ready",
+    degraded: false,
+    checkedAt,
+    lastConnectedAt: checkedAt,
+    lastRecoveredAt: recovered ? checkedAt : current.lastRecoveredAt,
+    lastError: null,
+    action: null
+  };
+}
+function markTelegramBotError(status, message, action, checkedAt = (/* @__PURE__ */ new Date()).toISOString()) {
+  current = {
+    ...current,
+    configured: true,
+    required: requiredFromEnv(),
+    status,
+    degraded: status !== "stopped",
+    checkedAt,
+    lastError: message,
+    action,
+    reconnectCount: status === "reconnecting" ? current.reconnectCount + 1 : current.reconnectCount
+  };
+}
+function classifyTelegramBotStartupError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /token|auth|unauthorized|forbidden|401|403|access_token_(?:expired|invalid)/i.test(message) ? "auth_failed" : "error";
+}
+function telegramBotBlocksReadiness(status, required = requiredFromEnv()) {
+  if (!required) return false;
+  return status.status !== "ready";
+}
+
+// src/services/telegramBotConfig.ts
+init_authSettings();
+var TELEGRAM_BOT_TOKEN_SETTING = "telegram_bot_token";
+var TELEGRAM_API_ID_SETTING = "telegram_api_id";
+var TELEGRAM_API_HASH_SETTING = "telegram_api_hash";
+var TELEGRAM_BOT_ENABLED_SETTING = "telegram_bot_enabled";
+var TELEGRAM_REQUIRED_SETTING = "telegram_required";
+var CREDENTIAL_KEYS = [TELEGRAM_BOT_TOKEN_SETTING, TELEGRAM_API_ID_SETTING, TELEGRAM_API_HASH_SETTING];
+var ALL_KEYS = [...CREDENTIAL_KEYS, TELEGRAM_BOT_ENABLED_SETTING, TELEGRAM_REQUIRED_SETTING];
+var ENV_TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+var ENV_TELEGRAM_API_ID = process.env.TELEGRAM_API_ID || "";
+var ENV_TELEGRAM_API_HASH = process.env.TELEGRAM_API_HASH || "";
+function enabledValue(value, fallback) {
+  if (value == null || value === "") return fallback;
+  return /^(1|true|yes|on)$/i.test(value);
+}
+function normalizeTelegramBotCredentials(input) {
+  const botToken = String(input?.botToken || "").trim();
+  const apiIdText = String(input?.apiId || "").trim();
+  const apiHash = String(input?.apiHash || "").trim();
+  if (!/^\d+$/.test(apiIdText) || Number(apiIdText) <= 0 || !Number.isSafeInteger(Number(apiIdText))) {
+    throw new Error("API ID \u5FC5\u987B\u662F\u6709\u6548\u7684\u6B63\u6574\u6570");
+  }
+  if (!/^\d+:[A-Za-z0-9_-]{20,}$/.test(botToken)) throw new Error("Bot Token \u683C\u5F0F\u65E0\u6548");
+  if (!/^[a-fA-F0-9]{32}$/.test(apiHash)) throw new Error("API Hash \u5FC5\u987B\u662F 32 \u4F4D\u5341\u516D\u8FDB\u5236\u5B57\u7B26\u4E32");
+  return { botToken, apiId: Number(apiIdText), apiHash };
+}
+async function getWebCredentials() {
+  const [botTokenRow, apiIdRow, apiHashRow] = await Promise.all([
+    getSettingStrict(TELEGRAM_BOT_TOKEN_SETTING),
+    getSettingStrict(TELEGRAM_API_ID_SETTING),
+    getSettingStrict(TELEGRAM_API_HASH_SETTING)
+  ]);
+  const foundCount = [botTokenRow, apiIdRow, apiHashRow].filter((row) => row.found).length;
+  if (foundCount === 0) return null;
+  if (foundCount !== 3 || !botTokenRow.value || !apiIdRow.value || !apiHashRow.value) {
+    throw new Error("Telegram Bot \u7F51\u9875\u51ED\u8BC1\u4E0D\u5B8C\u6574\uFF0C\u5DF2\u62D2\u7EDD\u56DE\u9000\u5230\u73AF\u5883\u53D8\u91CF");
+  }
+  return normalizeTelegramBotCredentials({ botToken: botTokenRow.value, apiId: apiIdRow.value, apiHash: apiHashRow.value });
+}
+function getEnvironmentCredentials() {
+  const botToken = ENV_TELEGRAM_BOT_TOKEN;
+  const apiId = ENV_TELEGRAM_API_ID;
+  const apiHash = ENV_TELEGRAM_API_HASH;
+  if (!botToken || !apiId || !apiHash) return null;
+  try {
+    return normalizeTelegramBotCredentials({ botToken, apiId, apiHash });
+  } catch {
+    return null;
+  }
+}
+async function getEffectiveTelegramBotConfig() {
+  const webCredentials = await getWebCredentials();
+  const environmentCredentials = getEnvironmentCredentials();
+  const source = webCredentials ? "web" : environmentCredentials ? "environment" : "none";
+  const credentials = webCredentials || environmentCredentials;
+  const [enabledRow, requiredRow] = await Promise.all([
+    getSettingStrict(TELEGRAM_BOT_ENABLED_SETTING),
+    getSettingStrict(TELEGRAM_REQUIRED_SETTING)
+  ]);
+  return {
+    credentials,
+    configured: Boolean(credentials),
+    enabled: Boolean(credentials) && enabledValue(enabledRow.value, true),
+    required: enabledValue(requiredRow.value, enabledValue(process.env.TELEGRAM_REQUIRED, false)),
+    source
+  };
+}
+async function applyEffectiveTelegramBotConfig() {
+  const effective = await getEffectiveTelegramBotConfig();
+  setTelegramBotRequired(effective.required);
+  return effective;
+}
+var lastBotIdentity = null;
+function setTelegramBotIdentity(bot) {
+  lastBotIdentity = bot;
+}
+async function getTelegramBotPublicConfig() {
+  const effective = await getEffectiveTelegramBotConfig();
+  const status = getTelegramBotStatus();
+  return {
+    configured: effective.configured,
+    enabled: effective.enabled,
+    required: effective.required,
+    pinConfigured: await isTelegramPinConfigured(),
+    source: effective.source,
+    status: status.status,
+    runtimeReady: status.status === "ready",
+    credentialProbeOnly: false,
+    bot: lastBotIdentity,
+    lastConnectedAt: status.lastConnectedAt,
+    lastError: status.lastError,
+    action: status.action
+  };
+}
+async function testTelegramBotCredentials(credentials) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1e4);
+  timeout.unref?.();
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${credentials.botToken}/getMe`, {
+      method: "GET",
+      cache: "no-store",
+      redirect: "error",
+      signal: controller.signal
+    });
+    const payload = await response.json().catch(() => null);
+    const me = payload?.result;
+    if (!response.ok || !payload?.ok || !me?.is_bot) throw new Error("Bot API credential verification failed");
+    return {
+      username: me?.username ? String(me.username) : null,
+      displayName: [me?.first_name, me?.last_name].filter(Boolean).join(" ") || null
+    };
+  } catch {
+    throw new Error("\u65E0\u6CD5\u9A8C\u8BC1 Telegram Bot\uFF0C\u8BF7\u68C0\u67E5 Token \u548C\u7F51\u7EDC");
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+async function saveTelegramBotConfig(credentials, options) {
+  await setSettings([
+    [TELEGRAM_BOT_TOKEN_SETTING, credentials.botToken],
+    [TELEGRAM_API_ID_SETTING, String(credentials.apiId)],
+    [TELEGRAM_API_HASH_SETTING, credentials.apiHash],
+    [TELEGRAM_BOT_ENABLED_SETTING, options.enabled ? "true" : "false"],
+    [TELEGRAM_REQUIRED_SETTING, options.required ? "true" : "false"]
+  ]);
+}
+async function snapshotTelegramBotConfig() {
+  const rows = await Promise.all(ALL_KEYS.map(async (key) => [key, await getSettingStrict(key)]));
+  return {
+    entries: rows.filter(([, row]) => row.found && row.value !== null).map(([key, row]) => [key, row.value])
+  };
+}
+async function restoreTelegramBotConfig(snapshot) {
+  await deleteSettings(ALL_KEYS);
+  if (snapshot.entries.length > 0) await setSettings(snapshot.entries);
+}
+function getEnvironmentTelegramBotCredentials() {
+  const credentials = getEnvironmentCredentials();
+  if (!credentials) throw new Error("\u73AF\u5883\u53D8\u91CF\u4E2D\u6CA1\u6709\u5B8C\u6574\u6709\u6548\u7684 Telegram Bot \u51ED\u8BC1");
+  return credentials;
+}
+async function migrateEnvironmentTelegramBotConfig(credentials) {
+  await saveTelegramBotConfig(credentials, {
+    enabled: true,
+    required: enabledValue(process.env.TELEGRAM_REQUIRED, false)
+  });
+}
+async function setTelegramBotEnabled(enabled) {
+  await setSetting(TELEGRAM_BOT_ENABLED_SETTING, enabled ? "true" : "false");
+}
+async function deleteTelegramBotConfig() {
+  await deleteSettings(ALL_KEYS);
+  lastBotIdentity = null;
+}
+
+// src/services/telegramMultiAccountLoginFlows.ts
+import crypto7 from "node:crypto";
+var TelegramUserLoginFlowError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "TelegramUserLoginFlowError";
+  }
+  code;
+};
+function telegramErrorName(error) {
+  if (!error || typeof error !== "object") return "";
+  return String(error.errorMessage || error.message || "");
+}
+function normalizeAccount(me) {
+  const displayName = [me.firstName, me.lastName].filter(Boolean).join(" ").trim();
+  return {
+    userId: String(me.id ?? ""),
+    username: me.username || null,
+    displayName: displayName || null
+  };
+}
+var TelegramMultiAccountLoginFlows = class {
+  constructor(deps) {
+    this.deps = deps;
+    this.now = deps.now || Date.now;
+    this.ttlMs = deps.ttlMs ?? 5 * 6e4;
+    this.maxErrors = deps.maxErrors ?? 3;
+  }
+  deps;
+  flows = /* @__PURE__ */ new Map();
+  ttlMs;
+  maxErrors;
+  now;
+  /** Backward-compatible alias for the existing phone-login service API. */
+  start(owner, rawPhone) {
+    return this.startPhone(owner, rawPhone);
+  }
+  async startPhone(owner, rawPhone) {
+    const phone = String(rawPhone || "").replace(/[\s()-]/g, "");
+    if (!/^\+[1-9]\d{6,14}$/.test(phone)) {
+      throw new TelegramUserLoginFlowError("INVALID_PHONE", "\u8BF7\u8F93\u5165\u542B\u56FD\u5BB6\u533A\u53F7\u7684\u6709\u6548\u624B\u673A\u53F7");
+    }
+    await this.removeOwnerFlows(owner);
+    const credentials = await this.requireCredentials();
+    const client2 = this.deps.createClient(credentials);
+    try {
+      await client2.connect();
+      const sent = await client2.sendCode(credentials, phone);
+      const id = this.newFlowId();
+      const expiresAt = this.now() + this.ttlMs;
+      const flow = {
+        id,
+        owner,
+        credentials,
+        expiresAt,
+        errors: 0,
+        client: client2,
+        cleanupTimer: this.scheduleCleanup(id, expiresAt),
+        kind: "phone",
+        phone,
+        phoneCodeHash: sent.phoneCodeHash,
+        step: "code"
+      };
+      this.flows.set(id, flow);
+      return {
+        flowId: id,
+        delivery: sent.isCodeViaApp ? "app" : "sms",
+        expiresAt: new Date(expiresAt).toISOString()
+      };
+    } catch (error) {
+      await this.closeClient(client2);
+      throw this.publicError(error);
+    }
+  }
+  async startQr(owner) {
+    await this.removeOwnerFlows(owner);
+    const credentials = await this.requireCredentials();
+    const client2 = this.deps.createClient(credentials);
+    const id = this.newFlowId();
+    const expiresAt = this.now() + this.ttlMs;
+    const flow = {
+      id,
+      owner,
+      credentials,
+      expiresAt,
+      errors: 0,
+      client: client2,
+      cleanupTimer: this.scheduleCleanup(id, expiresAt),
+      kind: "qr",
+      status: "pending",
+      qrData: null,
+      tokenExpiresAt: null,
+      version: 0,
+      passwordHint: null,
+      account: null,
+      error: null,
+      operation: Promise.resolve()
+    };
+    try {
+      await client2.connect();
+      client2.setQrLoginTokenHandler(async () => {
+        try {
+          await this.advanceQr(flow);
+        } catch (error) {
+          await this.failQr(flow, error);
+        }
+      });
+      this.flows.set(id, flow);
+      await this.advanceQr(flow);
+      return this.qrResponse(flow);
+    } catch (error) {
+      this.flows.delete(id);
+      clearTimeout(flow.cleanupTimer);
+      client2.setQrLoginTokenHandler(null);
+      await this.closeClient(client2);
+      throw this.publicError(error);
+    }
+  }
+  async refreshQr(owner, flowId) {
+    const flow = await this.requireQrFlow(owner, flowId);
+    if (flow.status !== "pending") return this.qrResponse(flow);
+    try {
+      await this.advanceQr(flow);
+    } catch (error) {
+      await this.failQr(flow, error);
+      throw this.publicError(error);
+    }
+    return this.qrResponse(flow);
+  }
+  async getQrStatus(owner, flowId) {
+    return this.qrResponse(await this.requireQrFlow(owner, flowId));
+  }
+  async submitCode(owner, flowId, rawCode) {
+    const flow = await this.requirePhoneFlow(owner, flowId, "code");
+    const code = String(rawCode || "").replace(/\s/g, "");
+    if (!/^\d{5,6}$/.test(code)) {
+      throw new TelegramUserLoginFlowError("INVALID_CODE", "\u8BF7\u8F93\u5165\u6709\u6548\u9A8C\u8BC1\u7801");
+    }
+    try {
+      const result = await this.requireClient(flow).signInCode(flow.phone, flow.phoneCodeHash, code);
+      if (result === "password_needed") {
+        flow.step = "password";
+        return { step: "password_required" };
+      }
+      return await this.completePhone(flow);
+    } catch (error) {
+      if (telegramErrorName(error).includes("SESSION_PASSWORD_NEEDED")) {
+        flow.step = "password";
+        return { step: "password_required" };
+      }
+      await this.recordError(flow);
+      throw this.publicError(error, "INVALID_CODE");
+    }
+  }
+  async submitPassword(owner, flowId, password) {
+    const flow = await this.requireFlow(owner, flowId);
+    if (!password) throw new TelegramUserLoginFlowError("INVALID_PASSWORD", "\u8BF7\u8F93\u5165\u4E24\u6B65\u9A8C\u8BC1\u5BC6\u7801");
+    if (flow.kind === "phone" && flow.step !== "password") {
+      throw new TelegramUserLoginFlowError("FLOW_NOT_FOUND", "\u767B\u5F55\u6B65\u9AA4\u65E0\u6548\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
+    }
+    if (flow.kind === "qr" && flow.status !== "password_required") {
+      throw new TelegramUserLoginFlowError("FLOW_NOT_FOUND", "\u767B\u5F55\u6B65\u9AA4\u65E0\u6548\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
+    }
+    try {
+      await this.requireClient(flow).signInPassword(password);
+      if (flow.kind === "phone") return await this.completePhone(flow);
+      const account = await this.authorizeAndClose(flow);
+      flow.status = "complete";
+      flow.account = account;
+      flow.qrData = null;
+      flow.tokenExpiresAt = null;
+      flow.passwordHint = null;
+      return { step: "complete", account };
+    } catch (error) {
+      await this.recordError(flow);
+      throw this.publicError(error, "INVALID_PASSWORD");
+    }
+  }
+  async cancel(owner, flowId) {
+    const flow = await this.requireFlow(owner, flowId);
+    await this.deleteAndClose(flow);
+    return { success: true };
+  }
+  async advanceQr(flow) {
+    const previous = flow.operation;
+    let release;
+    flow.operation = new Promise((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      if (flow.status !== "pending" || !this.flows.has(flow.id)) return;
+      const result = await this.requireClient(flow).exportQrLoginToken();
+      if (result.kind === "token") {
+        flow.qrData = `tg://login?token=${result.token.toString("base64url")}`;
+        flow.tokenExpiresAt = Math.min(result.expiresAt, flow.expiresAt);
+        flow.version += 1;
+        return;
+      }
+      flow.qrData = null;
+      flow.tokenExpiresAt = null;
+      if (result.kind === "password_required") {
+        flow.status = "password_required";
+        flow.passwordHint = result.hint || null;
+        return;
+      }
+      flow.account = await this.authorizeAndClose(flow);
+      flow.status = "complete";
+    } finally {
+      release();
+    }
+  }
+  async failQr(flow, error) {
+    if (!this.flows.has(flow.id) || flow.status === "complete") return;
+    flow.status = "error";
+    flow.qrData = null;
+    flow.tokenExpiresAt = null;
+    flow.error = this.publicError(error).message;
+    await this.detachAndClose(flow);
+  }
+  async completePhone(flow) {
+    try {
+      const account = await this.authorize(flow);
+      this.flows.delete(flow.id);
+      clearTimeout(flow.cleanupTimer);
+      return { step: "complete", account };
+    } finally {
+      await this.detachAndClose(flow);
+    }
+  }
+  async authorizeAndClose(flow) {
+    try {
+      return await this.authorize(flow);
+    } finally {
+      await this.detachAndClose(flow);
+    }
+  }
+  async authorize(flow) {
+    const client2 = this.requireClient(flow);
+    const account = normalizeAccount(await client2.getMe());
+    if (!account.userId) throw new TelegramUserLoginFlowError("TELEGRAM_ERROR", "Telegram \u767B\u5F55\u672A\u8FD4\u56DE\u7528\u6237\u8EAB\u4EFD");
+    await this.deps.onAuthorized({ session: client2.saveSession(), credentials: flow.credentials, account });
+    return account;
+  }
+  qrResponse(flow) {
+    const response = {
+      flowId: flow.id,
+      status: flow.status,
+      qrData: flow.status === "pending" ? flow.qrData : null,
+      expiresAt: new Date(flow.status === "pending" && flow.tokenExpiresAt ? flow.tokenExpiresAt : flow.expiresAt).toISOString(),
+      version: flow.version
+    };
+    if (flow.status === "password_required") response.passwordHint = flow.passwordHint;
+    if (flow.status === "complete" && flow.account) response.account = flow.account;
+    if (flow.status === "error" && flow.error) response.error = flow.error;
+    return response;
+  }
+  async requireFlow(owner, id) {
+    const flow = this.flows.get(String(id || ""));
+    if (!flow || flow.owner !== owner) {
+      throw new TelegramUserLoginFlowError("FLOW_NOT_FOUND", "\u767B\u5F55\u6D41\u7A0B\u4E0D\u5B58\u5728\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
+    }
+    if (flow.expiresAt <= this.now()) {
+      await this.deleteAndClose(flow);
+      throw new TelegramUserLoginFlowError("FLOW_EXPIRED", "\u767B\u5F55\u6D41\u7A0B\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
+    }
+    if (flow.errors >= this.maxErrors) {
+      await this.deleteAndClose(flow);
+      throw new TelegramUserLoginFlowError("TOO_MANY_ERRORS", "\u9519\u8BEF\u6B21\u6570\u8FC7\u591A\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
+    }
+    return flow;
+  }
+  async requirePhoneFlow(owner, id, step) {
+    const flow = await this.requireFlow(owner, id);
+    if (flow.kind !== "phone" || flow.step !== step) {
+      throw new TelegramUserLoginFlowError("FLOW_NOT_FOUND", "\u767B\u5F55\u6B65\u9AA4\u65E0\u6548\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
+    }
+    return flow;
+  }
+  async requireQrFlow(owner, id) {
+    const flow = await this.requireFlow(owner, id);
+    if (flow.kind !== "qr") {
+      throw new TelegramUserLoginFlowError("FLOW_NOT_FOUND", "\u4E8C\u7EF4\u7801\u767B\u5F55\u6D41\u7A0B\u4E0D\u5B58\u5728\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
+    }
+    return flow;
+  }
+  async recordError(flow) {
+    flow.errors += 1;
+    if (flow.errors >= this.maxErrors) await this.deleteAndClose(flow);
+  }
+  async removeOwnerFlows(owner) {
+    for (const flow of [...this.flows.values()]) {
+      if (flow.owner === owner) await this.deleteAndClose(flow);
+    }
+  }
+  scheduleCleanup(id, expiresAt) {
+    const timer = setTimeout(() => {
+      const flow = this.flows.get(id);
+      if (flow) void this.deleteAndClose(flow);
+    }, Math.max(1, expiresAt - this.now()));
+    timer.unref?.();
+    return timer;
+  }
+  async deleteAndClose(flow) {
+    this.flows.delete(flow.id);
+    clearTimeout(flow.cleanupTimer);
+    await this.detachAndClose(flow);
+  }
+  async detachAndClose(flow) {
+    const client2 = flow.client;
+    flow.client = null;
+    if (!client2) return;
+    if (flow.kind === "qr") client2.setQrLoginTokenHandler(null);
+    await this.closeClient(client2);
+  }
+  requireClient(flow) {
+    if (!flow.client) throw new TelegramUserLoginFlowError("FLOW_NOT_FOUND", "\u767B\u5F55\u6D41\u7A0B\u5DF2\u7ECF\u7ED3\u675F");
+    return flow.client;
+  }
+  async requireCredentials() {
+    const credentials = await this.deps.credentials();
+    if (!credentials?.apiId || !credentials.apiHash) {
+      throw new TelegramUserLoginFlowError("API_NOT_CONFIGURED", "\u8BF7\u5148\u914D\u7F6E\u6709\u6548\u7684 Telegram API ID \u548C API Hash");
+    }
+    return credentials;
+  }
+  newFlowId() {
+    return crypto7.randomBytes(24).toString("base64url");
+  }
+  publicError(error, fallback = "TELEGRAM_ERROR") {
+    if (error instanceof TelegramUserLoginFlowError) return error;
+    const name = telegramErrorName(error);
+    if (/PHONE_CODE_(INVALID|EXPIRED|EMPTY)/.test(name)) {
+      return new TelegramUserLoginFlowError("INVALID_CODE", "\u9A8C\u8BC1\u7801\u65E0\u6548\u6216\u5DF2\u8FC7\u671F");
+    }
+    if (/PASSWORD_HASH_INVALID/.test(name)) {
+      return new TelegramUserLoginFlowError("INVALID_PASSWORD", "\u4E24\u6B65\u9A8C\u8BC1\u5BC6\u7801\u9519\u8BEF");
+    }
+    if (/PHONE_NUMBER_INVALID/.test(name)) {
+      return new TelegramUserLoginFlowError("INVALID_PHONE", "\u624B\u673A\u53F7\u65E0\u6548");
+    }
+    return new TelegramUserLoginFlowError(
+      fallback,
+      fallback === "INVALID_PASSWORD" ? "\u4E24\u6B65\u9A8C\u8BC1\u5BC6\u7801\u9519\u8BEF" : fallback === "INVALID_CODE" ? "\u9A8C\u8BC1\u7801\u65E0\u6548\u6216\u5DF2\u8FC7\u671F" : "Telegram \u767B\u5F55\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5"
+    );
+  }
+  async closeClient(client2) {
+    try {
+      await client2.disconnect();
+    } catch {
+    }
+    try {
+      await client2.destroy();
+    } catch {
+    }
+  }
+};
+
+// src/services/telegramMultiAccountLogin.ts
+var adapter = null;
+function registerTelegramMultiAccountAuthorizedAdapter(next) {
+  adapter = next;
+}
+async function getCredentials() {
+  const effective = await getEffectiveTelegramBotConfig();
+  if (effective.credentials) {
+    return { apiId: effective.credentials.apiId, apiHash: effective.credentials.apiHash };
+  }
+  const apiId = Number.parseInt(process.env.TELEGRAM_API_ID || "0", 10);
+  const apiHash = process.env.TELEGRAM_API_HASH || "";
+  return apiId && apiHash ? { apiId, apiHash } : null;
+}
+function makeClient(credentials) {
+  return new TelegramClient2(new StringSession2(""), credentials.apiId, credentials.apiHash, {
+    proxy: getTelegramProxy(),
+    connectionRetries: 15,
+    retryDelay: 2e3,
+    useWSS: false,
+    deviceModel: "TG Vault Multi-Account Login",
+    systemVersion: "1.0.0",
+    appVersion: "1.0.0",
+    floodSleepThreshold: 120
+  });
+}
+var GramJsMultiAccountLoginClient = class {
+  constructor(client2, credentials) {
+    this.client = client2;
+    this.credentials = credentials;
+  }
+  client;
+  credentials;
+  qrHandler = null;
+  qrEvent = new Raw({ types: [Api.UpdateLoginToken] });
+  async connect() {
+    await this.client.connect();
+  }
+  sendCode(credentials, phone) {
+    return this.client.sendCode(credentials, phone);
+  }
+  async signInCode(phone, phoneCodeHash, code) {
+    try {
+      await this.client.invoke(new Api.auth.SignIn({ phoneNumber: phone, phoneCodeHash, phoneCode: code }));
+      return "authorized";
+    } catch (error) {
+      if (this.errorName(error).includes("SESSION_PASSWORD_NEEDED")) return "password_needed";
+      throw error;
+    }
+  }
+  async signInPassword(password) {
+    let captured;
+    await this.client.signInWithPassword(this.credentials, {
+      password: async () => password,
+      onError: async (error) => {
+        captured = error;
+        return true;
+      }
+    }).catch((error) => {
+      throw captured || error;
+    });
+  }
+  setQrLoginTokenHandler(handler) {
+    if (this.qrHandler) this.client.removeEventHandler(this.qrHandler, this.qrEvent);
+    this.qrHandler = handler;
+    if (handler) this.client.addEventHandler(handler, this.qrEvent);
+  }
+  async exportQrLoginToken() {
+    let result;
+    try {
+      result = await this.client.invoke(new Api.auth.ExportLoginToken({
+        apiId: this.credentials.apiId,
+        apiHash: this.credentials.apiHash,
+        exceptIds: []
+      }));
+    } catch (error) {
+      if (this.errorName(error).includes("SESSION_PASSWORD_NEEDED")) {
+        return { kind: "password_required" };
+      }
+      throw error;
+    }
+    if (result instanceof Api.auth.LoginToken) {
+      return {
+        kind: "token",
+        token: Buffer.from(result.token),
+        expiresAt: Number(result.expires) * 1e3
+      };
+    }
+    let imported = result;
+    if (result instanceof Api.auth.LoginTokenMigrateTo) {
+      await this.client._switchDC(result.dcId);
+      imported = await this.client.invoke(new Api.auth.ImportLoginToken({ token: result.token }));
+    }
+    if (imported instanceof Api.auth.LoginTokenSuccess) return { kind: "authorized" };
+    if (imported instanceof Api.auth.LoginToken) {
+      return {
+        kind: "token",
+        token: Buffer.from(imported.token),
+        expiresAt: Number(imported.expires) * 1e3
+      };
+    }
+    throw new Error("TELEGRAM_QR_LOGIN_UNEXPECTED_RESPONSE");
+  }
+  async getMe() {
+    return await this.client.getMe();
+  }
+  saveSession() {
+    return this.client.session.save();
+  }
+  disconnect() {
+    return this.client.disconnect();
+  }
+  destroy() {
+    return this.client.destroy();
+  }
+  errorName(error) {
+    if (!error || typeof error !== "object") return "";
+    return String(error.errorMessage || error.message || "");
+  }
+};
+async function onAuthorized(input) {
+  if (!adapter) {
+    throw new Error("Telegram \u591A\u8D26\u53F7\u4ED3\u5E93\u5C1A\u672A\u6CE8\u518C\uFF0C\u65E0\u6CD5\u4FDD\u5B58\u767B\u5F55\u8D26\u53F7");
+  }
+  await adapter.upsertByTelegramUserId(input);
+}
+var telegramMultiAccountLoginFlows = new TelegramMultiAccountLoginFlows({
+  credentials: getCredentials,
+  createClient: (credentials) => new GramJsMultiAccountLoginClient(makeClient(credentials), credentials),
+  onAuthorized
+});
+
+// src/services/telegramMultiAccountLoginAdapter.ts
+function createTelegramMultiAccountAuthorizedAdapter(deps) {
+  return {
+    async upsertByTelegramUserId({ session, credentials, account }) {
+      const persisted = await deps.repository.upsertAccount({
+        telegramUserId: account.userId,
+        username: account.username,
+        displayName: account.displayName,
+        session,
+        enabled: true
+      });
+      const accountId = String(persisted?.id || "");
+      if (accountId) await deps.pool.activateAccount(accountId, "login_complete", credentials);
+      if (accountId && deps.accessSweep) {
+        await deps.accessSweep.trigger({ accountIds: [accountId], reason: "account_created" });
+      }
+    }
+  };
+}
+
+// src/services/telegramAccountAccessSweep.ts
+var DENIED_ERROR_CODES = /* @__PURE__ */ new Set([
+  "CHANNEL_INVALID",
+  "CHANNEL_PRIVATE",
+  "CHAT_ADMIN_REQUIRED",
+  "CHAT_FORBIDDEN",
+  "CHAT_RESTRICTED",
+  "GROUP_PRIVATE",
+  "INVITE_HASH_EXPIRED",
+  "INVITE_HASH_INVALID",
+  "MESSAGE_ID_INVALID",
+  "PEER_ID_INVALID",
+  "USER_BANNED_IN_CHANNEL",
+  "USER_NOT_PARTICIPANT"
+]);
+var EMPTY_COUNTS = () => ({
+  accounts: 0,
+  sources: 0,
+  probes: 0,
+  allowed: 0,
+  denied: 0,
+  error: 0
+});
+var configuredDependencies = null;
+var currentSummary = {
+  runId: null,
+  status: "idle",
+  reason: null,
+  startedAt: null,
+  completedAt: null,
+  counts: EMPTY_COUNTS(),
+  lastError: null
+};
+var triggerTail = Promise.resolve();
+var nextRunSequence = 0;
+function errorText(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+function getTelegramAccessErrorCode(error) {
+  const candidate = error;
+  const raw = [candidate?.errorMessage, candidate?.code, candidate?.message, error].find((value) => typeof value === "string" && value.trim());
+  if (!raw) return "UNKNOWN_ERROR";
+  const normalized = raw.toUpperCase().trim();
+  if (/^[A-Z][A-Z0-9_]*$/.test(normalized)) return normalized;
+  const tokens = normalized.match(/[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+/g);
+  return tokens?.at(-1) || "UNKNOWN_ERROR";
+}
+function classifyTelegramAccessError(error) {
+  const code = getTelegramAccessErrorCode(error);
+  return DENIED_ERROR_CODES.has(code) || /(?:PRIVATE|FORBIDDEN|NOT_PARTICIPANT|BANNED)/.test(code) ? "denied" : "error";
+}
+function failureResult(input, error, now) {
+  return {
+    accountId: input.accountId,
+    sourceId: input.sourceId,
+    source: input.source,
+    scope: input.scope,
+    state: classifyTelegramAccessError(error),
+    checkedAt: now().toISOString(),
+    latestMessageId: null,
+    errorCode: getTelegramAccessErrorCode(error),
+    errorMessage: errorText(error)
+  };
+}
+async function probeTelegramAccountSource(input) {
+  const now = input.now || (() => /* @__PURE__ */ new Date());
+  try {
+    const entity = await input.client.getEntity(input.source);
+    const [latest] = await input.client.getMessages(entity, { limit: 1 });
+    const latestMessageId = typeof latest?.id === "number" ? latest.id : null;
+    if (input.scope === "comments" && latestMessageId !== null) {
+      await input.client.getMessages(input.source, { limit: 1, replyTo: latestMessageId });
+    }
+    return {
+      accountId: input.accountId,
+      sourceId: input.sourceId,
+      source: input.source,
+      scope: input.scope,
+      state: "allowed",
+      checkedAt: now().toISOString(),
+      latestMessageId
+    };
+  } catch (error) {
+    return failureResult(input, error, now);
+  }
+}
+async function mapWithConcurrency(values, concurrency2, worker) {
+  let cursor = 0;
+  const workerCount = Math.min(values.length, Math.max(1, Math.floor(concurrency2)));
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (cursor < values.length) {
+      const index = cursor;
+      cursor += 1;
+      await worker(values[index]);
+    }
+  }));
+}
+function normalizeScopes(source) {
+  const requested = source.scopes?.length ? source.scopes : ["channel"];
+  return Array.from(new Set(requested.filter((scope) => scope === "channel" || scope === "comments")));
+}
+function selected(values, key, identifiers) {
+  if (!identifiers) return [...values];
+  const wanted = new Set(identifiers);
+  return values.filter((value) => wanted.has(String(value[key])));
+}
+function runId(now) {
+  nextRunSequence += 1;
+  return `${now.getTime()}-${nextRunSequence}`;
+}
+async function runTelegramAccountAccessSweep(dependencies, options = {}) {
+  const now = dependencies.now || (() => /* @__PURE__ */ new Date());
+  const startedAt = now();
+  const reason = options.reason || "automatic";
+  const summary = {
+    runId: runId(startedAt),
+    status: "running",
+    reason,
+    startedAt: startedAt.toISOString(),
+    completedAt: null,
+    counts: EMPTY_COUNTS(),
+    lastError: null
+  };
+  currentSummary = summary;
+  try {
+    const [accountRows, sourceRows] = await Promise.all([
+      dependencies.listTelegramAccounts(),
+      dependencies.listTelegramChannelSubscriptions()
+    ]);
+    const accounts = selected(accountRows.filter((account) => account.enabled), "accountId", options.accountIds);
+    const sources = selected(sourceRows.filter((source) => source.enabled), "sourceId", options.sourceIds);
+    summary.counts.accounts = accounts.length;
+    summary.counts.sources = sources.length;
+    const work = [];
+    for (const account of accounts) {
+      for (const source of sources) {
+        for (const scope of normalizeScopes(source)) work.push({ account, source, scope });
+      }
+    }
+    summary.counts.probes = work.length;
+    const runtimePromises = /* @__PURE__ */ new Map();
+    const getRuntime = (accountId) => {
+      let runtime = runtimePromises.get(accountId);
+      if (!runtime) {
+        runtime = dependencies.getTelegramAccountRuntime(accountId);
+        runtimePromises.set(accountId, runtime);
+      }
+      return runtime;
+    };
+    await mapWithConcurrency(work, options.concurrency ?? 2, async (item) => {
+      let result;
+      try {
+        const runtime = await getRuntime(item.account.accountId);
+        if (!runtime?.client) throw new Error("TELEGRAM_ACCOUNT_RUNTIME_UNAVAILABLE");
+        result = await probeTelegramAccountSource({
+          accountId: item.account.accountId,
+          sourceId: item.source.sourceId,
+          source: item.source.source,
+          scope: item.scope,
+          client: runtime.client,
+          now
+        });
+      } catch (error) {
+        result = failureResult({
+          accountId: item.account.accountId,
+          sourceId: item.source.sourceId,
+          source: item.source.source,
+          scope: item.scope
+        }, error, now);
+      }
+      summary.counts[result.state] += 1;
+      await dependencies.markTelegramAccountSourceAccess(result);
+    });
+    summary.status = "completed";
+    summary.completedAt = now().toISOString();
+    currentSummary = summary;
+    return summary;
+  } catch (error) {
+    summary.status = "failed";
+    summary.completedAt = now().toISOString();
+    summary.lastError = errorText(error);
+    currentSummary = summary;
+    throw error;
+  }
+}
+function configureTelegramAccountAccessSweep(dependencies) {
+  configuredDependencies = dependencies;
+}
+function triggerTelegramAccountAccessSweep(options = {}) {
+  if (!configuredDependencies) {
+    return Promise.reject(new Error("TELEGRAM_ACCOUNT_ACCESS_SWEEP_NOT_CONFIGURED"));
+  }
+  const dependencies = configuredDependencies;
+  currentSummary = {
+    ...currentSummary,
+    status: "queued",
+    reason: options.reason || "manual",
+    completedAt: null,
+    lastError: null
+  };
+  const run = triggerTail.then(() => runTelegramAccountAccessSweep(dependencies, {
+    ...options,
+    reason: options.reason || "manual"
+  }));
+  triggerTail = run.then(() => void 0, () => void 0);
+  return run;
+}
+function getTelegramAccountAccessSweepSummary() {
+  return {
+    ...currentSummary,
+    counts: { ...currentSummary.counts }
+  };
+}
+
+// src/services/telegramAccountAccessSweepAdapter.ts
+init_db();
+function createTelegramAccountAccessSweepDependencies(options) {
+  const repository = options.repository || telegramAccountRepository;
+  const querySubscriptions = options.querySubscriptions || query;
+  return {
+    async listTelegramAccounts() {
+      const accounts = await repository.listEnabledAccounts();
+      return accounts.map((account) => ({ accountId: account.id, enabled: account.enabled }));
+    },
+    async listTelegramChannelSubscriptions() {
+      const result = await querySubscriptions(
+        `SELECT id, source, enabled
+                 FROM telegram_channel_subscriptions
+                 WHERE enabled = TRUE
+                 ORDER BY created_at, id`
+      );
+      return result.rows.map((row) => ({
+        sourceId: String(row.id),
+        source: String(row.source),
+        enabled: Boolean(row.enabled),
+        scopes: ["channel", "comments"]
+      }));
+    },
+    async getTelegramAccountRuntime(accountId) {
+      const client2 = options.clientPool.getAccountClient(accountId);
+      return client2 ? { client: client2 } : null;
+    },
+    async markTelegramAccountSourceAccess(result) {
+      const state = result.state === "error" ? "unknown" : result.state;
+      const error = result.errorCode || result.errorMessage || null;
+      const scope = result.scope === "channel" ? "scan" : "metadata";
+      await repository.markSourceAccess(result.accountId, result.source, scope, state, error);
+      if (result.scope === "channel") {
+        await repository.markSourceAccess(result.accountId, result.source, "download", state, error);
+      }
+    },
+    now: options.now
+  };
+}
+function installTelegramAccountAccessSweep(options) {
+  const dependencies = createTelegramAccountAccessSweepDependencies(options);
+  configureTelegramAccountAccessSweep(dependencies);
+  return dependencies;
+}
+
+// src/services/telegramMultiAccountRuntime.ts
+var installed = false;
+var initializationPromise2 = null;
+async function installTelegramMultiAccountRuntimeAdapters() {
+  if (installed) return;
+  installTelegramAccountAccessSweep({ clientPool: telegramUserClientPool });
+  registerTelegramMultiAccountAuthorizedAdapter(createTelegramMultiAccountAuthorizedAdapter({
+    repository: telegramAccountRepository,
+    pool: {
+      activateAccount: (accountId, reason, credentials) => telegramUserClientPool.activateAccount(accountId, reason, credentials)
+    },
+    accessSweep: { trigger: (options) => triggerTelegramAccountAccessSweep(options) }
+  }));
+  installed = true;
+}
+async function initializeTelegramMultiAccountRuntime(credentials) {
+  if (initializationPromise2) return initializationPromise2;
+  const run = (async () => {
+    await installTelegramMultiAccountRuntimeAdapters();
+    await initializeTelegramUserClientPool(credentials);
+  })();
+  initializationPromise2 = run;
+  try {
+    await run;
+  } finally {
+    if (initializationPromise2 === run) initializationPromise2 = null;
+  }
+}
+async function selectTelegramDownloadAccount(sourceKey, options = {}) {
+  const normalized = typeof options?.[Symbol.iterator] === "function" ? { excludeAccountIds: options } : options;
+  return telegramUserClientPool.select(sourceKey, { ...normalized, scope: normalized.scope || "download" });
+}
+async function markTelegramAccountCooldown(accountId, seconds, error = null) {
+  await telegramAccountRepository.markCooldown(accountId, seconds, error);
+  const safeSeconds = Number.isFinite(seconds) ? Math.max(1, seconds) : 60;
+  telegramUserClientPool.updateCooldown(accountId, new Date(Date.now() + safeSeconds * 1e3), error);
+}
+async function markTelegramAccountSourceAccess(accountId, sourceKey, scope, state, error = null) {
+  await telegramAccountRepository.markSourceAccess(accountId, sourceKey, scope, state, error);
+  telegramUserClientPool.updateSourceAccess(accountId, sourceKey, scope, state);
+}
+async function markTelegramAccountSessionExpired(accountId, error = null) {
+  await telegramAccountRepository.markSessionExpired(accountId, error);
+  await telegramUserClientPool.expireAccount(accountId);
+}
+function classifyTelegramDownloadAccountError(error) {
+  const value = error;
+  const text = `${value?.errorMessage || ""} ${value?.message || ""}`;
+  if (isTelegramSessionExpiredError(error)) return "session_expired";
+  if (/CHANNEL_PRIVATE|USER_NOT_PARTICIPANT|CHAT_FORBIDDEN|CHAT_ADMIN_REQUIRED|Could not find the input entity|Cannot find any entity|forbidden|privacy/i.test(text)) return "permission_denied";
+  if (Number(value?.seconds || value?.value || text.match(/FLOOD_WAIT_?(\d+)/i)?.[1] || 0) > 0 || /FLOOD|Too many requests/i.test(text)) return "flood_wait";
+  return "retryable";
+}
+function telegramFloodWaitSeconds(error) {
+  const value = error;
+  const text = `${value?.errorMessage || ""} ${value?.message || ""}`;
+  return Math.max(30, Number(value?.seconds || value?.value || text.match(/FLOOD_WAIT_?(\d+)/i)?.[1] || 60));
+}
+
+// src/services/telegramUpload.ts
+init_db();
+import fs10 from "fs";
+import path13 from "path";
+import crypto15 from "crypto";
+import bigInt from "big-integer";
+
+// src/utils/thumbnail.ts
+import path4 from "path";
+import sharp from "sharp";
+import ffmpeg from "fluent-ffmpeg";
+import fs4 from "fs";
+import crypto8 from "crypto";
+var THUMBNAIL_DIR = path4.resolve(process.env.THUMBNAIL_DIR || "./data/thumbnails");
+if (!fs4.existsSync(THUMBNAIL_DIR)) {
+  fs4.mkdirSync(THUMBNAIL_DIR, { recursive: true });
+}
+var PREVIEW_DIR = path4.resolve(process.env.PREVIEW_DIR || "./data/previews");
+if (!fs4.existsSync(PREVIEW_DIR)) {
+  fs4.mkdirSync(PREVIEW_DIR, { recursive: true });
+}
+function isMp4Like(mimeType, filePath) {
+  const lower = filePath.toLowerCase();
+  return mimeType === "video/mp4" || lower.endsWith(".mp4") || lower.endsWith(".m4v") || lower.endsWith(".mov");
+}
+function ffmpegRun(command, label) {
+  return new Promise((resolve, reject) => {
+    command.on("start", (cmd) => console.log(`[Preview] ${label} CMD: ${cmd}`)).on("end", () => resolve()).on("error", (err) => reject(err)).run();
+  });
+}
+async function generateMediaPreview(filePath, storedName, mimeType) {
+  const absFilePath = path4.resolve(filePath);
+  if (!fs4.existsSync(absFilePath)) return null;
+  try {
+    if (mimeType.startsWith("image/") && mimeType !== "image/gif") {
+      const previewName = `preview_${crypto8.randomUUID()}.webp`;
+      const previewPath = path4.join(PREVIEW_DIR, previewName);
+      await sharp(absFilePath).rotate().resize(2048, 2048, { fit: "inside", withoutEnlargement: true }).webp({ quality: 86, effort: 4 }).toFile(previewPath);
+      console.log(`[Preview] \u2705 Image preview created: ${previewName}`);
+      return previewPath;
+    }
+    if (mimeType.startsWith("video/")) {
+      const previewName = `preview_${crypto8.randomUUID()}.mp4`;
+      const previewPath = path4.join(PREVIEW_DIR, previewName);
+      const mp4Like = isMp4Like(mimeType, storedName || absFilePath);
+      if (mp4Like) {
+        try {
+          await ffmpegRun(
+            ffmpeg(absFilePath).outputOptions(["-c copy", "-movflags +faststart"]).output(previewPath),
+            "Video faststart"
+          );
+          if (fs4.existsSync(previewPath) && fs4.statSync(previewPath).size > 0) {
+            console.log(`[Preview] \u2705 Video faststart preview created: ${previewName}`);
+            return previewPath;
+          }
+        } catch (copyError) {
+          console.warn(`[Preview] \u26A0\uFE0F Faststart copy failed, fallback to transcode: ${copyError.message}`);
+          try {
+            if (fs4.existsSync(previewPath)) fs4.unlinkSync(previewPath);
+          } catch {
+          }
+        }
+      }
+      await ffmpegRun(
+        ffmpeg(absFilePath).videoCodec("libx264").audioCodec("aac").size("?x720").outputOptions([
+          "-preset veryfast",
+          "-crf 23",
+          "-movflags +faststart",
+          "-pix_fmt yuv420p",
+          "-profile:v baseline",
+          "-level 3.1",
+          "-b:a 128k"
+        ]).output(previewPath),
+        "Video transcode"
+      );
+      if (fs4.existsSync(previewPath) && fs4.statSync(previewPath).size > 0) {
+        console.log(`[Preview] \u2705 Video transcoded preview created: ${previewName}`);
+        return previewPath;
+      }
+    }
+  } catch (error) {
+    console.error(`[Preview] \u274C Generate preview failed for ${storedName}:`, error.message);
+  }
+  return null;
+}
+async function generateThumbnail(filePath, storedName, mimeType) {
+  const absFilePath = path4.resolve(filePath);
+  const thumbName = `thumb_${crypto8.randomUUID()}.webp`;
+  const thumbPath = path4.join(THUMBNAIL_DIR, thumbName);
+  console.log(`[Thumbnail] \u{1F680} Starting generation for: ${storedName}`);
+  console.log(`[Thumbnail] Source: ${absFilePath}`);
+  console.log(`[Thumbnail] Target: ${thumbPath}`);
+  console.log(`[Thumbnail] MIME: ${mimeType}`);
+  if (!fs4.existsSync(absFilePath)) {
+    console.error(`[Thumbnail] \u274C Source file does not exist: ${absFilePath}`);
+    return null;
+  }
+  if (mimeType === "image/gif") {
+    console.log(`[Thumbnail] \u23E9 Skipping GIF to preserve animation`);
+    return null;
+  }
+  try {
+    if (mimeType.startsWith("image/")) {
+      console.log(`[Thumbnail] \u{1F5BC}\uFE0F  Processing image with Sharp...`);
+      await sharp(absFilePath).resize(400, 300, { fit: "inside", withoutEnlargement: true }).webp({ quality: 80 }).toFile(thumbPath);
+      console.log(`[Thumbnail] \u2705 Image thumbnail created: ${thumbName}`);
+      return thumbPath;
+    } else if (mimeType.startsWith("video/")) {
+      console.log(`[Thumbnail] \u{1F3AC} Processing video with Ffmpeg...`);
+      const tryScreenshot = (timestamp) => {
+        return new Promise((resolve) => {
+          console.log(`[Thumbnail] \u{1F4F8} Attempting screenshot at ${timestamp}`);
+          ffmpeg(absFilePath).screenshots({
+            count: 1,
+            folder: THUMBNAIL_DIR,
+            filename: thumbName,
+            size: "400x300",
+            timestamps: [timestamp]
+          }).on("start", (cmd) => console.log(`[Thumbnail] FFmpeg CMD: ${cmd}`)).on("end", () => {
+            if (fs4.existsSync(thumbPath)) {
+              console.log(`[Thumbnail] \u2705 Video thumbnail created at ${timestamp}`);
+              resolve(true);
+            } else {
+              console.warn(`[Thumbnail] \u26A0\uFE0F  FFmpeg finished but file not found at ${timestamp}`);
+              resolve(false);
+            }
+          }).on("error", (err) => {
+            console.error(`[Thumbnail] \u274C FFmpeg error at ${timestamp}:`, err.message);
+            resolve(false);
+          });
+        });
+      };
+      let success = await tryScreenshot("10%");
+      if (!success) {
+        console.log(`[Thumbnail] \u{1F504} Retrying at 1s mark...`);
+        success = await tryScreenshot("00:00:01");
+      }
+      if (success) {
+        return thumbPath;
+      }
+    }
+  } catch (error) {
+    console.error(`[Thumbnail] \u274C Unexpected error:`, error.message);
+  }
+  return null;
+}
+async function getImageDimensions(filePath, mimeType) {
+  const absFilePath = path4.resolve(filePath);
+  console.log(`[Dimensions] \u{1F4CF} Getting dimensions for: ${absFilePath} (${mimeType})`);
+  try {
+    if (mimeType.startsWith("image/")) {
+      const metadata = await sharp(absFilePath).metadata();
+      const result = { width: metadata.width || 0, height: metadata.height || 0 };
+      console.log(`[Dimensions] \u2705 Image dimensions: ${result.width}x${result.height}`);
+      return result;
+    } else if (mimeType.startsWith("video/")) {
+      return new Promise((resolve) => {
+        ffmpeg.ffprobe(absFilePath, (err, metadata) => {
+          if (err) {
+            console.error(`[Dimensions] \u274C Probe failed:`, err.message);
+            resolve({ width: 0, height: 0 });
+          } else {
+            const stream = metadata.streams.find((s) => s.width && s.height);
+            const result = {
+              width: stream?.width || 0,
+              height: stream?.height || 0
+            };
+            console.log(`[Dimensions] \u2705 Video dimensions: ${result.width}x${result.height}`);
+            resolve(result);
+          }
+        });
+      });
+    }
+  } catch (error) {
+    console.error("Get dimensions failed:", error);
+  }
+  return { width: 0, height: 0 };
+}
+
+// src/services/telegramUpload.ts
+init_storage();
+
+// src/services/taskAbortRegistry.ts
+var TaskAbortRegistry = class {
+  controllers = /* @__PURE__ */ new Map();
+  acquire(taskId) {
+    const current3 = this.controllers.get(taskId);
+    if (current3 && !current3.controller.signal.aborted) {
+      current3.references += 1;
+      return current3.controller;
+    }
+    const controller = new AbortController();
+    this.controllers.set(taskId, { controller, references: 1 });
+    return controller;
+  }
+  get(taskId) {
+    return this.controllers.get(taskId)?.controller;
+  }
+  cancel(taskId, reason = "\u4EFB\u52A1\u5DF2\u53D6\u6D88") {
+    const entry = this.controllers.get(taskId);
+    if (!entry || entry.controller.signal.aborted) return false;
+    entry.controller.abort(reason);
+    this.controllers.delete(taskId);
+    return true;
+  }
+  release(taskId, controller) {
+    const entry = this.controllers.get(taskId);
+    if (!entry || entry.controller !== controller) return;
+    entry.references -= 1;
+    if (entry.references <= 0) this.controllers.delete(taskId);
+  }
+};
+
+// src/services/storageCooldownGuard.ts
+init_storage();
+init_storageCooldown();
+function formatStorageCooldownNotice(cooldownUntil) {
+  return [
+    "\u23F8\uFE0F Google Drive \u4ECA\u65E5\u4E0A\u4F20\u989D\u5EA6\u5DF2\u8FBE\u4E0A\u9650",
+    "",
+    "\u5F53\u524D\u4EFB\u52A1\u5DF2\u81EA\u52A8\u6682\u505C\uFF0C\u5269\u4F59\u6587\u4EF6\u4E0D\u4F1A\u4E22\u5931\uFF1B\u65E0\u9700\u70B9\u51FB\u201C\u7EE7\u7EED\u201D\u3002",
+    describeStorageCooldownRecovery(cooldownUntil),
+    "",
+    `\u6062\u590D\u65F6\u95F4\uFF1A${cooldownUntil.toISOString()}`
+  ].join("\n");
+}
+function buildStorageCooldownHttpError(error) {
+  return {
+    status: 429,
+    body: {
+      error: error.message || "Google Drive \u4ECA\u65E5\u4E0A\u4F20\u989D\u5EA6\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002",
+      code: "storage_account_cooling",
+      provider: error.provider,
+      reason: error.reason,
+      retryAt: error.cooldownUntil.toISOString()
+    }
+  };
+}
+function sendStorageCooldownHttpError(res, error) {
+  const payload = buildStorageCooldownHttpError(error);
+  res.status(payload.status).json(payload.body);
+}
+async function getStorageCooldown(target) {
+  if (target.provider.name !== "google_drive" || !target.accountId) return null;
+  return getStorageAccountCooldown(target.accountId, target.provider.name, STORAGE_COOLDOWN_REASON_DAILY_UPLOAD_LIMIT);
+}
+async function assertStorageTargetWritable(target) {
+  const cooldown = await getStorageCooldown(target);
+  if (!cooldown) return;
+  throw new StorageQuotaCooldownError("Google Drive \u4ECA\u65E5\u4E0A\u4F20\u989D\u5EA6\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u8BF7\u7B49\u5F85\u81EA\u52A8\u6062\u590D\u540E\u518D\u4E0A\u4F20\uFF0C\u6216\u4E34\u65F6\u5207\u6362\u5176\u5B83\u5B58\u50A8\u6E90\u3002", {
+    provider: cooldown.provider,
+    reason: cooldown.reason,
+    storageAccountId: cooldown.storageAccountId,
+    cooldownUntil: cooldown.cooldownUntil
+  });
+}
+function isStorageCooldownError(error) {
+  return isStorageQuotaCooldownError(error);
+}
+
+// src/services/telegramUpload.ts
+init_storageCooldown();
+
+// src/services/telegramUserClient.ts
+import fs9 from "node:fs";
+import path8 from "node:path";
+import { Api as Api2, TelegramClient as TelegramClient3 } from "telegram";
+import { StringSession as StringSession3 } from "telegram/sessions/index.js";
+
+// src/services/telegramUserWebLogin.ts
+import crypto10 from "node:crypto";
+var TelegramUserLoginFlowError2 = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "TelegramUserLoginFlowError";
+  }
+  code;
+};
+function telegramErrorName2(error) {
+  if (!error || typeof error !== "object") return "";
+  return String(error.errorMessage || error.message || "");
+}
+function normalizeAccount2(me) {
+  const displayName = [me.firstName, me.lastName].filter(Boolean).join(" ").trim();
+  return { userId: String(me.id ?? ""), username: me.username || null, displayName: displayName || null };
+}
+var TelegramUserWebLoginFlows = class {
+  constructor(deps) {
+    this.deps = deps;
+    this.now = deps.now || Date.now;
+    this.ttlMs = deps.ttlMs ?? 5 * 6e4;
+    this.maxErrors = deps.maxErrors ?? 3;
+  }
+  deps;
+  flows = /* @__PURE__ */ new Map();
+  ttlMs;
+  maxErrors;
+  now;
+  async start(owner, rawPhone) {
+    const phone = String(rawPhone || "").replace(/[\s()-]/g, "");
+    if (!/^\+[1-9]\d{6,14}$/.test(phone)) throw new TelegramUserLoginFlowError2("INVALID_PHONE", "\u8BF7\u8F93\u5165\u542B\u56FD\u5BB6\u533A\u53F7\u7684\u6709\u6548\u624B\u673A\u53F7");
+    await this.removeOwnerFlows(owner);
+    const credentials = await this.deps.credentials();
+    if (!credentials?.apiId || !credentials.apiHash) throw new TelegramUserLoginFlowError2("API_NOT_CONFIGURED", "\u8BF7\u5148\u914D\u7F6E\u6709\u6548\u7684 Telegram API ID \u548C API Hash");
+    const client2 = this.deps.createClient(credentials);
+    try {
+      await client2.connect();
+      const sent = await client2.sendCode(credentials, phone);
+      const flowId = crypto10.randomBytes(24).toString("base64url");
+      const expiresAt = this.now() + this.ttlMs;
+      this.flows.set(flowId, { id: flowId, owner, phone, phoneCodeHash: sent.phoneCodeHash, expiresAt, errors: 0, step: "code", client: client2, credentials });
+      return { flowId, delivery: sent.isCodeViaApp ? "app" : "sms", expiresAt: new Date(expiresAt).toISOString() };
+    } catch (error) {
+      await this.closeClient(client2);
+      throw this.publicError(error);
+    }
+  }
+  async submitCode(owner, flowId, rawCode) {
+    const flow = await this.requireFlow(owner, flowId, "code");
+    const code = String(rawCode || "").replace(/\s/g, "");
+    if (!/^\d{5,6}$/.test(code)) throw new TelegramUserLoginFlowError2("INVALID_CODE", "\u8BF7\u8F93\u5165\u6709\u6548\u9A8C\u8BC1\u7801");
+    try {
+      const result = await flow.client.signInCode(flow.phone, flow.phoneCodeHash, code);
+      if (result === "password_needed") {
+        flow.step = "password";
+        return { step: "password_required" };
+      }
+      return await this.complete(flow);
+    } catch (error) {
+      if (telegramErrorName2(error).includes("SESSION_PASSWORD_NEEDED")) {
+        flow.step = "password";
+        return { step: "password_required" };
+      }
+      await this.recordError(flow);
+      throw this.publicError(error, "INVALID_CODE");
+    }
+  }
+  async submitPassword(owner, flowId, password) {
+    const flow = await this.requireFlow(owner, flowId, "password");
+    if (!password) throw new TelegramUserLoginFlowError2("INVALID_PASSWORD", "\u8BF7\u8F93\u5165\u4E24\u6B65\u9A8C\u8BC1\u5BC6\u7801");
+    try {
+      await flow.client.signInPassword(password);
+      return await this.complete(flow);
+    } catch (error) {
+      await this.recordError(flow);
+      throw this.publicError(error, "INVALID_PASSWORD");
+    }
+  }
+  async removeOwnerFlows(owner) {
+    const owned = [...this.flows.values()].filter((flow) => flow.owner === owner);
+    for (const flow of owned) {
+      this.flows.delete(flow.id);
+      await this.closeClient(flow.client);
+    }
+  }
+  async complete(flow) {
+    try {
+      const account = normalizeAccount2(await flow.client.getMe());
+      await this.deps.persistAndActivate(flow.client.saveSession(), account, flow.credentials);
+      this.flows.delete(flow.id);
+      return { step: "complete", account };
+    } finally {
+      await this.closeClient(flow.client);
+    }
+  }
+  async requireFlow(owner, id, step) {
+    const flow = this.flows.get(id);
+    if (!flow || flow.owner !== owner) throw new TelegramUserLoginFlowError2("FLOW_NOT_FOUND", "\u767B\u5F55\u6D41\u7A0B\u4E0D\u5B58\u5728\uFF0C\u8BF7\u91CD\u65B0\u53D1\u9001\u9A8C\u8BC1\u7801");
+    if (flow.expiresAt <= this.now()) {
+      this.flows.delete(id);
+      await this.closeClient(flow.client);
+      throw new TelegramUserLoginFlowError2("FLOW_EXPIRED", "\u767B\u5F55\u6D41\u7A0B\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u53D1\u9001\u9A8C\u8BC1\u7801");
+    }
+    if (flow.errors >= this.maxErrors) {
+      this.flows.delete(id);
+      await this.closeClient(flow.client);
+      throw new TelegramUserLoginFlowError2("TOO_MANY_ERRORS", "\u9519\u8BEF\u6B21\u6570\u8FC7\u591A\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
+    }
+    if (flow.step !== step) throw new TelegramUserLoginFlowError2("FLOW_NOT_FOUND", "\u767B\u5F55\u6B65\u9AA4\u65E0\u6548\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
+    return flow;
+  }
+  async recordError(flow) {
+    flow.errors += 1;
+  }
+  publicError(error, fallback = "TELEGRAM_ERROR") {
+    if (error instanceof TelegramUserLoginFlowError2) return error;
+    const name = telegramErrorName2(error);
+    if (/PHONE_CODE_(INVALID|EXPIRED|EMPTY)/.test(name)) return new TelegramUserLoginFlowError2("INVALID_CODE", "\u9A8C\u8BC1\u7801\u65E0\u6548\u6216\u5DF2\u8FC7\u671F");
+    if (/PASSWORD_HASH_INVALID/.test(name)) return new TelegramUserLoginFlowError2("INVALID_PASSWORD", "\u4E24\u6B65\u9A8C\u8BC1\u5BC6\u7801\u9519\u8BEF");
+    if (/PHONE_NUMBER_INVALID/.test(name)) return new TelegramUserLoginFlowError2("INVALID_PHONE", "\u624B\u673A\u53F7\u65E0\u6548");
+    return new TelegramUserLoginFlowError2(fallback, fallback === "INVALID_PASSWORD" ? "\u4E24\u6B65\u9A8C\u8BC1\u5BC6\u7801\u9519\u8BEF" : fallback === "INVALID_CODE" ? "\u9A8C\u8BC1\u7801\u65E0\u6548\u6216\u5DF2\u8FC7\u671F" : "Telegram \u767B\u5F55\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+  }
+  async closeClient(client2) {
+    try {
+      await client2.disconnect();
+    } catch {
+    }
+    try {
+      await client2.destroy();
+    } catch {
+    }
+  }
+};
+
+// src/services/telegramUserClient.ts
+init_settings();
+
+// src/services/telegramUserClientStatus.ts
+var current2 = {
+  status: "not_configured",
+  userId: null,
+  username: null,
+  checkedAt: null,
+  lastError: null,
+  action: "\u914D\u7F6E Telegram API \u540E\u5728\u7F51\u9875\u767B\u5F55\u8D26\u53F7"
+};
+function getTelegramUserClientStatus() {
+  return { ...current2 };
+}
+function recordTelegramUserClientReady(input) {
+  current2 = {
+    status: "ready",
+    userId: input.userId,
+    username: input.username || null,
+    checkedAt: input.checkedAt || (/* @__PURE__ */ new Date()).toISOString(),
+    lastError: null,
+    action: null
+  };
+}
+function recordTelegramUserClientFailure(status, message) {
+  const actions = {
+    not_configured: "\u914D\u7F6E Telegram API \u540E\u5728\u7F51\u9875\u767B\u5F55\u8D26\u53F7",
+    missing_session: "\u5728\u7F51\u9875\u4E2D\u767B\u5F55 Telegram \u7528\u6237\u8D26\u53F7",
+    disabled: "\u53EF\u968F\u65F6\u91CD\u65B0\u542F\u7528\uFF0C\u5DF2\u52A0\u5BC6\u4FDD\u5B58\u7684\u767B\u5F55\u4FE1\u606F\u4F1A\u4FDD\u7559",
+    expired: "\u5728\u7F51\u9875\u4E2D\u91CD\u65B0\u767B\u5F55 Telegram \u7528\u6237\u8D26\u53F7",
+    permission_denied: "\u5148\u7528\u8BE5\u8D26\u53F7\u52A0\u5165\u76EE\u6807\u9891\u9053\u5E76\u91CD\u65B0\u6D4B\u8BD5",
+    error: "\u68C0\u67E5\u7F51\u7EDC\u4E0E\u540E\u7AEF\u65E5\u5FD7\u540E\u91CD\u65B0\u6D4B\u8BD5"
+  };
+  current2 = { ...current2, status, checkedAt: (/* @__PURE__ */ new Date()).toISOString(), lastError: message, action: actions[status] };
+}
+
+// src/services/telegramUserClient.ts
+var TELEGRAM_USER_SESSION_SETTING = "telegram_user_session";
+var TELEGRAM_USER_ENABLED_SETTING = "telegram_user_download_enabled";
+var TELEGRAM_USER_ID_SETTING = "telegram_user_id";
+var TELEGRAM_USER_USERNAME_SETTING = "telegram_user_username";
+var userClient = null;
+var userSessionFilePath = "";
+async function getTelegramUserCredentials() {
+  const effective = await getEffectiveTelegramBotConfig();
+  if (effective.credentials) return { apiId: effective.credentials.apiId, apiHash: effective.credentials.apiHash };
+  const apiId = Number.parseInt(process.env.TELEGRAM_API_ID || "0", 10);
+  const apiHash = process.env.TELEGRAM_API_HASH || "";
+  return apiId && apiHash ? { apiId, apiHash } : null;
+}
+function getSessionFilePath() {
+  return process.env.TELEGRAM_USER_SESSION_FILE || "./data/telegram_user_session.txt";
+}
+async function stopLegacyClient() {
+  const current3 = userClient;
+  userClient = null;
+  if (current3) {
+    try {
+      await current3.disconnect();
+    } catch {
+    }
+    try {
+      await current3.destroy();
+    } catch {
+    }
+  }
+}
+async function migrateLegacyTelegramUserSession() {
+  const stored = await getSetting(TELEGRAM_USER_SESSION_SETTING, "");
+  if (stored) return stored;
+  userSessionFilePath = getSessionFilePath();
+  if (!fs9.existsSync(userSessionFilePath)) return "";
+  const legacy = fs9.readFileSync(userSessionFilePath, "utf8").trim();
+  if (!legacy) return "";
+  await setSetting(TELEGRAM_USER_SESSION_SETTING, legacy);
+  return legacy;
+}
+function makeClient2(session, credentials) {
+  return new TelegramClient3(new StringSession3(session), credentials.apiId, credentials.apiHash, {
+    proxy: getTelegramProxy(),
+    connectionRetries: 15,
+    retryDelay: 2e3,
+    useWSS: false,
+    deviceModel: "TG Vault User Downloader",
+    systemVersion: "1.0.0",
+    appVersion: "1.0.0",
+    floodSleepThreshold: 120
+  });
+}
+async function initTelegramUserClient(credentials) {
+  await stopLegacyClient();
+  const resolved = credentials || await getTelegramUserCredentials();
+  if (!resolved) {
+    recordTelegramUserClientFailure("not_configured", "\u672A\u914D\u7F6E Telegram API");
+    return;
+  }
+  const sessionString = await migrateLegacyTelegramUserSession();
+  if (!sessionString) {
+    recordTelegramUserClientFailure("not_configured", "\u672A\u914D\u7F6E Telegram \u7528\u6237\u8D26\u53F7 session");
+    return;
+  }
+  await initializeTelegramMultiAccountRuntime(resolved);
+  const pooledClient = telegramUserClientPool.getDefaultClient();
+  if (pooledClient) {
+    const me = await pooledClient.getMe();
+    recordTelegramUserClientReady({ userId: String(me?.id || ""), username: me?.username || null });
+    const legacyPath = getSessionFilePath();
+    if (fs9.existsSync(legacyPath)) fs9.rmSync(legacyPath, { force: true });
+    return;
+  }
+  if (!sessionString) {
+    recordTelegramUserClientFailure("missing_session", "\u5C1A\u672A\u767B\u5F55 Telegram \u7528\u6237\u8D26\u53F7");
+    return;
+  }
+  if (await getSetting(TELEGRAM_USER_ENABLED_SETTING, "false") !== "true") {
+    recordTelegramUserClientFailure("disabled", "");
+    return;
+  }
+  const client2 = makeClient2(sessionString, resolved);
+  try {
+    await client2.connect();
+    if (!await client2.checkAuthorization()) throw new Error("SESSION_EXPIRED");
+    userClient = client2;
+    const saved = client2.session.save();
+    if (saved !== sessionString) await setSetting(TELEGRAM_USER_SESSION_SETTING, saved);
+    const me = await client2.getMe();
+    recordTelegramUserClientReady({ userId: String(me?.id || ""), username: me?.username || null });
+    const legacyPath = getSessionFilePath();
+    if (fs9.existsSync(legacyPath)) fs9.rmSync(legacyPath, { force: true });
+  } catch (error) {
+    try {
+      await client2.disconnect();
+    } catch {
+    }
+    try {
+      await client2.destroy();
+    } catch {
+    }
+    recordTelegramUserClientFailure(String(error.message).includes("EXPIRED") ? "expired" : "error", "Telegram \u7528\u6237\u8D26\u53F7\u8FDE\u63A5\u5931\u8D25");
+  }
+}
+async function restoreEnabledTelegramUserAccountsAfterRestart() {
+  await telegramAccountRepository.migrateLegacySystemSettings();
+  const enabledAccounts = await telegramAccountRepository.listEnabledAccounts();
+  if (enabledAccounts.length === 0) return;
+  const credentials = await getTelegramUserCredentials();
+  if (!credentials) {
+    recordTelegramUserClientFailure("not_configured", "\u672A\u914D\u7F6E Telegram API");
+    return;
+  }
+  await initializeTelegramMultiAccountRuntime(credentials);
+  const pooledClient = telegramUserClientPool.getDefaultClient();
+  if (!pooledClient) {
+    recordTelegramUserClientFailure("error", "\u5DF2\u542F\u7528\u7684 Telegram \u7528\u6237\u8D26\u53F7\u8FDE\u63A5\u5931\u8D25");
+    return;
+  }
+  const me = await pooledClient.getMe();
+  recordTelegramUserClientReady({ userId: String(me?.id || ""), username: me?.username || null });
+}
+async function activateTelegramUserAccount(accountId) {
+  const credentials = await getTelegramUserCredentials();
+  if (!credentials) throw new Error("\u672A\u914D\u7F6E Telegram API");
+  await telegramUserClientPool.activateAccount(accountId, "explicit_enable", credentials);
+  if (!telegramUserClientPool.getAccountClient(accountId)) throw new Error("Telegram \u7528\u6237\u8D26\u53F7\u8FDE\u63A5\u5931\u8D25");
+}
+async function persistAndActivate(session, account, credentials) {
+  await setSettings([
+    [TELEGRAM_USER_SESSION_SETTING, session],
+    [TELEGRAM_USER_ENABLED_SETTING, "true"],
+    [TELEGRAM_USER_ID_SETTING, account.userId],
+    [TELEGRAM_USER_USERNAME_SETTING, account.username || ""]
+  ]);
+  const persisted = await upsertTelegramUserAccountWithoutRuntimeRefresh({
+    telegramUserId: account.userId,
+    username: account.username,
+    displayName: account.displayName,
+    session,
+    enabled: true,
+    isLegacy: true
+  });
+  await telegramUserClientPool.activateAccount(persisted.id, "login_complete", credentials);
+  if (!telegramUserClientPool.getAccountClient(persisted.id)) throw new Error("Telegram \u7528\u6237\u8D26\u53F7\u8FDE\u63A5\u5931\u8D25");
+}
+var GramJsWebLoginClient = class {
+  constructor(client2, credentials) {
+    this.client = client2;
+    this.credentials = credentials;
+  }
+  client;
+  credentials;
+  async connect() {
+    await this.client.connect();
+  }
+  sendCode(credentials, phone) {
+    return this.client.sendCode(credentials, phone);
+  }
+  async signInCode(phone, phoneCodeHash, code) {
+    try {
+      await this.client.invoke(new Api2.auth.SignIn({ phoneNumber: phone, phoneCodeHash, phoneCode: code }));
+      return "authorized";
+    } catch (error) {
+      const name = String(error?.errorMessage || error.message || "");
+      if (name.includes("SESSION_PASSWORD_NEEDED")) return "password_needed";
+      throw error;
+    }
+  }
+  async signInPassword(password) {
+    let captured;
+    await this.client.signInWithPassword(this.credentials, {
+      password: async () => password,
+      onError: async (error) => {
+        captured = error;
+        return true;
+      }
+    }).catch((error) => {
+      throw captured || error;
+    });
+  }
+  async getMe() {
+    return await this.client.getMe();
+  }
+  saveSession() {
+    return this.client.session.save();
+  }
+  disconnect() {
+    return this.client.disconnect();
+  }
+  destroy() {
+    return this.client.destroy();
+  }
+};
+var telegramUserWebLogin = new TelegramUserWebLoginFlows({
+  credentials: getTelegramUserCredentials,
+  createClient: (credentials) => new GramJsWebLoginClient(makeClient2("", credentials), credentials),
+  persistAndActivate
+});
+async function getTelegramUserAccountStatus() {
+  const session = await migrateLegacyTelegramUserSession();
+  const enabled = await getSetting(TELEGRAM_USER_ENABLED_SETTING, "false") === "true";
+  const userId = await getSetting(TELEGRAM_USER_ID_SETTING, "");
+  const username = await getSetting(TELEGRAM_USER_USERNAME_SETTING, "");
+  return {
+    configured: Boolean(session),
+    enabled,
+    connected: isTelegramUserClientReady(),
+    account: userId ? { userId, username: username || null, displayName: null } : null
+  };
+}
+async function disableTelegramUserAccount() {
+  await setSetting(TELEGRAM_USER_ENABLED_SETTING, "false");
+  for (const account of await listTelegramUserAccounts()) {
+    if (account.isLegacy) {
+      await telegramAccountRepository.setEnabled(account.id, false);
+      await telegramUserClientPool.deactivateAccount(account.id);
+    }
+  }
+  await stopLegacyClient();
+  recordTelegramUserClientFailure("disabled", "");
+}
+async function enableTelegramUserAccount() {
+  await setSetting(TELEGRAM_USER_ENABLED_SETTING, "true");
+  for (const account of await listTelegramUserAccounts()) {
+    if (account.isLegacy) await telegramAccountRepository.setEnabled(account.id, true);
+  }
+  await initTelegramUserClient();
+}
+async function unlinkTelegramUserAccount() {
+  await stopLegacyClient();
+  for (const account of await listTelegramUserAccounts()) {
+    if (account.isLegacy) await deleteTelegramUserAccount(account.id);
+  }
+  await deleteSettings([TELEGRAM_USER_SESSION_SETTING, TELEGRAM_USER_ENABLED_SETTING, TELEGRAM_USER_ID_SETTING, TELEGRAM_USER_USERNAME_SETTING]);
+  const legacyPath = getSessionFilePath();
+  if (fs9.existsSync(legacyPath)) fs9.rmSync(legacyPath, { force: true });
+  recordTelegramUserClientFailure("missing_session", "\u5C1A\u672A\u767B\u5F55 Telegram \u7528\u6237\u8D26\u53F7");
+}
+function getTelegramUserClient() {
+  return telegramUserClientPool.getDefaultClient() || userClient;
+}
+function isTelegramUserClientReady() {
+  return Boolean(getTelegramUserClient()?.connected);
+}
+function getTelegramUserSessionFilePath() {
+  return userSessionFilePath || path8.resolve(getSessionFilePath());
+}
+
+// src/services/telegramUpload.ts
+init_settings();
+init_telegramState();
 
 // src/utils/telegramUtils.ts
-import path6 from "path";
+import path9 from "path";
 
 // src/utils/fileMetadata.ts
 function getFileType(mimeType) {
@@ -3806,7 +6127,7 @@ function getTypeEmoji(mimeType) {
   return "\u{1F4C1}";
 }
 function getMimeTypeFromFilename(filename) {
-  const ext = path6.extname(filename).toLowerCase();
+  const ext = path9.extname(filename).toLowerCase();
   const mimeTypes = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
@@ -3864,7 +6185,7 @@ function getMimeTypeFromFilename(filename) {
 function sanitizeFilename(name) {
   if (!name) return "unknown";
   const firstLine = name.split("\n")[0].trim();
-  const originalExt = path6.extname(firstLine);
+  const originalExt = path9.extname(firstLine);
   const ext = originalExt && originalExt.length <= 15 ? originalExt : "";
   const withoutExt = ext ? firstLine.slice(0, -ext.length) : firstLine;
   let sanitized = withoutExt.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/\s+/g, " ").trim();
@@ -3882,8 +6203,119 @@ function sanitizeFilename(name) {
   return result || "unknown";
 }
 
+// src/utils/telegramMedia.ts
+import { Api as Api3 } from "telegram";
+function getDownloadableMedia(message) {
+  if (!message.media) return null;
+  const media = message.media;
+  if (message.sticker) return null;
+  if (message.document || message.photo || message.video || message.audio || message.voice) {
+    return message.media;
+  }
+  if (media.document || media.photo) {
+    return media.document || media.photo;
+  }
+  if (media.webpage?.document || media.webpage?.photo) {
+    return media.webpage.document || media.webpage.photo;
+  }
+  return null;
+}
+function isTelegramPhotoMedia(media) {
+  const inner = media?.photo || media;
+  return media?.className === "MessageMediaPhoto" || inner?.className === "Photo" || Boolean(inner?.sizes);
+}
+function getEstimatedFileSize(message) {
+  const media = getDownloadableMedia(message);
+  if (isTelegramPhotoMedia(media)) {
+    return 0;
+  }
+  const document = media?.document || media;
+  if (document?.size) {
+    return Number(document.size) || 0;
+  }
+  return 0;
+}
+function getDocumentFilename(document, fallback) {
+  const fileNameAttr = document.attributes?.find((a) => a.className === "DocumentAttributeFilename");
+  return fileNameAttr?.fileName || fallback;
+}
+function isGeneratedTelegramName(fileName, messageId) {
+  const lower = fileName.toLowerCase();
+  return new RegExp(`^(?:file|video|audio|voice)_${messageId}(?:\\.[^.]+)?$`, "i").test(lower);
+}
+function extractFileInfo(message) {
+  const downloadableMedia = getDownloadableMedia(message);
+  if (!downloadableMedia) return null;
+  let fileName = "unknown";
+  let mimeType = "application/octet-stream";
+  let generatedName = false;
+  try {
+    if (message.document) {
+      const doc = message.document;
+      const fileNameAttr = doc.attributes?.find((a) => a.className === "DocumentAttributeFilename");
+      generatedName = !fileNameAttr?.fileName;
+      fileName = fileNameAttr?.fileName || `file_${message.id}`;
+      mimeType = doc.mimeType || getMimeTypeFromFilename(fileName);
+      if (isGeneratedTelegramName(fileName, message.id)) {
+        const videoAttr = doc.attributes?.find((a) => a.className === "DocumentAttributeVideo");
+        const audioAttr = doc.attributes?.find((a) => a.className === "DocumentAttributeAudio");
+        if (videoAttr) fileName = `video_${message.id}.mp4`;
+        else if (audioAttr) fileName = `audio_${message.id}.mp3`;
+      }
+    } else if (message.photo) {
+      generatedName = true;
+      fileName = `image_${message.id}.jpg`;
+      mimeType = "image/jpeg";
+    } else if (message.video) {
+      const video = message.video;
+      const fileNameAttr = video.attributes?.find((a) => a.className === "DocumentAttributeFilename");
+      generatedName = !fileNameAttr?.fileName;
+      fileName = fileNameAttr?.fileName || `video_${message.id}.mp4`;
+      mimeType = video.mimeType || "video/mp4";
+    } else if (message.audio) {
+      const audio = message.audio;
+      const fileNameAttr = audio.attributes?.find((a) => a.className === "DocumentAttributeFilename");
+      generatedName = !fileNameAttr?.fileName;
+      fileName = fileNameAttr?.fileName || `audio_${message.id}.mp3`;
+      mimeType = audio.mimeType || "audio/mpeg";
+    } else if (message.voice) {
+      generatedName = true;
+      fileName = `audio_${message.id}.ogg`;
+      mimeType = "audio/ogg";
+    } else {
+      const media = message.media;
+      if (media.document && media.document instanceof Api3.Document) {
+        const doc = media.document;
+        const fileNameAttr = doc.attributes?.find((a) => a.className === "DocumentAttributeFilename");
+        generatedName = !fileNameAttr?.fileName;
+        fileName = fileNameAttr?.fileName || `file_${message.id}`;
+        mimeType = doc.mimeType || getMimeTypeFromFilename(fileName);
+      } else {
+        const document = downloadableMedia.document || downloadableMedia;
+        const photo = downloadableMedia.photo || downloadableMedia;
+        if (document?.className === "Document" || document?.attributes) {
+          const documentFileName = getDocumentFilename(document, "");
+          generatedName = !documentFileName;
+          fileName = documentFileName || `file_${message.id}`;
+          mimeType = document.mimeType || getMimeTypeFromFilename(fileName);
+        } else if (photo?.className === "Photo" || photo?.sizes) {
+          generatedName = true;
+          fileName = `image_${message.id}.jpg`;
+          mimeType = "image/jpeg";
+        } else {
+          return null;
+        }
+      }
+    }
+  } catch (e) {
+    console.error("\u{1F916} \u63D0\u53D6\u6587\u4EF6\u4FE1\u606F\u51FA\u9519:", e);
+    return null;
+  }
+  return { fileName: sanitizeFilename(fileName), mimeType, generatedName };
+}
+
 // src/utils/telegramMessages.ts
-import { Api } from "telegram";
+import { Api as Api4 } from "telegram";
 
 // src/utils/providerMetadata.ts
 var PROVIDERS = {
@@ -3905,6 +6337,11 @@ function getProviderDisplayName(providerId) {
 
 // src/i18n/telegramRussian.json
 var telegramRussian_default = {
+  "bot.wizard.confirmSource": "\u{1F4CC} \u041A\u0430\u043D\u0430\u043B: {source}",
+  "bot.wizard.confirmComments": "\u{1F4AC} \u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438: {value}",
+  "bot.wizard.folder.defaultValue": "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0446\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "bot.wizard.storage.current": "\u0422\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435",
+  "bot.wizard.storage.currentAccount": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u0430\u043A\u043A\u0430\u0443\u043D\u0442",
   "bot.wizard.confirmTitle": "\u041F\u043E\u0436\u0430\u043B\u0443\u0439\u0441\u0442\u0430, \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u043E\u0431\u044A\u0435\u043C \u0437\u0430\u0434\u0430\u0447\u0438:",
   "bot.wizard.confirmTagRange": "\u0422\u0435\u0433: #{tag}",
   "bot.wizard.confirmDateRange": "\u0414\u0430\u0442\u044B: {startDate} \u2192 {endDate}",
@@ -4414,6 +6851,8 @@ var telegramRussian_default = {
   "bot.legacy.tagResult": "\u2705 \u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u043E \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0435 \u0442\u0435\u0433\u043E\u0432 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0430.\n\u0422\u0435\u0433: {tag}\n\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440: {jobId}\n\u0412 \u043E\u0447\u0435\u0440\u0435\u0434\u0438: {found}\n\u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E: {skipped}\n\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C: {failed}{commentLine}",
   "bot.legacy.dateResult": "\u2705 \u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u043E \u0434\u0438\u0430\u043F\u0430\u0437\u043E\u043D\u0443 \u0434\u0430\u0442 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0430.\n\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440: {jobId}\n\u0412 \u043E\u0447\u0435\u0440\u0435\u0434\u0438: {found}\n\u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E: {skipped}\n\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C: {failed}{commentLine}",
   "bot.legacy.failed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C {mode}: {error}.",
+  "bot.link.empty": "\u0412 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0438 \u043D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0433\u043E \u0434\u043B\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0444\u0430\u0439\u043B\u0430. \u0412\u043E\u0437\u043C\u043E\u0436\u043D\u043E, \u043E\u043D\u043E \u0443\u0434\u0430\u043B\u0435\u043D\u043E \u0438\u043B\u0438 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0443.",
+  "bot.link.failed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u043F\u043E \u0441\u0441\u044B\u043B\u043A\u0435: {error}",
   "bot.legacy.confirmTag": "\u23F3 \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043E. \u0417\u0430\u043F\u0443\u0441\u043A\u0430\u0435\u043C \u0444\u043E\u043D\u043E\u0432\u043E\u0435 \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 {source} \u043D\u0430 \u043D\u0430\u043B\u0438\u0447\u0438\u0435 \u043C\u0443\u043B\u044C\u0442\u0438\u043C\u0435\u0434\u0438\u0439\u043D\u044B\u0445 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439 \u0441 \u043F\u043E\u043C\u043E\u0449\u044C\u044E {tag}\u2026",
   "bot.legacy.confirmDate": "\u23F3 \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043E. \u0417\u0430\u043F\u0443\u0441\u043A \u0444\u043E\u043D\u043E\u0432\u043E\u0433\u043E \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u044F {source}: {startDate} \u2192 {endDate}\u2026",
   "bot.legacy.submitFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0437\u0430\u0434\u0430\u0447\u0443: {error}.",
@@ -5230,6 +7669,8 @@ var resources = {
     "bot.legacy.tagResult": "\u2705 \u6807\u7B7E\u4E0B\u8F7D\u4EFB\u52A1\u5B8C\u6210\n\u6807\u7B7E: {tag}\nID: {jobId}\n\u5165\u961F: {found}\n\u8DF3\u8FC7: {skipped}\n\u5931\u8D25: {failed}{commentLine}",
     "bot.legacy.dateResult": "\u2705 \u65E5\u671F\u8303\u56F4\u4EFB\u52A1\u5B8C\u6210\nID: {jobId}\n\u5165\u961F: {found}\n\u8DF3\u8FC7: {skipped}\n\u5931\u8D25: {failed}{commentLine}",
     "bot.legacy.failed": "\u274C {mode}\u4E0B\u8F7D\u5931\u8D25: {error}",
+    "bot.link.empty": "\u8FD9\u6761\u6D88\u606F\u6CA1\u6709\u53EF\u4E0B\u8F7D\u7684\u6587\u4EF6\uFF0C\u53EF\u80FD\u5DF2\u88AB\u5220\u9664\u6216\u5F53\u524D\u4E0B\u8F7D\u8D26\u53F7\u65E0\u6CD5\u8BBF\u95EE\u3002",
+    "bot.link.failed": "\u94FE\u63A5\u4E0B\u8F7D\u5931\u8D25: {error}",
     "bot.legacy.confirmTag": "\u23F3 \u5DF2\u786E\u8BA4\uFF0C\u5F00\u59CB\u540E\u53F0\u626B\u63CF {source} \u4E2D\u5E26\u6709 {tag} \u7684\u5A92\u4F53\u6D88\u606F\u2026",
     "bot.legacy.confirmDate": "\u23F3 \u5DF2\u786E\u8BA4\uFF0C\u5F00\u59CB\u540E\u53F0\u626B\u63CF {source}\uFF1A{startDate} \u2192 {endDate}\u2026",
     "bot.legacy.submitFailed": "\u274C \u4EFB\u52A1\u63D0\u4EA4\u5931\u8D25: {error}",
@@ -5585,6 +8026,11 @@ var resources = {
     "commands.bulkFailed": "\u53D6\u6D88\u5931\u8D25\uFF1A{error}",
     "commands.stopFailed": "\u274C \u5F3A\u5236\u505C\u6B62\u4EFB\u52A1\u5931\u8D25\uFF1A{error}",
     "bot.wizard.confirmTitle": "\u8BF7\u786E\u8BA4\u4EFB\u52A1\u8303\u56F4\uFF1A",
+    "bot.wizard.confirmSource": "\u{1F4CC} \u9891\u9053\uFF1A{source}",
+    "bot.wizard.confirmComments": "\u{1F4AC} \u8BC4\u8BBA\u533A\uFF1A{value}",
+    "bot.wizard.folder.defaultValue": "\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B",
+    "bot.wizard.storage.current": "\u5F53\u524D\u5B58\u50A8",
+    "bot.wizard.storage.currentAccount": "\u5F53\u524D\u8D26\u6237",
     "bot.wizard.confirmTagRange": "\u6807\u7B7E\uFF1A#{tag}",
     "bot.wizard.confirmDateRange": "\u65E5\u671F\uFF1A{startDate} \u2192 {endDate}",
     "bot.wizard.confirmDays": "\u{1F4C5} \u5171 {days} \u5929\uFF08\u542B\u9996\u5C3E\u65E5\u671F\uFF09",
@@ -5646,6 +8092,11 @@ var resources = {
   },
   en: {
     "bot.wizard.confirmTitle": "Please confirm the task scope:",
+    "bot.wizard.confirmSource": "\u{1F4CC} Channel: {source}",
+    "bot.wizard.confirmComments": "\u{1F4AC} Comments: {value}",
+    "bot.wizard.folder.defaultValue": "Default automatic organization",
+    "bot.wizard.storage.current": "Current storage",
+    "bot.wizard.storage.currentAccount": "Current account",
     "bot.wizard.confirmTagRange": "Tag: #{tag}",
     "bot.wizard.confirmDateRange": "Dates: {startDate} \u2192 {endDate}",
     "bot.wizard.confirmDays": "\u{1F4C5} {days} days, inclusive",
@@ -6154,6 +8605,8 @@ var resources = {
     "bot.legacy.tagResult": "\u2705 Tag download task complete\nTag: {tag}\nID: {jobId}\nQueued: {found}\nSkipped: {skipped}\nFailed: {failed}{commentLine}",
     "bot.legacy.dateResult": "\u2705 Date-range task complete\nID: {jobId}\nQueued: {found}\nSkipped: {skipped}\nFailed: {failed}{commentLine}",
     "bot.legacy.failed": "\u274C {mode} download failed: {error}",
+    "bot.link.empty": "No downloadable file found in this message. It may have been deleted or be inaccessible.",
+    "bot.link.failed": "Link download failed: {error}",
     "bot.legacy.confirmTag": "\u23F3 Confirmed. Starting a background scan of {source} for media messages with {tag}\u2026",
     "bot.legacy.confirmDate": "\u23F3 Confirmed. Starting a background scan of {source}: {startDate} \u2192 {endDate}\u2026",
     "bot.legacy.submitFailed": "\u274C Could not submit the task: {error}",
@@ -6572,16 +9025,16 @@ function buildTaskControlLines(taskId, queuePaused = false, pauseReason, systemP
 }
 function buildTaskControlButtons(taskId, queuePaused = false, systemPause, queuePausing = false, userPaused = queuePaused && !systemPause, failedCount = 0, locale = DEFAULT_LOCALE) {
   if (!taskId) return void 0;
-  const actionButtons = queuePaused || queuePausing ? systemPause && !userPaused ? [] : [new Api.KeyboardButtonCallback({ text: t(locale, "task.resume"), data: Buffer.from(`tq_resume_${taskId}`) })] : [new Api.KeyboardButtonCallback({ text: t(locale, "task.pause"), data: Buffer.from(`tq_pause_${taskId}`) })];
-  actionButtons.push(new Api.KeyboardButtonCallback({ text: t(locale, "task.cancel"), data: Buffer.from(`tq_cancel_${taskId}`) }));
-  const rows = [new Api.KeyboardButtonRow({ buttons: actionButtons })];
+  const actionButtons = queuePaused || queuePausing ? systemPause && !userPaused ? [] : [new Api4.KeyboardButtonCallback({ text: t(locale, "task.resume"), data: Buffer.from(`tq_resume_${taskId}`) })] : [new Api4.KeyboardButtonCallback({ text: t(locale, "task.pause"), data: Buffer.from(`tq_pause_${taskId}`) })];
+  actionButtons.push(new Api4.KeyboardButtonCallback({ text: t(locale, "task.cancel"), data: Buffer.from(`tq_cancel_${taskId}`) }));
+  const rows = [new Api4.KeyboardButtonRow({ buttons: actionButtons })];
   if (failedCount > 0) {
-    rows.push(new Api.KeyboardButtonRow({ buttons: [
-      new Api.KeyboardButtonCallback({ text: t(locale, "task.retryFailed", { count: failedCount }), data: Buffer.from(`receipt_retry_${taskId}`) }),
-      new Api.KeyboardButtonCallback({ text: t(locale, "task.failureDetails"), data: Buffer.from(`receipt_failures_${taskId}`) })
+    rows.push(new Api4.KeyboardButtonRow({ buttons: [
+      new Api4.KeyboardButtonCallback({ text: t(locale, "task.retryFailed", { count: failedCount }), data: Buffer.from(`receipt_retry_${taskId}`) }),
+      new Api4.KeyboardButtonCallback({ text: t(locale, "task.failureDetails"), data: Buffer.from(`receipt_failures_${taskId}`) })
     ] }));
   }
-  return new Api.ReplyInlineMarkup({ rows });
+  return new Api4.ReplyInlineMarkup({ rows });
 }
 function collectCompletedFolders(singleFiles, batches) {
   const folders = /* @__PURE__ */ new Set();
@@ -7062,2383 +9515,12 @@ async function buildConsolidatedStatus(singleFiles, batches) {
   return lines.join("\n");
 }
 
-// src/services/telegramCommands.ts
-init_telegramState();
-
-// src/services/telegramUpload.ts
-import { Api as Api6 } from "telegram";
-
-// src/services/telegramAccountRepository.ts
-init_db();
-init_credentialCrypto();
-function mapAccount(row) {
-  return {
-    id: String(row.id),
-    telegramUserId: String(row.telegram_user_id || ""),
-    username: row.username || null,
-    displayName: row.display_name || null,
-    session: String(row.session_ciphertext || ""),
-    enabled: Boolean(row.enabled),
-    healthState: row.health_state,
-    cooldownUntil: row.cooldown_until || null,
-    weight: Number(row.weight || 1),
-    priority: Number(row.priority || 0),
-    maxConnections: Number(row.max_connections || 1),
-    lastError: row.last_error || null,
-    isLegacy: Boolean(row.is_legacy)
-  };
-}
-function mapAccess(row) {
-  return {
-    accountId: String(row.account_id),
-    sourceKey: String(row.source_key),
-    scope: row.scope,
-    accessState: row.access_state,
-    lastError: row.last_error || null,
-    checkedAt: row.checked_at || null
-  };
-}
-var TelegramAccountRepository = class {
-  constructor(db = { query }) {
-    this.db = db;
-  }
-  db;
-  async migrateLegacySystemSettings() {
-    const result = await this.db.query(`
-            INSERT INTO telegram_user_accounts
-                (telegram_user_id, username, session_ciphertext, enabled, health_state, is_legacy)
-            SELECT
-                COALESCE(NULLIF(user_id.value, ''), 'legacy'),
-                NULLIF(username.value, ''),
-                session.value,
-                COALESCE(enabled.value, 'false') = 'true',
-                CASE WHEN COALESCE(enabled.value, 'false') = 'true' THEN 'degraded' ELSE 'healthy' END,
-                TRUE
-            FROM system_settings session
-            LEFT JOIN system_settings user_id ON user_id.key = 'telegram_user_id'
-            LEFT JOIN system_settings username ON username.key = 'telegram_user_username'
-            LEFT JOIN system_settings enabled ON enabled.key = 'telegram_user_download_enabled'
-            WHERE session.key = 'telegram_user_session' AND session.value <> ''
-              AND NOT EXISTS (
-                  SELECT 1 FROM telegram_user_accounts
-                  WHERE is_legacy = TRUE AND deleted_at IS NULL
-              )
-            ON CONFLICT (telegram_user_id) DO NOTHING
-            RETURNING id
-        `);
-    return result.rows[0]?.id ? String(result.rows[0].id) : null;
-  }
-  async upsertAccount(input) {
-    const result = await this.db.query(`
-            INSERT INTO telegram_user_accounts
-                (telegram_user_id, username, display_name, session_ciphertext, enabled, health_state, weight, priority, max_connections, is_legacy, last_error, session_expired_at)
-            VALUES ($1, $2, $3, $4, $5, 'healthy', $6, $7, $8, $9, NULL, NULL)
-            ON CONFLICT (telegram_user_id) DO UPDATE SET
-                username = EXCLUDED.username, display_name = EXCLUDED.display_name,
-                session_ciphertext = EXCLUDED.session_ciphertext, enabled = EXCLUDED.enabled,
-                health_state = 'healthy', weight = EXCLUDED.weight, priority = EXCLUDED.priority,
-                max_connections = EXCLUDED.max_connections, is_legacy = EXCLUDED.is_legacy, last_error = NULL,
-                session_expired_at = NULL, deleted_at = NULL, updated_at = NOW()
-            RETURNING *
-        `, [
-      input.telegramUserId,
-      input.username || null,
-      input.displayName || null,
-      encryptCredential(input.session),
-      input.enabled ?? true,
-      Math.max(0.01, input.weight ?? 1),
-      input.priority ?? 0,
-      Math.max(1, input.maxConnections ?? 4),
-      input.isLegacy ?? false
-    ]);
-    return mapAccount(result.rows[0]);
-  }
-  async listEnabledAccounts() {
-    const result = await this.db.query(`
-            SELECT * FROM telegram_user_accounts
-            WHERE enabled = TRUE AND deleted_at IS NULL
-            ORDER BY priority DESC, created_at, id
-        `);
-    return result.rows.map(mapAccount);
-  }
-  async listAccounts() {
-    const result = await this.db.query(`
-            SELECT * FROM telegram_user_accounts WHERE deleted_at IS NULL
-            ORDER BY priority DESC, created_at, id
-        `);
-    return result.rows.map(mapAccount);
-  }
-  async getAccount(accountId) {
-    const result = await this.db.query("SELECT * FROM telegram_user_accounts WHERE id = $1 AND deleted_at IS NULL", [accountId]);
-    return result.rows[0] ? mapAccount(result.rows[0]) : null;
-  }
-  async setEnabled(accountId, enabled) {
-    const result = await this.db.query(
-      `UPDATE telegram_user_accounts SET enabled = $2, updated_at = NOW()
-             WHERE id = $1 AND deleted_at IS NULL`,
-      [accountId, enabled]
-    );
-    return result.rowCount === 1;
-  }
-  async deleteAccount(accountId) {
-    await this.db.query("DELETE FROM telegram_account_source_access WHERE account_id = $1", [accountId]);
-    const result = await this.db.query(
-      `UPDATE telegram_user_accounts
-             SET enabled = FALSE, session_ciphertext = '', health_state = 'session_expired',
-                 cooldown_until = NULL, deleted_at = NOW(), updated_at = NOW()
-             WHERE id = $1 AND deleted_at IS NULL`,
-      [accountId]
-    );
-    return result.rowCount === 1;
-  }
-  async listAccessForAccount(accountId) {
-    const result = await this.db.query(`
-            SELECT * FROM telegram_account_source_access
-            WHERE account_id = $1 ORDER BY checked_at DESC NULLS LAST, source_key, scope
-        `, [accountId]);
-    return result.rows.map(mapAccess);
-  }
-  async getAccessSummaryForAccount(accountId) {
-    const result = await this.db.query(`
-            SELECT COUNT(*)::int AS total,
-                   COUNT(*) FILTER (WHERE access_state = 'allowed')::int AS allowed,
-                   COUNT(*) FILTER (WHERE access_state = 'denied')::int AS denied,
-                   COUNT(*) FILTER (WHERE access_state = 'unknown')::int AS unknown,
-                   MAX(checked_at) AS last_checked_at
-            FROM telegram_account_source_access
-            WHERE account_id = $1 AND scope = 'download'
-        `, [accountId]);
-    const row = result.rows[0] || {};
-    const total = Number(row.total || 0);
-    return { allowed: Number(row.allowed || 0), denied: Number(row.denied || 0), unknown: Number(row.unknown || 0), total, lastCheckedAt: row.last_checked_at || null };
-  }
-  async updateSession(accountId, session) {
-    const result = await this.db.query(`
-            UPDATE telegram_user_accounts SET session_ciphertext = $2, health_state = 'healthy',
-                session_expired_at = NULL, last_error = NULL, updated_at = NOW()
-            WHERE id = $1 AND deleted_at IS NULL
-        `, [accountId, encryptCredential(session)]);
-    return result.rowCount === 1;
-  }
-  async recordHealthy(accountId) {
-    const result = await this.db.query(`
-            UPDATE telegram_user_accounts SET health_state = 'healthy', last_error = NULL,
-                last_connected_at = NOW(), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL
-        `, [accountId]);
-    return result.rowCount === 1;
-  }
-  async recordFailure(accountId, error) {
-    const result = await this.db.query(`
-            UPDATE telegram_user_accounts SET health_state = 'degraded', last_error = $2,
-                last_failure_at = NOW(), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL
-        `, [accountId, error]);
-    return result.rowCount === 1;
-  }
-  async markCooldown(accountId, seconds, error = null) {
-    const cooldownSeconds = Number.isFinite(seconds) ? Math.max(1, Math.ceil(seconds)) : 60;
-    const result = await this.db.query(`
-            UPDATE telegram_user_accounts SET cooldown_until = NOW() + ($2::double precision * INTERVAL '1 second'),
-                health_state = 'degraded', last_error = $3, last_failure_at = NOW(), updated_at = NOW()
-            WHERE id = $1 AND deleted_at IS NULL
-        `, [accountId, cooldownSeconds, error]);
-    return result.rowCount === 1;
-  }
-  async markSessionExpired(accountId, error = null) {
-    const result = await this.db.query(`
-            UPDATE telegram_user_accounts SET health_state = 'session_expired', session_expired_at = NOW(),
-                cooldown_until = NULL, last_error = $2, last_failure_at = NOW(), updated_at = NOW()
-            WHERE id = $1 AND deleted_at IS NULL
-        `, [accountId, error]);
-    return result.rowCount === 1;
-  }
-  async markSourceAccess(accountId, sourceKey, scope, accessState, error = null) {
-    const result = await this.db.query(`
-            INSERT INTO telegram_account_source_access
-                (account_id, source_key, scope, access_state, last_error, checked_at)
-            VALUES ($1, $2, $3, $4, $5, NOW())
-            ON CONFLICT (account_id, source_key, scope) DO UPDATE SET
-                access_state = EXCLUDED.access_state, last_error = EXCLUDED.last_error,
-                checked_at = NOW(), updated_at = NOW()
-            RETURNING *
-        `, [accountId, sourceKey, scope, accessState, error]);
-    return mapAccess(result.rows[0]);
-  }
-  async probeSourceAccess(accountId, sourceKey, scope, accessState, error = null) {
-    return this.markSourceAccess(accountId, sourceKey, scope, accessState, error);
-  }
-  async getSourceAccess(accountId, sourceKey, scope) {
-    const result = await this.db.query(`
-            SELECT * FROM telegram_account_source_access
-            WHERE account_id = $1 AND source_key = $2 AND scope = $3
-        `, [accountId, sourceKey, scope]);
-    return result.rows[0] ? mapAccess(result.rows[0]) : null;
-  }
-  async listSourceAccess(sourceKey, scope) {
-    const result = await this.db.query(`
-            SELECT * FROM telegram_account_source_access
-            WHERE source_key = $1 AND scope = $2 ORDER BY checked_at DESC NULLS LAST, account_id
-        `, [sourceKey, scope]);
-    return result.rows.map(mapAccess);
-  }
-  async getLatestAccessCheckForAccount(accountId) {
-    const result = await this.db.query(
-      "SELECT MAX(checked_at) AS checked_at FROM telegram_account_source_access WHERE account_id = $1",
-      [accountId]
-    );
-    return result.rows[0]?.checked_at || null;
-  }
-  async startDownloadAttempt(input) {
-    const result = await this.db.query(`
-            INSERT INTO telegram_download_attempts
-                (account_id, source_key, scope, job_id, item_id, lease_token, status)
-            VALUES ($1, $2, $3, $4, $5, $6, 'running') RETURNING id
-        `, [input.accountId, input.sourceKey, input.scope || "download", input.jobId || null, input.itemId || null, input.leaseToken || null]);
-    return String(result.rows[0].id);
-  }
-  async finishDownloadAttempt(attemptId, status, error = null) {
-    const result = await this.db.query(`
-            UPDATE telegram_download_attempts SET status = $2, error = $3, finished_at = NOW()
-            WHERE id = $1 AND status = 'running'
-        `, [attemptId, status, error]);
-    return result.rowCount === 1;
-  }
-};
-var telegramAccountRepository = new TelegramAccountRepository();
-
-// src/services/telegramUserClientPool.ts
-init_credentialCrypto();
-import { TelegramClient } from "telegram";
-import { StringSession } from "telegram/sessions/index.js";
-
-// src/services/telegramAccountScheduler.ts
-function selectWeightedLeastConnectedTelegramAccount(candidates, options = {}) {
-  const now = (options.now || /* @__PURE__ */ new Date()).getTime();
-  const excluded = new Set(options.excludeAccountIds || []);
-  const runnable = candidates.filter((candidate) => {
-    const cooldownUntil = candidate.cooldownUntil ? new Date(candidate.cooldownUntil).getTime() : 0;
-    return candidate.enabled && candidate.healthState !== "session_expired" && candidate.sourceAccessState !== "denied" && !excluded.has(candidate.accountId) && candidate.activeConnections < Math.max(1, candidate.maxConnections) && (!Number.isFinite(cooldownUntil) || cooldownUntil <= now);
-  });
-  runnable.sort((left, right) => {
-    const accessDifference = Number(right.sourceAccessState === "allowed") - Number(left.sourceAccessState === "allowed");
-    if (accessDifference) return accessDifference;
-    const leftLoad = (left.activeConnections + 1) / Math.max(Number.EPSILON, left.weight);
-    const rightLoad = (right.activeConnections + 1) / Math.max(Number.EPSILON, right.weight);
-    if (leftLoad !== rightLoad) return leftLoad - rightLoad;
-    const priorityDifference = (right.priority || 0) - (left.priority || 0);
-    if (priorityDifference) return priorityDifference;
-    return left.accountId.localeCompare(right.accountId);
-  });
-  return runnable[0] || null;
-}
-
-// src/services/telegramUserClientPool.ts
-function errorName(error) {
-  const value = error;
-  return String(value?.errorMessage || value?.message || error || "Telegram account connection failed");
-}
-function isTelegramSessionExpiredError(error) {
-  return /(AUTH_KEY_UNREGISTERED|SESSION_(REVOKED|EXPIRED)|USER_DEACTIVATED|SESSION_EXPIRED)/i.test(errorName(error));
-}
-var TelegramUserClientPool = class {
-  constructor(deps) {
-    this.deps = deps;
-  }
-  deps;
-  entries = /* @__PURE__ */ new Map();
-  credentials = null;
-  initializationTail = Promise.resolve();
-  async initialize(credentials) {
-    const run = this.initializationTail.then(async () => {
-      await this.shutdownEntries();
-      this.credentials = credentials;
-      await this.deps.repository.migrateLegacySystemSettings();
-      const accounts = await this.deps.repository.listEnabledAccounts();
-      await Promise.allSettled(accounts.map((account) => this.connectAccount(account)));
-    });
-    this.initializationTail = run.catch(() => void 0);
-    await run;
-  }
-  async refresh() {
-    if (!this.credentials) return;
-    await this.initialize(this.credentials);
-  }
-  async deactivateAccount(accountId) {
-    await this.runLifecycleOperation(() => this.expireEntry(accountId));
-  }
-  async activateAccount(accountId, reason, credentials) {
-    if (reason !== "login_complete" && reason !== "explicit_enable") throw new Error("TELEGRAM_USER_ACTIVATION_NOT_ALLOWED");
-    await this.runLifecycleOperation(async () => {
-      await this.expireEntry(accountId);
-      if (credentials) this.credentials = credentials;
-      if (!this.credentials) return;
-      const account = await this.deps.repository.getAccount(accountId);
-      if (!account) return;
-      await this.connectAccount(account);
-    });
-  }
-  async connectAccount(account) {
-    if (!this.credentials || !account.enabled || account.healthState === "session_expired") return;
-    let client2 = null;
-    try {
-      const session = this.deps.decryptSession(account.session);
-      client2 = this.deps.createClient(session, this.credentials, account.id);
-      await client2.connect();
-      if (!await client2.checkAuthorization()) throw new Error("SESSION_EXPIRED");
-      await client2.getMe();
-      const saved = this.deps.saveSession?.(client2) || session;
-      if (saved && saved !== session) await this.deps.repository.updateSession(account.id, saved);
-      await this.deps.repository.recordHealthy(account.id);
-      this.entries.set(account.id, {
-        account: { ...account, healthState: "healthy", lastError: null },
-        client: client2,
-        activeConnections: 0
-      });
-    } catch (error) {
-      if (client2) await this.closeClient(client2);
-      const message = errorName(error);
-      if (isTelegramSessionExpiredError(error)) await this.deps.repository.markSessionExpired(account.id, message);
-      else await this.deps.repository.recordFailure(account.id, message);
-    }
-  }
-  async select(sourceKey, options = {}) {
-    const scope = options.scope || "download";
-    const access = await this.deps.repository.listSourceAccess(sourceKey, scope);
-    const accessByAccount = new Map(access.map((row) => [row.accountId, row]));
-    const selected3 = selectWeightedLeastConnectedTelegramAccount([...this.entries.values()].map((entry2) => ({
-      accountId: entry2.account.id,
-      enabled: entry2.account.enabled,
-      healthState: entry2.account.healthState,
-      cooldownUntil: entry2.account.cooldownUntil,
-      weight: entry2.account.weight,
-      priority: entry2.account.priority,
-      activeConnections: entry2.activeConnections,
-      maxConnections: entry2.account.maxConnections,
-      sourceAccessState: accessByAccount.get(entry2.account.id)?.accessState || "unknown"
-    })), options);
-    if (!selected3) return null;
-    const entry = this.entries.get(selected3.accountId);
-    if (!entry) return null;
-    entry.activeConnections += 1;
-    let released = false;
-    return {
-      accountId: entry.account.id,
-      client: entry.client,
-      release: () => {
-        if (released) return;
-        released = true;
-        entry.activeConnections = Math.max(0, entry.activeConnections - 1);
-      }
-    };
-  }
-  getDefaultClient() {
-    return [...this.entries.values()].sort((left, right) => right.account.priority - left.account.priority || left.account.id.localeCompare(right.account.id))[0]?.client || null;
-  }
-  getAccountClient(accountId) {
-    return this.entries.get(accountId)?.client || null;
-  }
-  getActiveConnections(accountId) {
-    return this.entries.get(accountId)?.activeConnections || 0;
-  }
-  getReadyAccountIds() {
-    return [...this.entries.keys()];
-  }
-  getRuntimeState() {
-    return [...this.entries.values()].map((entry) => ({
-      accountId: entry.account.id,
-      connected: Boolean(entry.client.connected),
-      activeConnections: entry.activeConnections
-    }));
-  }
-  updateCooldown(accountId, cooldownUntil, error) {
-    const entry = this.entries.get(accountId);
-    if (entry) entry.account = { ...entry.account, cooldownUntil, healthState: "degraded", lastError: error };
-  }
-  updateSourceAccess(_accountId, _sourceKey, _scope, _state) {
-  }
-  async expireAccount(accountId) {
-    await this.runLifecycleOperation(() => this.expireEntry(accountId));
-  }
-  async expireEntry(accountId) {
-    const entry = this.entries.get(accountId);
-    this.entries.delete(accountId);
-    if (entry) await this.closeClient(entry.client);
-  }
-  async shutdown() {
-    await this.runLifecycleOperation(() => this.shutdownEntries());
-  }
-  async shutdownEntries() {
-    const entries = [...this.entries.values()];
-    this.entries.clear();
-    await Promise.all(entries.map((entry) => this.closeClient(entry.client)));
-  }
-  async runLifecycleOperation(operation) {
-    const run = this.initializationTail.then(operation);
-    this.initializationTail = run.then(() => void 0, () => void 0);
-    return await run;
-  }
-  async closeClient(client2) {
-    try {
-      await client2.disconnect();
-    } catch {
-    }
-    try {
-      await client2.destroy();
-    } catch {
-    }
-  }
-};
-var telegramUserClientPool = new TelegramUserClientPool({
-  repository: telegramAccountRepository,
-  decryptSession: decryptCredential,
-  createClient: (session, credentials) => new TelegramClient(
-    new StringSession(session),
-    credentials.apiId,
-    credentials.apiHash,
-    {
-      connectionRetries: 15,
-      retryDelay: 2e3,
-      useWSS: false,
-      deviceModel: "TG Vault User Downloader",
-      systemVersion: "1.0.0",
-      appVersion: "1.0.0",
-      floodSleepThreshold: 120
-    }
-  ),
-  saveSession: (client2) => client2.session.save()
-});
-var currentCredentials = null;
-async function initializeTelegramUserClientPool(credentials) {
-  currentCredentials = credentials;
-  await telegramUserClientPool.initialize(credentials);
-}
-async function listTelegramUserAccounts() {
-  const accounts = await telegramAccountRepository.listAccounts();
-  const ready = new Set(telegramUserClientPool.getReadyAccountIds());
-  return accounts.map(({ session: _session, ...account }) => ({
-    ...account,
-    connected: ready.has(account.id),
-    activeConnections: telegramUserClientPool.getActiveConnections(account.id)
-  }));
-}
-async function upsertTelegramUserAccountWithoutRuntimeRefresh(input) {
-  const account = await telegramAccountRepository.upsertAccount(input);
-  const { session: _session, ...publicAccount } = account;
-  return {
-    ...publicAccount,
-    connected: telegramUserClientPool.getReadyAccountIds().includes(account.id),
-    activeConnections: telegramUserClientPool.getActiveConnections(account.id)
-  };
-}
-async function deleteTelegramUserAccount(accountId) {
-  await telegramUserClientPool.expireAccount(accountId);
-  return telegramAccountRepository.deleteAccount(accountId);
-}
-var getTelegramAccountSourceAccess = telegramAccountRepository.getSourceAccess.bind(telegramAccountRepository);
-var listTelegramAccountSourceAccess = telegramAccountRepository.listSourceAccess.bind(telegramAccountRepository);
-var probeTelegramAccountSourceAccess = telegramAccountRepository.probeSourceAccess.bind(telegramAccountRepository);
-var startTelegramDownloadAttempt = telegramAccountRepository.startDownloadAttempt.bind(telegramAccountRepository);
-var finishTelegramDownloadAttempt = telegramAccountRepository.finishDownloadAttempt.bind(telegramAccountRepository);
-
-// src/services/telegramMultiAccountLogin.ts
-import { Api as Api2, TelegramClient as TelegramClient2 } from "telegram";
-import { StringSession as StringSession2 } from "telegram/sessions/index.js";
-import { Raw } from "telegram/events/index.js";
-
-// src/services/telegramBotConfig.ts
-init_settings();
-
-// src/services/telegramBotStatus.ts
-var requiredOverride = null;
-function requiredFromEnv() {
-  if (requiredOverride !== null) return requiredOverride;
-  return /^(1|true|yes|on)$/i.test(process.env.TELEGRAM_REQUIRED || "false");
-}
-function setTelegramBotRequired(required) {
-  requiredOverride = required;
-  current = { ...current, required };
-}
-var current = {
-  status: "not_configured",
-  configured: false,
-  required: requiredFromEnv(),
-  degraded: false,
-  checkedAt: (/* @__PURE__ */ new Date()).toISOString(),
-  lastConnectedAt: null,
-  lastRecoveredAt: null,
-  lastError: null,
-  action: "\u914D\u7F6E TELEGRAM_BOT_TOKEN\u3001TELEGRAM_API_ID \u548C TELEGRAM_API_HASH",
-  reconnectCount: 0
-};
-function resetTelegramBotStatus(configured2, checkedAt = (/* @__PURE__ */ new Date()).toISOString()) {
-  current = {
-    status: configured2 ? "stopped" : "not_configured",
-    configured: configured2,
-    required: requiredFromEnv(),
-    degraded: false,
-    checkedAt,
-    lastConnectedAt: null,
-    lastRecoveredAt: null,
-    lastError: null,
-    action: configured2 ? "\u542F\u52A8 Telegram Bot" : "\u914D\u7F6E TELEGRAM_BOT_TOKEN\u3001TELEGRAM_API_ID \u548C TELEGRAM_API_HASH",
-    reconnectCount: 0
-  };
-}
-function getTelegramBotStatus() {
-  return { ...current, required: requiredFromEnv() };
-}
-function markTelegramBotStarting(checkedAt = (/* @__PURE__ */ new Date()).toISOString()) {
-  current = {
-    ...current,
-    configured: true,
-    required: requiredFromEnv(),
-    status: "starting",
-    degraded: false,
-    checkedAt,
-    lastError: null,
-    action: "\u7B49\u5F85 Telegram \u8FDE\u63A5\u5EFA\u7ACB"
-  };
-}
-function markTelegramBotReady(checkedAt = (/* @__PURE__ */ new Date()).toISOString()) {
-  const recovered = current.status === "reconnecting" || current.status === "auth_failed" || current.status === "error";
-  current = {
-    ...current,
-    configured: true,
-    required: requiredFromEnv(),
-    status: "ready",
-    degraded: false,
-    checkedAt,
-    lastConnectedAt: checkedAt,
-    lastRecoveredAt: recovered ? checkedAt : current.lastRecoveredAt,
-    lastError: null,
-    action: null
-  };
-}
-function markTelegramBotError(status, message, action, checkedAt = (/* @__PURE__ */ new Date()).toISOString()) {
-  current = {
-    ...current,
-    configured: true,
-    required: requiredFromEnv(),
-    status,
-    degraded: status !== "stopped",
-    checkedAt,
-    lastError: message,
-    action,
-    reconnectCount: status === "reconnecting" ? current.reconnectCount + 1 : current.reconnectCount
-  };
-}
-function classifyTelegramBotStartupError(error) {
-  const message = error instanceof Error ? error.message : String(error);
-  return /token|auth|unauthorized|forbidden|401|403|access_token_(?:expired|invalid)/i.test(message) ? "auth_failed" : "error";
-}
-function telegramBotBlocksReadiness(status, required = requiredFromEnv()) {
-  if (!required) return false;
-  return status.status !== "ready";
-}
-
-// src/services/telegramBotConfig.ts
-init_authSettings();
-var TELEGRAM_BOT_TOKEN_SETTING = "telegram_bot_token";
-var TELEGRAM_API_ID_SETTING = "telegram_api_id";
-var TELEGRAM_API_HASH_SETTING = "telegram_api_hash";
-var TELEGRAM_BOT_ENABLED_SETTING = "telegram_bot_enabled";
-var TELEGRAM_REQUIRED_SETTING = "telegram_required";
-var CREDENTIAL_KEYS = [TELEGRAM_BOT_TOKEN_SETTING, TELEGRAM_API_ID_SETTING, TELEGRAM_API_HASH_SETTING];
-var ALL_KEYS = [...CREDENTIAL_KEYS, TELEGRAM_BOT_ENABLED_SETTING, TELEGRAM_REQUIRED_SETTING];
-var ENV_TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
-var ENV_TELEGRAM_API_ID = process.env.TELEGRAM_API_ID || "";
-var ENV_TELEGRAM_API_HASH = process.env.TELEGRAM_API_HASH || "";
-function enabledValue(value, fallback) {
-  if (value == null || value === "") return fallback;
-  return /^(1|true|yes|on)$/i.test(value);
-}
-function normalizeTelegramBotCredentials(input) {
-  const botToken = String(input?.botToken || "").trim();
-  const apiIdText = String(input?.apiId || "").trim();
-  const apiHash = String(input?.apiHash || "").trim();
-  if (!/^\d+$/.test(apiIdText) || Number(apiIdText) <= 0 || !Number.isSafeInteger(Number(apiIdText))) {
-    throw new Error("API ID \u5FC5\u987B\u662F\u6709\u6548\u7684\u6B63\u6574\u6570");
-  }
-  if (!/^\d+:[A-Za-z0-9_-]{20,}$/.test(botToken)) throw new Error("Bot Token \u683C\u5F0F\u65E0\u6548");
-  if (!/^[a-fA-F0-9]{32}$/.test(apiHash)) throw new Error("API Hash \u5FC5\u987B\u662F 32 \u4F4D\u5341\u516D\u8FDB\u5236\u5B57\u7B26\u4E32");
-  return { botToken, apiId: Number(apiIdText), apiHash };
-}
-async function getWebCredentials() {
-  const [botTokenRow, apiIdRow, apiHashRow] = await Promise.all([
-    getSettingStrict(TELEGRAM_BOT_TOKEN_SETTING),
-    getSettingStrict(TELEGRAM_API_ID_SETTING),
-    getSettingStrict(TELEGRAM_API_HASH_SETTING)
-  ]);
-  const foundCount = [botTokenRow, apiIdRow, apiHashRow].filter((row) => row.found).length;
-  if (foundCount === 0) return null;
-  if (foundCount !== 3 || !botTokenRow.value || !apiIdRow.value || !apiHashRow.value) {
-    throw new Error("Telegram Bot \u7F51\u9875\u51ED\u8BC1\u4E0D\u5B8C\u6574\uFF0C\u5DF2\u62D2\u7EDD\u56DE\u9000\u5230\u73AF\u5883\u53D8\u91CF");
-  }
-  return normalizeTelegramBotCredentials({ botToken: botTokenRow.value, apiId: apiIdRow.value, apiHash: apiHashRow.value });
-}
-function getEnvironmentCredentials() {
-  const botToken = ENV_TELEGRAM_BOT_TOKEN;
-  const apiId = ENV_TELEGRAM_API_ID;
-  const apiHash = ENV_TELEGRAM_API_HASH;
-  if (!botToken || !apiId || !apiHash) return null;
-  try {
-    return normalizeTelegramBotCredentials({ botToken, apiId, apiHash });
-  } catch {
-    return null;
-  }
-}
-async function getEffectiveTelegramBotConfig() {
-  const webCredentials = await getWebCredentials();
-  const environmentCredentials = getEnvironmentCredentials();
-  const source = webCredentials ? "web" : environmentCredentials ? "environment" : "none";
-  const credentials = webCredentials || environmentCredentials;
-  const [enabledRow, requiredRow] = await Promise.all([
-    getSettingStrict(TELEGRAM_BOT_ENABLED_SETTING),
-    getSettingStrict(TELEGRAM_REQUIRED_SETTING)
-  ]);
-  return {
-    credentials,
-    configured: Boolean(credentials),
-    enabled: Boolean(credentials) && enabledValue(enabledRow.value, true),
-    required: enabledValue(requiredRow.value, enabledValue(process.env.TELEGRAM_REQUIRED, false)),
-    source
-  };
-}
-async function applyEffectiveTelegramBotConfig() {
-  const effective = await getEffectiveTelegramBotConfig();
-  setTelegramBotRequired(effective.required);
-  return effective;
-}
-var lastBotIdentity = null;
-function setTelegramBotIdentity(bot) {
-  lastBotIdentity = bot;
-}
-async function getTelegramBotPublicConfig() {
-  const effective = await getEffectiveTelegramBotConfig();
-  const status = getTelegramBotStatus();
-  return {
-    configured: effective.configured,
-    enabled: effective.enabled,
-    required: effective.required,
-    pinConfigured: await isTelegramPinConfigured(),
-    source: effective.source,
-    status: status.status,
-    runtimeReady: status.status === "ready",
-    credentialProbeOnly: false,
-    bot: lastBotIdentity,
-    lastConnectedAt: status.lastConnectedAt,
-    lastError: status.lastError,
-    action: status.action
-  };
-}
-async function testTelegramBotCredentials(credentials) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 1e4);
-  timeout.unref?.();
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${credentials.botToken}/getMe`, {
-      method: "GET",
-      cache: "no-store",
-      redirect: "error",
-      signal: controller.signal
-    });
-    const payload = await response.json().catch(() => null);
-    const me = payload?.result;
-    if (!response.ok || !payload?.ok || !me?.is_bot) throw new Error("Bot API credential verification failed");
-    return {
-      username: me?.username ? String(me.username) : null,
-      displayName: [me?.first_name, me?.last_name].filter(Boolean).join(" ") || null
-    };
-  } catch {
-    throw new Error("\u65E0\u6CD5\u9A8C\u8BC1 Telegram Bot\uFF0C\u8BF7\u68C0\u67E5 Token \u548C\u7F51\u7EDC");
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-async function saveTelegramBotConfig(credentials, options) {
-  await setSettings([
-    [TELEGRAM_BOT_TOKEN_SETTING, credentials.botToken],
-    [TELEGRAM_API_ID_SETTING, String(credentials.apiId)],
-    [TELEGRAM_API_HASH_SETTING, credentials.apiHash],
-    [TELEGRAM_BOT_ENABLED_SETTING, options.enabled ? "true" : "false"],
-    [TELEGRAM_REQUIRED_SETTING, options.required ? "true" : "false"]
-  ]);
-}
-async function snapshotTelegramBotConfig() {
-  const rows = await Promise.all(ALL_KEYS.map(async (key) => [key, await getSettingStrict(key)]));
-  return {
-    entries: rows.filter(([, row]) => row.found && row.value !== null).map(([key, row]) => [key, row.value])
-  };
-}
-async function restoreTelegramBotConfig(snapshot) {
-  await deleteSettings(ALL_KEYS);
-  if (snapshot.entries.length > 0) await setSettings(snapshot.entries);
-}
-function getEnvironmentTelegramBotCredentials() {
-  const credentials = getEnvironmentCredentials();
-  if (!credentials) throw new Error("\u73AF\u5883\u53D8\u91CF\u4E2D\u6CA1\u6709\u5B8C\u6574\u6709\u6548\u7684 Telegram Bot \u51ED\u8BC1");
-  return credentials;
-}
-async function migrateEnvironmentTelegramBotConfig(credentials) {
-  await saveTelegramBotConfig(credentials, {
-    enabled: true,
-    required: enabledValue(process.env.TELEGRAM_REQUIRED, false)
-  });
-}
-async function setTelegramBotEnabled(enabled) {
-  await setSetting(TELEGRAM_BOT_ENABLED_SETTING, enabled ? "true" : "false");
-}
-async function deleteTelegramBotConfig() {
-  await deleteSettings(ALL_KEYS);
-  lastBotIdentity = null;
-}
-
-// src/services/telegramMultiAccountLoginFlows.ts
-import crypto8 from "node:crypto";
-var TelegramUserLoginFlowError = class extends Error {
-  constructor(code, message) {
-    super(message);
-    this.code = code;
-    this.name = "TelegramUserLoginFlowError";
-  }
-  code;
-};
-function telegramErrorName(error) {
-  if (!error || typeof error !== "object") return "";
-  return String(error.errorMessage || error.message || "");
-}
-function normalizeAccount(me) {
-  const displayName = [me.firstName, me.lastName].filter(Boolean).join(" ").trim();
-  return {
-    userId: String(me.id ?? ""),
-    username: me.username || null,
-    displayName: displayName || null
-  };
-}
-var TelegramMultiAccountLoginFlows = class {
-  constructor(deps) {
-    this.deps = deps;
-    this.now = deps.now || Date.now;
-    this.ttlMs = deps.ttlMs ?? 5 * 6e4;
-    this.maxErrors = deps.maxErrors ?? 3;
-  }
-  deps;
-  flows = /* @__PURE__ */ new Map();
-  ttlMs;
-  maxErrors;
-  now;
-  /** Backward-compatible alias for the existing phone-login service API. */
-  start(owner, rawPhone) {
-    return this.startPhone(owner, rawPhone);
-  }
-  async startPhone(owner, rawPhone) {
-    const phone = String(rawPhone || "").replace(/[\s()-]/g, "");
-    if (!/^\+[1-9]\d{6,14}$/.test(phone)) {
-      throw new TelegramUserLoginFlowError("INVALID_PHONE", "\u8BF7\u8F93\u5165\u542B\u56FD\u5BB6\u533A\u53F7\u7684\u6709\u6548\u624B\u673A\u53F7");
-    }
-    await this.removeOwnerFlows(owner);
-    const credentials = await this.requireCredentials();
-    const client2 = this.deps.createClient(credentials);
-    try {
-      await client2.connect();
-      const sent = await client2.sendCode(credentials, phone);
-      const id = this.newFlowId();
-      const expiresAt = this.now() + this.ttlMs;
-      const flow = {
-        id,
-        owner,
-        credentials,
-        expiresAt,
-        errors: 0,
-        client: client2,
-        cleanupTimer: this.scheduleCleanup(id, expiresAt),
-        kind: "phone",
-        phone,
-        phoneCodeHash: sent.phoneCodeHash,
-        step: "code"
-      };
-      this.flows.set(id, flow);
-      return {
-        flowId: id,
-        delivery: sent.isCodeViaApp ? "app" : "sms",
-        expiresAt: new Date(expiresAt).toISOString()
-      };
-    } catch (error) {
-      await this.closeClient(client2);
-      throw this.publicError(error);
-    }
-  }
-  async startQr(owner) {
-    await this.removeOwnerFlows(owner);
-    const credentials = await this.requireCredentials();
-    const client2 = this.deps.createClient(credentials);
-    const id = this.newFlowId();
-    const expiresAt = this.now() + this.ttlMs;
-    const flow = {
-      id,
-      owner,
-      credentials,
-      expiresAt,
-      errors: 0,
-      client: client2,
-      cleanupTimer: this.scheduleCleanup(id, expiresAt),
-      kind: "qr",
-      status: "pending",
-      qrData: null,
-      tokenExpiresAt: null,
-      version: 0,
-      passwordHint: null,
-      account: null,
-      error: null,
-      operation: Promise.resolve()
-    };
-    try {
-      await client2.connect();
-      client2.setQrLoginTokenHandler(async () => {
-        try {
-          await this.advanceQr(flow);
-        } catch (error) {
-          await this.failQr(flow, error);
-        }
-      });
-      this.flows.set(id, flow);
-      await this.advanceQr(flow);
-      return this.qrResponse(flow);
-    } catch (error) {
-      this.flows.delete(id);
-      clearTimeout(flow.cleanupTimer);
-      client2.setQrLoginTokenHandler(null);
-      await this.closeClient(client2);
-      throw this.publicError(error);
-    }
-  }
-  async refreshQr(owner, flowId) {
-    const flow = await this.requireQrFlow(owner, flowId);
-    if (flow.status !== "pending") return this.qrResponse(flow);
-    try {
-      await this.advanceQr(flow);
-    } catch (error) {
-      await this.failQr(flow, error);
-      throw this.publicError(error);
-    }
-    return this.qrResponse(flow);
-  }
-  async getQrStatus(owner, flowId) {
-    return this.qrResponse(await this.requireQrFlow(owner, flowId));
-  }
-  async submitCode(owner, flowId, rawCode) {
-    const flow = await this.requirePhoneFlow(owner, flowId, "code");
-    const code = String(rawCode || "").replace(/\s/g, "");
-    if (!/^\d{5,6}$/.test(code)) {
-      throw new TelegramUserLoginFlowError("INVALID_CODE", "\u8BF7\u8F93\u5165\u6709\u6548\u9A8C\u8BC1\u7801");
-    }
-    try {
-      const result = await this.requireClient(flow).signInCode(flow.phone, flow.phoneCodeHash, code);
-      if (result === "password_needed") {
-        flow.step = "password";
-        return { step: "password_required" };
-      }
-      return await this.completePhone(flow);
-    } catch (error) {
-      if (telegramErrorName(error).includes("SESSION_PASSWORD_NEEDED")) {
-        flow.step = "password";
-        return { step: "password_required" };
-      }
-      await this.recordError(flow);
-      throw this.publicError(error, "INVALID_CODE");
-    }
-  }
-  async submitPassword(owner, flowId, password) {
-    const flow = await this.requireFlow(owner, flowId);
-    if (!password) throw new TelegramUserLoginFlowError("INVALID_PASSWORD", "\u8BF7\u8F93\u5165\u4E24\u6B65\u9A8C\u8BC1\u5BC6\u7801");
-    if (flow.kind === "phone" && flow.step !== "password") {
-      throw new TelegramUserLoginFlowError("FLOW_NOT_FOUND", "\u767B\u5F55\u6B65\u9AA4\u65E0\u6548\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
-    }
-    if (flow.kind === "qr" && flow.status !== "password_required") {
-      throw new TelegramUserLoginFlowError("FLOW_NOT_FOUND", "\u767B\u5F55\u6B65\u9AA4\u65E0\u6548\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
-    }
-    try {
-      await this.requireClient(flow).signInPassword(password);
-      if (flow.kind === "phone") return await this.completePhone(flow);
-      const account = await this.authorizeAndClose(flow);
-      flow.status = "complete";
-      flow.account = account;
-      flow.qrData = null;
-      flow.tokenExpiresAt = null;
-      flow.passwordHint = null;
-      return { step: "complete", account };
-    } catch (error) {
-      await this.recordError(flow);
-      throw this.publicError(error, "INVALID_PASSWORD");
-    }
-  }
-  async cancel(owner, flowId) {
-    const flow = await this.requireFlow(owner, flowId);
-    await this.deleteAndClose(flow);
-    return { success: true };
-  }
-  async advanceQr(flow) {
-    const previous = flow.operation;
-    let release;
-    flow.operation = new Promise((resolve) => {
-      release = resolve;
-    });
-    await previous;
-    try {
-      if (flow.status !== "pending" || !this.flows.has(flow.id)) return;
-      const result = await this.requireClient(flow).exportQrLoginToken();
-      if (result.kind === "token") {
-        flow.qrData = `tg://login?token=${result.token.toString("base64url")}`;
-        flow.tokenExpiresAt = Math.min(result.expiresAt, flow.expiresAt);
-        flow.version += 1;
-        return;
-      }
-      flow.qrData = null;
-      flow.tokenExpiresAt = null;
-      if (result.kind === "password_required") {
-        flow.status = "password_required";
-        flow.passwordHint = result.hint || null;
-        return;
-      }
-      flow.account = await this.authorizeAndClose(flow);
-      flow.status = "complete";
-    } finally {
-      release();
-    }
-  }
-  async failQr(flow, error) {
-    if (!this.flows.has(flow.id) || flow.status === "complete") return;
-    flow.status = "error";
-    flow.qrData = null;
-    flow.tokenExpiresAt = null;
-    flow.error = this.publicError(error).message;
-    await this.detachAndClose(flow);
-  }
-  async completePhone(flow) {
-    try {
-      const account = await this.authorize(flow);
-      this.flows.delete(flow.id);
-      clearTimeout(flow.cleanupTimer);
-      return { step: "complete", account };
-    } finally {
-      await this.detachAndClose(flow);
-    }
-  }
-  async authorizeAndClose(flow) {
-    try {
-      return await this.authorize(flow);
-    } finally {
-      await this.detachAndClose(flow);
-    }
-  }
-  async authorize(flow) {
-    const client2 = this.requireClient(flow);
-    const account = normalizeAccount(await client2.getMe());
-    if (!account.userId) throw new TelegramUserLoginFlowError("TELEGRAM_ERROR", "Telegram \u767B\u5F55\u672A\u8FD4\u56DE\u7528\u6237\u8EAB\u4EFD");
-    await this.deps.onAuthorized({ session: client2.saveSession(), credentials: flow.credentials, account });
-    return account;
-  }
-  qrResponse(flow) {
-    const response = {
-      flowId: flow.id,
-      status: flow.status,
-      qrData: flow.status === "pending" ? flow.qrData : null,
-      expiresAt: new Date(flow.status === "pending" && flow.tokenExpiresAt ? flow.tokenExpiresAt : flow.expiresAt).toISOString(),
-      version: flow.version
-    };
-    if (flow.status === "password_required") response.passwordHint = flow.passwordHint;
-    if (flow.status === "complete" && flow.account) response.account = flow.account;
-    if (flow.status === "error" && flow.error) response.error = flow.error;
-    return response;
-  }
-  async requireFlow(owner, id) {
-    const flow = this.flows.get(String(id || ""));
-    if (!flow || flow.owner !== owner) {
-      throw new TelegramUserLoginFlowError("FLOW_NOT_FOUND", "\u767B\u5F55\u6D41\u7A0B\u4E0D\u5B58\u5728\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
-    }
-    if (flow.expiresAt <= this.now()) {
-      await this.deleteAndClose(flow);
-      throw new TelegramUserLoginFlowError("FLOW_EXPIRED", "\u767B\u5F55\u6D41\u7A0B\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
-    }
-    if (flow.errors >= this.maxErrors) {
-      await this.deleteAndClose(flow);
-      throw new TelegramUserLoginFlowError("TOO_MANY_ERRORS", "\u9519\u8BEF\u6B21\u6570\u8FC7\u591A\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
-    }
-    return flow;
-  }
-  async requirePhoneFlow(owner, id, step) {
-    const flow = await this.requireFlow(owner, id);
-    if (flow.kind !== "phone" || flow.step !== step) {
-      throw new TelegramUserLoginFlowError("FLOW_NOT_FOUND", "\u767B\u5F55\u6B65\u9AA4\u65E0\u6548\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
-    }
-    return flow;
-  }
-  async requireQrFlow(owner, id) {
-    const flow = await this.requireFlow(owner, id);
-    if (flow.kind !== "qr") {
-      throw new TelegramUserLoginFlowError("FLOW_NOT_FOUND", "\u4E8C\u7EF4\u7801\u767B\u5F55\u6D41\u7A0B\u4E0D\u5B58\u5728\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
-    }
-    return flow;
-  }
-  async recordError(flow) {
-    flow.errors += 1;
-    if (flow.errors >= this.maxErrors) await this.deleteAndClose(flow);
-  }
-  async removeOwnerFlows(owner) {
-    for (const flow of [...this.flows.values()]) {
-      if (flow.owner === owner) await this.deleteAndClose(flow);
-    }
-  }
-  scheduleCleanup(id, expiresAt) {
-    const timer = setTimeout(() => {
-      const flow = this.flows.get(id);
-      if (flow) void this.deleteAndClose(flow);
-    }, Math.max(1, expiresAt - this.now()));
-    timer.unref?.();
-    return timer;
-  }
-  async deleteAndClose(flow) {
-    this.flows.delete(flow.id);
-    clearTimeout(flow.cleanupTimer);
-    await this.detachAndClose(flow);
-  }
-  async detachAndClose(flow) {
-    const client2 = flow.client;
-    flow.client = null;
-    if (!client2) return;
-    if (flow.kind === "qr") client2.setQrLoginTokenHandler(null);
-    await this.closeClient(client2);
-  }
-  requireClient(flow) {
-    if (!flow.client) throw new TelegramUserLoginFlowError("FLOW_NOT_FOUND", "\u767B\u5F55\u6D41\u7A0B\u5DF2\u7ECF\u7ED3\u675F");
-    return flow.client;
-  }
-  async requireCredentials() {
-    const credentials = await this.deps.credentials();
-    if (!credentials?.apiId || !credentials.apiHash) {
-      throw new TelegramUserLoginFlowError("API_NOT_CONFIGURED", "\u8BF7\u5148\u914D\u7F6E\u6709\u6548\u7684 Telegram API ID \u548C API Hash");
-    }
-    return credentials;
-  }
-  newFlowId() {
-    return crypto8.randomBytes(24).toString("base64url");
-  }
-  publicError(error, fallback = "TELEGRAM_ERROR") {
-    if (error instanceof TelegramUserLoginFlowError) return error;
-    const name = telegramErrorName(error);
-    if (/PHONE_CODE_(INVALID|EXPIRED|EMPTY)/.test(name)) {
-      return new TelegramUserLoginFlowError("INVALID_CODE", "\u9A8C\u8BC1\u7801\u65E0\u6548\u6216\u5DF2\u8FC7\u671F");
-    }
-    if (/PASSWORD_HASH_INVALID/.test(name)) {
-      return new TelegramUserLoginFlowError("INVALID_PASSWORD", "\u4E24\u6B65\u9A8C\u8BC1\u5BC6\u7801\u9519\u8BEF");
-    }
-    if (/PHONE_NUMBER_INVALID/.test(name)) {
-      return new TelegramUserLoginFlowError("INVALID_PHONE", "\u624B\u673A\u53F7\u65E0\u6548");
-    }
-    return new TelegramUserLoginFlowError(
-      fallback,
-      fallback === "INVALID_PASSWORD" ? "\u4E24\u6B65\u9A8C\u8BC1\u5BC6\u7801\u9519\u8BEF" : fallback === "INVALID_CODE" ? "\u9A8C\u8BC1\u7801\u65E0\u6548\u6216\u5DF2\u8FC7\u671F" : "Telegram \u767B\u5F55\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5"
-    );
-  }
-  async closeClient(client2) {
-    try {
-      await client2.disconnect();
-    } catch {
-    }
-    try {
-      await client2.destroy();
-    } catch {
-    }
-  }
-};
-
-// src/services/telegramMultiAccountLogin.ts
-var adapter = null;
-function registerTelegramMultiAccountAuthorizedAdapter(next) {
-  adapter = next;
-}
-async function getCredentials() {
-  const effective = await getEffectiveTelegramBotConfig();
-  if (effective.credentials) {
-    return { apiId: effective.credentials.apiId, apiHash: effective.credentials.apiHash };
-  }
-  const apiId = Number.parseInt(process.env.TELEGRAM_API_ID || "0", 10);
-  const apiHash = process.env.TELEGRAM_API_HASH || "";
-  return apiId && apiHash ? { apiId, apiHash } : null;
-}
-function makeClient(credentials) {
-  return new TelegramClient2(new StringSession2(""), credentials.apiId, credentials.apiHash, {
-    connectionRetries: 15,
-    retryDelay: 2e3,
-    useWSS: false,
-    deviceModel: "TG Vault Multi-Account Login",
-    systemVersion: "1.0.0",
-    appVersion: "1.0.0",
-    floodSleepThreshold: 120
-  });
-}
-var GramJsMultiAccountLoginClient = class {
-  constructor(client2, credentials) {
-    this.client = client2;
-    this.credentials = credentials;
-  }
-  client;
-  credentials;
-  qrHandler = null;
-  qrEvent = new Raw({ types: [Api2.UpdateLoginToken] });
-  async connect() {
-    await this.client.connect();
-  }
-  sendCode(credentials, phone) {
-    return this.client.sendCode(credentials, phone);
-  }
-  async signInCode(phone, phoneCodeHash, code) {
-    try {
-      await this.client.invoke(new Api2.auth.SignIn({ phoneNumber: phone, phoneCodeHash, phoneCode: code }));
-      return "authorized";
-    } catch (error) {
-      if (this.errorName(error).includes("SESSION_PASSWORD_NEEDED")) return "password_needed";
-      throw error;
-    }
-  }
-  async signInPassword(password) {
-    let captured;
-    await this.client.signInWithPassword(this.credentials, {
-      password: async () => password,
-      onError: async (error) => {
-        captured = error;
-        return true;
-      }
-    }).catch((error) => {
-      throw captured || error;
-    });
-  }
-  setQrLoginTokenHandler(handler) {
-    if (this.qrHandler) this.client.removeEventHandler(this.qrHandler, this.qrEvent);
-    this.qrHandler = handler;
-    if (handler) this.client.addEventHandler(handler, this.qrEvent);
-  }
-  async exportQrLoginToken() {
-    let result;
-    try {
-      result = await this.client.invoke(new Api2.auth.ExportLoginToken({
-        apiId: this.credentials.apiId,
-        apiHash: this.credentials.apiHash,
-        exceptIds: []
-      }));
-    } catch (error) {
-      if (this.errorName(error).includes("SESSION_PASSWORD_NEEDED")) {
-        return { kind: "password_required" };
-      }
-      throw error;
-    }
-    if (result instanceof Api2.auth.LoginToken) {
-      return {
-        kind: "token",
-        token: Buffer.from(result.token),
-        expiresAt: Number(result.expires) * 1e3
-      };
-    }
-    let imported = result;
-    if (result instanceof Api2.auth.LoginTokenMigrateTo) {
-      await this.client._switchDC(result.dcId);
-      imported = await this.client.invoke(new Api2.auth.ImportLoginToken({ token: result.token }));
-    }
-    if (imported instanceof Api2.auth.LoginTokenSuccess) return { kind: "authorized" };
-    if (imported instanceof Api2.auth.LoginToken) {
-      return {
-        kind: "token",
-        token: Buffer.from(imported.token),
-        expiresAt: Number(imported.expires) * 1e3
-      };
-    }
-    throw new Error("TELEGRAM_QR_LOGIN_UNEXPECTED_RESPONSE");
-  }
-  async getMe() {
-    return await this.client.getMe();
-  }
-  saveSession() {
-    return this.client.session.save();
-  }
-  disconnect() {
-    return this.client.disconnect();
-  }
-  destroy() {
-    return this.client.destroy();
-  }
-  errorName(error) {
-    if (!error || typeof error !== "object") return "";
-    return String(error.errorMessage || error.message || "");
-  }
-};
-async function onAuthorized(input) {
-  if (!adapter) {
-    throw new Error("Telegram \u591A\u8D26\u53F7\u4ED3\u5E93\u5C1A\u672A\u6CE8\u518C\uFF0C\u65E0\u6CD5\u4FDD\u5B58\u767B\u5F55\u8D26\u53F7");
-  }
-  await adapter.upsertByTelegramUserId(input);
-}
-var telegramMultiAccountLoginFlows = new TelegramMultiAccountLoginFlows({
-  credentials: getCredentials,
-  createClient: (credentials) => new GramJsMultiAccountLoginClient(makeClient(credentials), credentials),
-  onAuthorized
-});
-
-// src/services/telegramMultiAccountLoginAdapter.ts
-function createTelegramMultiAccountAuthorizedAdapter(deps) {
-  return {
-    async upsertByTelegramUserId({ session, credentials, account }) {
-      const persisted = await deps.repository.upsertAccount({
-        telegramUserId: account.userId,
-        username: account.username,
-        displayName: account.displayName,
-        session,
-        enabled: true
-      });
-      const accountId = String(persisted?.id || "");
-      if (accountId) await deps.pool.activateAccount(accountId, "login_complete", credentials);
-      if (accountId && deps.accessSweep) {
-        await deps.accessSweep.trigger({ accountIds: [accountId], reason: "account_created" });
-      }
-    }
-  };
-}
-
-// src/services/telegramAccountAccessSweep.ts
-var DENIED_ERROR_CODES = /* @__PURE__ */ new Set([
-  "CHANNEL_INVALID",
-  "CHANNEL_PRIVATE",
-  "CHAT_ADMIN_REQUIRED",
-  "CHAT_FORBIDDEN",
-  "CHAT_RESTRICTED",
-  "GROUP_PRIVATE",
-  "INVITE_HASH_EXPIRED",
-  "INVITE_HASH_INVALID",
-  "MESSAGE_ID_INVALID",
-  "PEER_ID_INVALID",
-  "USER_BANNED_IN_CHANNEL",
-  "USER_NOT_PARTICIPANT"
-]);
-var EMPTY_COUNTS = () => ({
-  accounts: 0,
-  sources: 0,
-  probes: 0,
-  allowed: 0,
-  denied: 0,
-  error: 0
-});
-var configuredDependencies = null;
-var currentSummary = {
-  runId: null,
-  status: "idle",
-  reason: null,
-  startedAt: null,
-  completedAt: null,
-  counts: EMPTY_COUNTS(),
-  lastError: null
-};
-var triggerTail = Promise.resolve();
-var nextRunSequence = 0;
-function errorText2(error) {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-}
-function getTelegramAccessErrorCode(error) {
-  const candidate = error;
-  const raw = [candidate?.errorMessage, candidate?.code, candidate?.message, error].find((value) => typeof value === "string" && value.trim());
-  if (!raw) return "UNKNOWN_ERROR";
-  const normalized = raw.toUpperCase().trim();
-  if (/^[A-Z][A-Z0-9_]*$/.test(normalized)) return normalized;
-  const tokens = normalized.match(/[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+/g);
-  return tokens?.at(-1) || "UNKNOWN_ERROR";
-}
-function classifyTelegramAccessError(error) {
-  const code = getTelegramAccessErrorCode(error);
-  return DENIED_ERROR_CODES.has(code) || /(?:PRIVATE|FORBIDDEN|NOT_PARTICIPANT|BANNED)/.test(code) ? "denied" : "error";
-}
-function failureResult(input, error, now) {
-  return {
-    accountId: input.accountId,
-    sourceId: input.sourceId,
-    source: input.source,
-    scope: input.scope,
-    state: classifyTelegramAccessError(error),
-    checkedAt: now().toISOString(),
-    latestMessageId: null,
-    errorCode: getTelegramAccessErrorCode(error),
-    errorMessage: errorText2(error)
-  };
-}
-async function probeTelegramAccountSource(input) {
-  const now = input.now || (() => /* @__PURE__ */ new Date());
-  try {
-    const entity = await input.client.getEntity(input.source);
-    const [latest] = await input.client.getMessages(entity, { limit: 1 });
-    const latestMessageId = typeof latest?.id === "number" ? latest.id : null;
-    if (input.scope === "comments" && latestMessageId !== null) {
-      await input.client.getMessages(input.source, { limit: 1, replyTo: latestMessageId });
-    }
-    return {
-      accountId: input.accountId,
-      sourceId: input.sourceId,
-      source: input.source,
-      scope: input.scope,
-      state: "allowed",
-      checkedAt: now().toISOString(),
-      latestMessageId
-    };
-  } catch (error) {
-    return failureResult(input, error, now);
-  }
-}
-async function mapWithConcurrency(values, concurrency2, worker) {
-  let cursor = 0;
-  const workerCount = Math.min(values.length, Math.max(1, Math.floor(concurrency2)));
-  await Promise.all(Array.from({ length: workerCount }, async () => {
-    while (cursor < values.length) {
-      const index = cursor;
-      cursor += 1;
-      await worker(values[index]);
-    }
-  }));
-}
-function normalizeScopes(source) {
-  const requested = source.scopes?.length ? source.scopes : ["channel"];
-  return Array.from(new Set(requested.filter((scope) => scope === "channel" || scope === "comments")));
-}
-function selected(values, key, identifiers) {
-  if (!identifiers) return [...values];
-  const wanted = new Set(identifiers);
-  return values.filter((value) => wanted.has(String(value[key])));
-}
-function runId(now) {
-  nextRunSequence += 1;
-  return `${now.getTime()}-${nextRunSequence}`;
-}
-async function runTelegramAccountAccessSweep(dependencies, options = {}) {
-  const now = dependencies.now || (() => /* @__PURE__ */ new Date());
-  const startedAt = now();
-  const reason = options.reason || "automatic";
-  const summary = {
-    runId: runId(startedAt),
-    status: "running",
-    reason,
-    startedAt: startedAt.toISOString(),
-    completedAt: null,
-    counts: EMPTY_COUNTS(),
-    lastError: null
-  };
-  currentSummary = summary;
-  try {
-    const [accountRows, sourceRows] = await Promise.all([
-      dependencies.listTelegramAccounts(),
-      dependencies.listTelegramChannelSubscriptions()
-    ]);
-    const accounts = selected(accountRows.filter((account) => account.enabled), "accountId", options.accountIds);
-    const sources = selected(sourceRows.filter((source) => source.enabled), "sourceId", options.sourceIds);
-    summary.counts.accounts = accounts.length;
-    summary.counts.sources = sources.length;
-    const work = [];
-    for (const account of accounts) {
-      for (const source of sources) {
-        for (const scope of normalizeScopes(source)) work.push({ account, source, scope });
-      }
-    }
-    summary.counts.probes = work.length;
-    const runtimePromises = /* @__PURE__ */ new Map();
-    const getRuntime = (accountId) => {
-      let runtime = runtimePromises.get(accountId);
-      if (!runtime) {
-        runtime = dependencies.getTelegramAccountRuntime(accountId);
-        runtimePromises.set(accountId, runtime);
-      }
-      return runtime;
-    };
-    await mapWithConcurrency(work, options.concurrency ?? 2, async (item) => {
-      let result;
-      try {
-        const runtime = await getRuntime(item.account.accountId);
-        if (!runtime?.client) throw new Error("TELEGRAM_ACCOUNT_RUNTIME_UNAVAILABLE");
-        result = await probeTelegramAccountSource({
-          accountId: item.account.accountId,
-          sourceId: item.source.sourceId,
-          source: item.source.source,
-          scope: item.scope,
-          client: runtime.client,
-          now
-        });
-      } catch (error) {
-        result = failureResult({
-          accountId: item.account.accountId,
-          sourceId: item.source.sourceId,
-          source: item.source.source,
-          scope: item.scope
-        }, error, now);
-      }
-      summary.counts[result.state] += 1;
-      await dependencies.markTelegramAccountSourceAccess(result);
-    });
-    summary.status = "completed";
-    summary.completedAt = now().toISOString();
-    currentSummary = summary;
-    return summary;
-  } catch (error) {
-    summary.status = "failed";
-    summary.completedAt = now().toISOString();
-    summary.lastError = errorText2(error);
-    currentSummary = summary;
-    throw error;
-  }
-}
-function configureTelegramAccountAccessSweep(dependencies) {
-  configuredDependencies = dependencies;
-}
-function triggerTelegramAccountAccessSweep(options = {}) {
-  if (!configuredDependencies) {
-    return Promise.reject(new Error("TELEGRAM_ACCOUNT_ACCESS_SWEEP_NOT_CONFIGURED"));
-  }
-  const dependencies = configuredDependencies;
-  currentSummary = {
-    ...currentSummary,
-    status: "queued",
-    reason: options.reason || "manual",
-    completedAt: null,
-    lastError: null
-  };
-  const run = triggerTail.then(() => runTelegramAccountAccessSweep(dependencies, {
-    ...options,
-    reason: options.reason || "manual"
-  }));
-  triggerTail = run.then(() => void 0, () => void 0);
-  return run;
-}
-function getTelegramAccountAccessSweepSummary() {
-  return {
-    ...currentSummary,
-    counts: { ...currentSummary.counts }
-  };
-}
-
-// src/services/telegramAccountAccessSweepAdapter.ts
-init_db();
-function createTelegramAccountAccessSweepDependencies(options) {
-  const repository = options.repository || telegramAccountRepository;
-  const querySubscriptions = options.querySubscriptions || query;
-  return {
-    async listTelegramAccounts() {
-      const accounts = await repository.listEnabledAccounts();
-      return accounts.map((account) => ({ accountId: account.id, enabled: account.enabled }));
-    },
-    async listTelegramChannelSubscriptions() {
-      const result = await querySubscriptions(
-        `SELECT id, source, enabled
-                 FROM telegram_channel_subscriptions
-                 WHERE enabled = TRUE
-                 ORDER BY created_at, id`
-      );
-      return result.rows.map((row) => ({
-        sourceId: String(row.id),
-        source: String(row.source),
-        enabled: Boolean(row.enabled),
-        scopes: ["channel", "comments"]
-      }));
-    },
-    async getTelegramAccountRuntime(accountId) {
-      const client2 = options.clientPool.getAccountClient(accountId);
-      return client2 ? { client: client2 } : null;
-    },
-    async markTelegramAccountSourceAccess(result) {
-      const state = result.state === "error" ? "unknown" : result.state;
-      const error = result.errorCode || result.errorMessage || null;
-      const scope = result.scope === "channel" ? "scan" : "metadata";
-      await repository.markSourceAccess(result.accountId, result.source, scope, state, error);
-      if (result.scope === "channel") {
-        await repository.markSourceAccess(result.accountId, result.source, "download", state, error);
-      }
-    },
-    now: options.now
-  };
-}
-function installTelegramAccountAccessSweep(options) {
-  const dependencies = createTelegramAccountAccessSweepDependencies(options);
-  configureTelegramAccountAccessSweep(dependencies);
-  return dependencies;
-}
-
-// src/services/telegramMultiAccountRuntime.ts
-var installed = false;
-var initializationPromise2 = null;
-async function installTelegramMultiAccountRuntimeAdapters() {
-  if (installed) return;
-  installTelegramAccountAccessSweep({ clientPool: telegramUserClientPool });
-  registerTelegramMultiAccountAuthorizedAdapter(createTelegramMultiAccountAuthorizedAdapter({
-    repository: telegramAccountRepository,
-    pool: {
-      activateAccount: (accountId, reason, credentials) => telegramUserClientPool.activateAccount(accountId, reason, credentials)
-    },
-    accessSweep: { trigger: (options) => triggerTelegramAccountAccessSweep(options) }
-  }));
-  installed = true;
-}
-async function initializeTelegramMultiAccountRuntime(credentials) {
-  if (initializationPromise2) return initializationPromise2;
-  const run = (async () => {
-    await installTelegramMultiAccountRuntimeAdapters();
-    await initializeTelegramUserClientPool(credentials);
-  })();
-  initializationPromise2 = run;
-  try {
-    await run;
-  } finally {
-    if (initializationPromise2 === run) initializationPromise2 = null;
-  }
-}
-async function selectTelegramDownloadAccount(sourceKey, options = {}) {
-  const normalized = typeof options?.[Symbol.iterator] === "function" ? { excludeAccountIds: options } : options;
-  return telegramUserClientPool.select(sourceKey, { ...normalized, scope: normalized.scope || "download" });
-}
-async function markTelegramAccountCooldown(accountId, seconds, error = null) {
-  await telegramAccountRepository.markCooldown(accountId, seconds, error);
-  const safeSeconds = Number.isFinite(seconds) ? Math.max(1, seconds) : 60;
-  telegramUserClientPool.updateCooldown(accountId, new Date(Date.now() + safeSeconds * 1e3), error);
-}
-async function markTelegramAccountSourceAccess(accountId, sourceKey, scope, state, error = null) {
-  await telegramAccountRepository.markSourceAccess(accountId, sourceKey, scope, state, error);
-  telegramUserClientPool.updateSourceAccess(accountId, sourceKey, scope, state);
-}
-async function markTelegramAccountSessionExpired(accountId, error = null) {
-  await telegramAccountRepository.markSessionExpired(accountId, error);
-  await telegramUserClientPool.expireAccount(accountId);
-}
-function classifyTelegramDownloadAccountError(error) {
-  const value = error;
-  const text = `${value?.errorMessage || ""} ${value?.message || ""}`;
-  if (isTelegramSessionExpiredError(error)) return "session_expired";
-  if (/CHANNEL_PRIVATE|USER_NOT_PARTICIPANT|CHAT_FORBIDDEN|CHAT_ADMIN_REQUIRED|Could not find the input entity|Cannot find any entity|forbidden|privacy/i.test(text)) return "permission_denied";
-  if (Number(value?.seconds || value?.value || text.match(/FLOOD_WAIT_?(\d+)/i)?.[1] || 0) > 0 || /FLOOD|Too many requests/i.test(text)) return "flood_wait";
-  return "retryable";
-}
-function telegramFloodWaitSeconds(error) {
-  const value = error;
-  const text = `${value?.errorMessage || ""} ${value?.message || ""}`;
-  return Math.max(30, Number(value?.seconds || value?.value || text.match(/FLOOD_WAIT_?(\d+)/i)?.[1] || 60));
-}
-
-// src/services/telegramUpload.ts
-init_db();
-import fs9 from "fs";
-import path12 from "path";
-import crypto15 from "crypto";
-import bigInt from "big-integer";
-
-// src/utils/thumbnail.ts
-import path7 from "path";
-import sharp from "sharp";
-import ffmpeg from "fluent-ffmpeg";
-import fs7 from "fs";
-import crypto9 from "crypto";
-var THUMBNAIL_DIR = path7.resolve(process.env.THUMBNAIL_DIR || "./data/thumbnails");
-if (!fs7.existsSync(THUMBNAIL_DIR)) {
-  fs7.mkdirSync(THUMBNAIL_DIR, { recursive: true });
-}
-var PREVIEW_DIR = path7.resolve(process.env.PREVIEW_DIR || "./data/previews");
-if (!fs7.existsSync(PREVIEW_DIR)) {
-  fs7.mkdirSync(PREVIEW_DIR, { recursive: true });
-}
-function isMp4Like(mimeType, filePath) {
-  const lower = filePath.toLowerCase();
-  return mimeType === "video/mp4" || lower.endsWith(".mp4") || lower.endsWith(".m4v") || lower.endsWith(".mov");
-}
-function ffmpegRun(command, label) {
-  return new Promise((resolve, reject) => {
-    command.on("start", (cmd) => console.log(`[Preview] ${label} CMD: ${cmd}`)).on("end", () => resolve()).on("error", (err) => reject(err)).run();
-  });
-}
-async function generateMediaPreview(filePath, storedName, mimeType) {
-  const absFilePath = path7.resolve(filePath);
-  if (!fs7.existsSync(absFilePath)) return null;
-  try {
-    if (mimeType.startsWith("image/") && mimeType !== "image/gif") {
-      const previewName = `preview_${crypto9.randomUUID()}.webp`;
-      const previewPath = path7.join(PREVIEW_DIR, previewName);
-      await sharp(absFilePath).rotate().resize(2048, 2048, { fit: "inside", withoutEnlargement: true }).webp({ quality: 86, effort: 4 }).toFile(previewPath);
-      console.log(`[Preview] \u2705 Image preview created: ${previewName}`);
-      return previewPath;
-    }
-    if (mimeType.startsWith("video/")) {
-      const previewName = `preview_${crypto9.randomUUID()}.mp4`;
-      const previewPath = path7.join(PREVIEW_DIR, previewName);
-      const mp4Like = isMp4Like(mimeType, storedName || absFilePath);
-      if (mp4Like) {
-        try {
-          await ffmpegRun(
-            ffmpeg(absFilePath).outputOptions(["-c copy", "-movflags +faststart"]).output(previewPath),
-            "Video faststart"
-          );
-          if (fs7.existsSync(previewPath) && fs7.statSync(previewPath).size > 0) {
-            console.log(`[Preview] \u2705 Video faststart preview created: ${previewName}`);
-            return previewPath;
-          }
-        } catch (copyError) {
-          console.warn(`[Preview] \u26A0\uFE0F Faststart copy failed, fallback to transcode: ${copyError.message}`);
-          try {
-            if (fs7.existsSync(previewPath)) fs7.unlinkSync(previewPath);
-          } catch {
-          }
-        }
-      }
-      await ffmpegRun(
-        ffmpeg(absFilePath).videoCodec("libx264").audioCodec("aac").size("?x720").outputOptions([
-          "-preset veryfast",
-          "-crf 23",
-          "-movflags +faststart",
-          "-pix_fmt yuv420p",
-          "-profile:v baseline",
-          "-level 3.1",
-          "-b:a 128k"
-        ]).output(previewPath),
-        "Video transcode"
-      );
-      if (fs7.existsSync(previewPath) && fs7.statSync(previewPath).size > 0) {
-        console.log(`[Preview] \u2705 Video transcoded preview created: ${previewName}`);
-        return previewPath;
-      }
-    }
-  } catch (error) {
-    console.error(`[Preview] \u274C Generate preview failed for ${storedName}:`, error.message);
-  }
-  return null;
-}
-async function generateThumbnail(filePath, storedName, mimeType) {
-  const absFilePath = path7.resolve(filePath);
-  const thumbName = `thumb_${crypto9.randomUUID()}.webp`;
-  const thumbPath = path7.join(THUMBNAIL_DIR, thumbName);
-  console.log(`[Thumbnail] \u{1F680} Starting generation for: ${storedName}`);
-  console.log(`[Thumbnail] Source: ${absFilePath}`);
-  console.log(`[Thumbnail] Target: ${thumbPath}`);
-  console.log(`[Thumbnail] MIME: ${mimeType}`);
-  if (!fs7.existsSync(absFilePath)) {
-    console.error(`[Thumbnail] \u274C Source file does not exist: ${absFilePath}`);
-    return null;
-  }
-  if (mimeType === "image/gif") {
-    console.log(`[Thumbnail] \u23E9 Skipping GIF to preserve animation`);
-    return null;
-  }
-  try {
-    if (mimeType.startsWith("image/")) {
-      console.log(`[Thumbnail] \u{1F5BC}\uFE0F  Processing image with Sharp...`);
-      await sharp(absFilePath).resize(400, 300, { fit: "inside", withoutEnlargement: true }).webp({ quality: 80 }).toFile(thumbPath);
-      console.log(`[Thumbnail] \u2705 Image thumbnail created: ${thumbName}`);
-      return thumbPath;
-    } else if (mimeType.startsWith("video/")) {
-      console.log(`[Thumbnail] \u{1F3AC} Processing video with Ffmpeg...`);
-      const tryScreenshot = (timestamp) => {
-        return new Promise((resolve) => {
-          console.log(`[Thumbnail] \u{1F4F8} Attempting screenshot at ${timestamp}`);
-          ffmpeg(absFilePath).screenshots({
-            count: 1,
-            folder: THUMBNAIL_DIR,
-            filename: thumbName,
-            size: "400x300",
-            timestamps: [timestamp]
-          }).on("start", (cmd) => console.log(`[Thumbnail] FFmpeg CMD: ${cmd}`)).on("end", () => {
-            if (fs7.existsSync(thumbPath)) {
-              console.log(`[Thumbnail] \u2705 Video thumbnail created at ${timestamp}`);
-              resolve(true);
-            } else {
-              console.warn(`[Thumbnail] \u26A0\uFE0F  FFmpeg finished but file not found at ${timestamp}`);
-              resolve(false);
-            }
-          }).on("error", (err) => {
-            console.error(`[Thumbnail] \u274C FFmpeg error at ${timestamp}:`, err.message);
-            resolve(false);
-          });
-        });
-      };
-      let success = await tryScreenshot("10%");
-      if (!success) {
-        console.log(`[Thumbnail] \u{1F504} Retrying at 1s mark...`);
-        success = await tryScreenshot("00:00:01");
-      }
-      if (success) {
-        return thumbPath;
-      }
-    }
-  } catch (error) {
-    console.error(`[Thumbnail] \u274C Unexpected error:`, error.message);
-  }
-  return null;
-}
-async function getImageDimensions(filePath, mimeType) {
-  const absFilePath = path7.resolve(filePath);
-  console.log(`[Dimensions] \u{1F4CF} Getting dimensions for: ${absFilePath} (${mimeType})`);
-  try {
-    if (mimeType.startsWith("image/")) {
-      const metadata = await sharp(absFilePath).metadata();
-      const result = { width: metadata.width || 0, height: metadata.height || 0 };
-      console.log(`[Dimensions] \u2705 Image dimensions: ${result.width}x${result.height}`);
-      return result;
-    } else if (mimeType.startsWith("video/")) {
-      return new Promise((resolve) => {
-        ffmpeg.ffprobe(absFilePath, (err, metadata) => {
-          if (err) {
-            console.error(`[Dimensions] \u274C Probe failed:`, err.message);
-            resolve({ width: 0, height: 0 });
-          } else {
-            const stream = metadata.streams.find((s) => s.width && s.height);
-            const result = {
-              width: stream?.width || 0,
-              height: stream?.height || 0
-            };
-            console.log(`[Dimensions] \u2705 Video dimensions: ${result.width}x${result.height}`);
-            resolve(result);
-          }
-        });
-      });
-    }
-  } catch (error) {
-    console.error("Get dimensions failed:", error);
-  }
-  return { width: 0, height: 0 };
-}
-
-// src/services/telegramUpload.ts
-init_storage();
-
-// src/services/taskAbortRegistry.ts
-var TaskAbortRegistry = class {
-  controllers = /* @__PURE__ */ new Map();
-  acquire(taskId) {
-    const current3 = this.controllers.get(taskId);
-    if (current3 && !current3.controller.signal.aborted) {
-      current3.references += 1;
-      return current3.controller;
-    }
-    const controller = new AbortController();
-    this.controllers.set(taskId, { controller, references: 1 });
-    return controller;
-  }
-  get(taskId) {
-    return this.controllers.get(taskId)?.controller;
-  }
-  cancel(taskId, reason = "\u4EFB\u52A1\u5DF2\u53D6\u6D88") {
-    const entry = this.controllers.get(taskId);
-    if (!entry || entry.controller.signal.aborted) return false;
-    entry.controller.abort(reason);
-    this.controllers.delete(taskId);
-    return true;
-  }
-  release(taskId, controller) {
-    const entry = this.controllers.get(taskId);
-    if (!entry || entry.controller !== controller) return;
-    entry.references -= 1;
-    if (entry.references <= 0) this.controllers.delete(taskId);
-  }
-};
-
-// src/services/storageCooldownGuard.ts
-init_storage();
-init_storageCooldown();
-function formatStorageCooldownNotice(cooldownUntil) {
-  return [
-    "\u23F8\uFE0F Google Drive \u4ECA\u65E5\u4E0A\u4F20\u989D\u5EA6\u5DF2\u8FBE\u4E0A\u9650",
-    "",
-    "\u5F53\u524D\u4EFB\u52A1\u5DF2\u81EA\u52A8\u6682\u505C\uFF0C\u5269\u4F59\u6587\u4EF6\u4E0D\u4F1A\u4E22\u5931\uFF1B\u65E0\u9700\u70B9\u51FB\u201C\u7EE7\u7EED\u201D\u3002",
-    describeStorageCooldownRecovery(cooldownUntil),
-    "",
-    `\u6062\u590D\u65F6\u95F4\uFF1A${cooldownUntil.toISOString()}`
-  ].join("\n");
-}
-function buildStorageCooldownHttpError(error) {
-  return {
-    status: 429,
-    body: {
-      error: error.message || "Google Drive \u4ECA\u65E5\u4E0A\u4F20\u989D\u5EA6\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002",
-      code: "storage_account_cooling",
-      provider: error.provider,
-      reason: error.reason,
-      retryAt: error.cooldownUntil.toISOString()
-    }
-  };
-}
-function sendStorageCooldownHttpError(res, error) {
-  const payload = buildStorageCooldownHttpError(error);
-  res.status(payload.status).json(payload.body);
-}
-async function getStorageCooldown(target) {
-  if (target.provider.name !== "google_drive" || !target.accountId) return null;
-  return getStorageAccountCooldown(target.accountId, target.provider.name, STORAGE_COOLDOWN_REASON_DAILY_UPLOAD_LIMIT);
-}
-async function assertStorageTargetWritable(target) {
-  const cooldown = await getStorageCooldown(target);
-  if (!cooldown) return;
-  throw new StorageQuotaCooldownError("Google Drive \u4ECA\u65E5\u4E0A\u4F20\u989D\u5EA6\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u8BF7\u7B49\u5F85\u81EA\u52A8\u6062\u590D\u540E\u518D\u4E0A\u4F20\uFF0C\u6216\u4E34\u65F6\u5207\u6362\u5176\u5B83\u5B58\u50A8\u6E90\u3002", {
-    provider: cooldown.provider,
-    reason: cooldown.reason,
-    storageAccountId: cooldown.storageAccountId,
-    cooldownUntil: cooldown.cooldownUntil
-  });
-}
-function isStorageCooldownError(error) {
-  return isStorageQuotaCooldownError(error);
-}
-
-// src/services/telegramUpload.ts
-init_storageCooldown();
-
-// src/services/telegramUserClient.ts
-import fs8 from "node:fs";
-import path8 from "node:path";
-import { Api as Api3, TelegramClient as TelegramClient3 } from "telegram";
-import { StringSession as StringSession3 } from "telegram/sessions/index.js";
-
-// src/services/telegramUserWebLogin.ts
-import crypto10 from "node:crypto";
-var TelegramUserLoginFlowError2 = class extends Error {
-  constructor(code, message) {
-    super(message);
-    this.code = code;
-    this.name = "TelegramUserLoginFlowError";
-  }
-  code;
-};
-function telegramErrorName2(error) {
-  if (!error || typeof error !== "object") return "";
-  return String(error.errorMessage || error.message || "");
-}
-function normalizeAccount2(me) {
-  const displayName = [me.firstName, me.lastName].filter(Boolean).join(" ").trim();
-  return { userId: String(me.id ?? ""), username: me.username || null, displayName: displayName || null };
-}
-var TelegramUserWebLoginFlows = class {
-  constructor(deps) {
-    this.deps = deps;
-    this.now = deps.now || Date.now;
-    this.ttlMs = deps.ttlMs ?? 5 * 6e4;
-    this.maxErrors = deps.maxErrors ?? 3;
-  }
-  deps;
-  flows = /* @__PURE__ */ new Map();
-  ttlMs;
-  maxErrors;
-  now;
-  async start(owner, rawPhone) {
-    const phone = String(rawPhone || "").replace(/[\s()-]/g, "");
-    if (!/^\+[1-9]\d{6,14}$/.test(phone)) throw new TelegramUserLoginFlowError2("INVALID_PHONE", "\u8BF7\u8F93\u5165\u542B\u56FD\u5BB6\u533A\u53F7\u7684\u6709\u6548\u624B\u673A\u53F7");
-    await this.removeOwnerFlows(owner);
-    const credentials = await this.deps.credentials();
-    if (!credentials?.apiId || !credentials.apiHash) throw new TelegramUserLoginFlowError2("API_NOT_CONFIGURED", "\u8BF7\u5148\u914D\u7F6E\u6709\u6548\u7684 Telegram API ID \u548C API Hash");
-    const client2 = this.deps.createClient(credentials);
-    try {
-      await client2.connect();
-      const sent = await client2.sendCode(credentials, phone);
-      const flowId = crypto10.randomBytes(24).toString("base64url");
-      const expiresAt = this.now() + this.ttlMs;
-      this.flows.set(flowId, { id: flowId, owner, phone, phoneCodeHash: sent.phoneCodeHash, expiresAt, errors: 0, step: "code", client: client2, credentials });
-      return { flowId, delivery: sent.isCodeViaApp ? "app" : "sms", expiresAt: new Date(expiresAt).toISOString() };
-    } catch (error) {
-      await this.closeClient(client2);
-      throw this.publicError(error);
-    }
-  }
-  async submitCode(owner, flowId, rawCode) {
-    const flow = await this.requireFlow(owner, flowId, "code");
-    const code = String(rawCode || "").replace(/\s/g, "");
-    if (!/^\d{5,6}$/.test(code)) throw new TelegramUserLoginFlowError2("INVALID_CODE", "\u8BF7\u8F93\u5165\u6709\u6548\u9A8C\u8BC1\u7801");
-    try {
-      const result = await flow.client.signInCode(flow.phone, flow.phoneCodeHash, code);
-      if (result === "password_needed") {
-        flow.step = "password";
-        return { step: "password_required" };
-      }
-      return await this.complete(flow);
-    } catch (error) {
-      if (telegramErrorName2(error).includes("SESSION_PASSWORD_NEEDED")) {
-        flow.step = "password";
-        return { step: "password_required" };
-      }
-      await this.recordError(flow);
-      throw this.publicError(error, "INVALID_CODE");
-    }
-  }
-  async submitPassword(owner, flowId, password) {
-    const flow = await this.requireFlow(owner, flowId, "password");
-    if (!password) throw new TelegramUserLoginFlowError2("INVALID_PASSWORD", "\u8BF7\u8F93\u5165\u4E24\u6B65\u9A8C\u8BC1\u5BC6\u7801");
-    try {
-      await flow.client.signInPassword(password);
-      return await this.complete(flow);
-    } catch (error) {
-      await this.recordError(flow);
-      throw this.publicError(error, "INVALID_PASSWORD");
-    }
-  }
-  async removeOwnerFlows(owner) {
-    const owned = [...this.flows.values()].filter((flow) => flow.owner === owner);
-    for (const flow of owned) {
-      this.flows.delete(flow.id);
-      await this.closeClient(flow.client);
-    }
-  }
-  async complete(flow) {
-    try {
-      const account = normalizeAccount2(await flow.client.getMe());
-      await this.deps.persistAndActivate(flow.client.saveSession(), account, flow.credentials);
-      this.flows.delete(flow.id);
-      return { step: "complete", account };
-    } finally {
-      await this.closeClient(flow.client);
-    }
-  }
-  async requireFlow(owner, id, step) {
-    const flow = this.flows.get(id);
-    if (!flow || flow.owner !== owner) throw new TelegramUserLoginFlowError2("FLOW_NOT_FOUND", "\u767B\u5F55\u6D41\u7A0B\u4E0D\u5B58\u5728\uFF0C\u8BF7\u91CD\u65B0\u53D1\u9001\u9A8C\u8BC1\u7801");
-    if (flow.expiresAt <= this.now()) {
-      this.flows.delete(id);
-      await this.closeClient(flow.client);
-      throw new TelegramUserLoginFlowError2("FLOW_EXPIRED", "\u767B\u5F55\u6D41\u7A0B\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u53D1\u9001\u9A8C\u8BC1\u7801");
-    }
-    if (flow.errors >= this.maxErrors) {
-      this.flows.delete(id);
-      await this.closeClient(flow.client);
-      throw new TelegramUserLoginFlowError2("TOO_MANY_ERRORS", "\u9519\u8BEF\u6B21\u6570\u8FC7\u591A\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
-    }
-    if (flow.step !== step) throw new TelegramUserLoginFlowError2("FLOW_NOT_FOUND", "\u767B\u5F55\u6B65\u9AA4\u65E0\u6548\uFF0C\u8BF7\u91CD\u65B0\u5F00\u59CB\u767B\u5F55");
-    return flow;
-  }
-  async recordError(flow) {
-    flow.errors += 1;
-  }
-  publicError(error, fallback = "TELEGRAM_ERROR") {
-    if (error instanceof TelegramUserLoginFlowError2) return error;
-    const name = telegramErrorName2(error);
-    if (/PHONE_CODE_(INVALID|EXPIRED|EMPTY)/.test(name)) return new TelegramUserLoginFlowError2("INVALID_CODE", "\u9A8C\u8BC1\u7801\u65E0\u6548\u6216\u5DF2\u8FC7\u671F");
-    if (/PASSWORD_HASH_INVALID/.test(name)) return new TelegramUserLoginFlowError2("INVALID_PASSWORD", "\u4E24\u6B65\u9A8C\u8BC1\u5BC6\u7801\u9519\u8BEF");
-    if (/PHONE_NUMBER_INVALID/.test(name)) return new TelegramUserLoginFlowError2("INVALID_PHONE", "\u624B\u673A\u53F7\u65E0\u6548");
-    return new TelegramUserLoginFlowError2(fallback, fallback === "INVALID_PASSWORD" ? "\u4E24\u6B65\u9A8C\u8BC1\u5BC6\u7801\u9519\u8BEF" : fallback === "INVALID_CODE" ? "\u9A8C\u8BC1\u7801\u65E0\u6548\u6216\u5DF2\u8FC7\u671F" : "Telegram \u767B\u5F55\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
-  }
-  async closeClient(client2) {
-    try {
-      await client2.disconnect();
-    } catch {
-    }
-    try {
-      await client2.destroy();
-    } catch {
-    }
-  }
-};
-
-// src/services/telegramUserClient.ts
-init_settings();
-
-// src/services/telegramUserClientStatus.ts
-var current2 = {
-  status: "not_configured",
-  userId: null,
-  username: null,
-  checkedAt: null,
-  lastError: null,
-  action: "\u914D\u7F6E Telegram API \u540E\u5728\u7F51\u9875\u767B\u5F55\u8D26\u53F7"
-};
-function getTelegramUserClientStatus() {
-  return { ...current2 };
-}
-function recordTelegramUserClientReady(input) {
-  current2 = {
-    status: "ready",
-    userId: input.userId,
-    username: input.username || null,
-    checkedAt: input.checkedAt || (/* @__PURE__ */ new Date()).toISOString(),
-    lastError: null,
-    action: null
-  };
-}
-function recordTelegramUserClientFailure(status, message) {
-  const actions = {
-    not_configured: "\u914D\u7F6E Telegram API \u540E\u5728\u7F51\u9875\u767B\u5F55\u8D26\u53F7",
-    missing_session: "\u5728\u7F51\u9875\u4E2D\u767B\u5F55 Telegram \u7528\u6237\u8D26\u53F7",
-    disabled: "\u53EF\u968F\u65F6\u91CD\u65B0\u542F\u7528\uFF0C\u5DF2\u52A0\u5BC6\u4FDD\u5B58\u7684\u767B\u5F55\u4FE1\u606F\u4F1A\u4FDD\u7559",
-    expired: "\u5728\u7F51\u9875\u4E2D\u91CD\u65B0\u767B\u5F55 Telegram \u7528\u6237\u8D26\u53F7",
-    permission_denied: "\u5148\u7528\u8BE5\u8D26\u53F7\u52A0\u5165\u76EE\u6807\u9891\u9053\u5E76\u91CD\u65B0\u6D4B\u8BD5",
-    error: "\u68C0\u67E5\u7F51\u7EDC\u4E0E\u540E\u7AEF\u65E5\u5FD7\u540E\u91CD\u65B0\u6D4B\u8BD5"
-  };
-  current2 = { ...current2, status, checkedAt: (/* @__PURE__ */ new Date()).toISOString(), lastError: message, action: actions[status] };
-}
-
-// src/services/telegramUserClient.ts
-var TELEGRAM_USER_SESSION_SETTING = "telegram_user_session";
-var TELEGRAM_USER_ENABLED_SETTING = "telegram_user_download_enabled";
-var TELEGRAM_USER_ID_SETTING = "telegram_user_id";
-var TELEGRAM_USER_USERNAME_SETTING = "telegram_user_username";
-var userClient = null;
-var userSessionFilePath = "";
-async function getTelegramUserCredentials() {
-  const effective = await getEffectiveTelegramBotConfig();
-  if (effective.credentials) return { apiId: effective.credentials.apiId, apiHash: effective.credentials.apiHash };
-  const apiId = Number.parseInt(process.env.TELEGRAM_API_ID || "0", 10);
-  const apiHash = process.env.TELEGRAM_API_HASH || "";
-  return apiId && apiHash ? { apiId, apiHash } : null;
-}
-function getSessionFilePath() {
-  return process.env.TELEGRAM_USER_SESSION_FILE || "./data/telegram_user_session.txt";
-}
-async function stopLegacyClient() {
-  const current3 = userClient;
-  userClient = null;
-  if (current3) {
-    try {
-      await current3.disconnect();
-    } catch {
-    }
-    try {
-      await current3.destroy();
-    } catch {
-    }
-  }
-}
-async function migrateLegacyTelegramUserSession() {
-  const stored = await getSetting(TELEGRAM_USER_SESSION_SETTING, "");
-  if (stored) return stored;
-  userSessionFilePath = getSessionFilePath();
-  if (!fs8.existsSync(userSessionFilePath)) return "";
-  const legacy = fs8.readFileSync(userSessionFilePath, "utf8").trim();
-  if (!legacy) return "";
-  await setSetting(TELEGRAM_USER_SESSION_SETTING, legacy);
-  return legacy;
-}
-function makeClient2(session, credentials) {
-  return new TelegramClient3(new StringSession3(session), credentials.apiId, credentials.apiHash, {
-    connectionRetries: 15,
-    retryDelay: 2e3,
-    useWSS: false,
-    deviceModel: "TG Vault User Downloader",
-    systemVersion: "1.0.0",
-    appVersion: "1.0.0",
-    floodSleepThreshold: 120
-  });
-}
-async function initTelegramUserClient(credentials) {
-  await stopLegacyClient();
-  const resolved = credentials || await getTelegramUserCredentials();
-  if (!resolved) {
-    recordTelegramUserClientFailure("not_configured", "\u672A\u914D\u7F6E Telegram API");
-    return;
-  }
-  const sessionString = await migrateLegacyTelegramUserSession();
-  if (!sessionString) {
-    recordTelegramUserClientFailure("not_configured", "\u672A\u914D\u7F6E Telegram \u7528\u6237\u8D26\u53F7 session");
-    return;
-  }
-  await initializeTelegramMultiAccountRuntime(resolved);
-  const pooledClient = telegramUserClientPool.getDefaultClient();
-  if (pooledClient) {
-    const me = await pooledClient.getMe();
-    recordTelegramUserClientReady({ userId: String(me?.id || ""), username: me?.username || null });
-    const legacyPath = getSessionFilePath();
-    if (fs8.existsSync(legacyPath)) fs8.rmSync(legacyPath, { force: true });
-    return;
-  }
-  if (!sessionString) {
-    recordTelegramUserClientFailure("missing_session", "\u5C1A\u672A\u767B\u5F55 Telegram \u7528\u6237\u8D26\u53F7");
-    return;
-  }
-  if (await getSetting(TELEGRAM_USER_ENABLED_SETTING, "false") !== "true") {
-    recordTelegramUserClientFailure("disabled", "");
-    return;
-  }
-  const client2 = makeClient2(sessionString, resolved);
-  try {
-    await client2.connect();
-    if (!await client2.checkAuthorization()) throw new Error("SESSION_EXPIRED");
-    userClient = client2;
-    const saved = client2.session.save();
-    if (saved !== sessionString) await setSetting(TELEGRAM_USER_SESSION_SETTING, saved);
-    const me = await client2.getMe();
-    recordTelegramUserClientReady({ userId: String(me?.id || ""), username: me?.username || null });
-    const legacyPath = getSessionFilePath();
-    if (fs8.existsSync(legacyPath)) fs8.rmSync(legacyPath, { force: true });
-  } catch (error) {
-    try {
-      await client2.disconnect();
-    } catch {
-    }
-    try {
-      await client2.destroy();
-    } catch {
-    }
-    recordTelegramUserClientFailure(String(error.message).includes("EXPIRED") ? "expired" : "error", "Telegram \u7528\u6237\u8D26\u53F7\u8FDE\u63A5\u5931\u8D25");
-  }
-}
-async function restoreEnabledTelegramUserAccountsAfterRestart() {
-  await telegramAccountRepository.migrateLegacySystemSettings();
-  const enabledAccounts = await telegramAccountRepository.listEnabledAccounts();
-  if (enabledAccounts.length === 0) return;
-  const credentials = await getTelegramUserCredentials();
-  if (!credentials) {
-    recordTelegramUserClientFailure("not_configured", "\u672A\u914D\u7F6E Telegram API");
-    return;
-  }
-  await initializeTelegramMultiAccountRuntime(credentials);
-  const pooledClient = telegramUserClientPool.getDefaultClient();
-  if (!pooledClient) {
-    recordTelegramUserClientFailure("error", "\u5DF2\u542F\u7528\u7684 Telegram \u7528\u6237\u8D26\u53F7\u8FDE\u63A5\u5931\u8D25");
-    return;
-  }
-  const me = await pooledClient.getMe();
-  recordTelegramUserClientReady({ userId: String(me?.id || ""), username: me?.username || null });
-}
-async function activateTelegramUserAccount(accountId) {
-  const credentials = await getTelegramUserCredentials();
-  if (!credentials) throw new Error("\u672A\u914D\u7F6E Telegram API");
-  await telegramUserClientPool.activateAccount(accountId, "explicit_enable", credentials);
-  if (!telegramUserClientPool.getAccountClient(accountId)) throw new Error("Telegram \u7528\u6237\u8D26\u53F7\u8FDE\u63A5\u5931\u8D25");
-}
-async function persistAndActivate(session, account, credentials) {
-  await setSettings([
-    [TELEGRAM_USER_SESSION_SETTING, session],
-    [TELEGRAM_USER_ENABLED_SETTING, "true"],
-    [TELEGRAM_USER_ID_SETTING, account.userId],
-    [TELEGRAM_USER_USERNAME_SETTING, account.username || ""]
-  ]);
-  const persisted = await upsertTelegramUserAccountWithoutRuntimeRefresh({
-    telegramUserId: account.userId,
-    username: account.username,
-    displayName: account.displayName,
-    session,
-    enabled: true,
-    isLegacy: true
-  });
-  await telegramUserClientPool.activateAccount(persisted.id, "login_complete", credentials);
-  if (!telegramUserClientPool.getAccountClient(persisted.id)) throw new Error("Telegram \u7528\u6237\u8D26\u53F7\u8FDE\u63A5\u5931\u8D25");
-}
-var GramJsWebLoginClient = class {
-  constructor(client2, credentials) {
-    this.client = client2;
-    this.credentials = credentials;
-  }
-  client;
-  credentials;
-  async connect() {
-    await this.client.connect();
-  }
-  sendCode(credentials, phone) {
-    return this.client.sendCode(credentials, phone);
-  }
-  async signInCode(phone, phoneCodeHash, code) {
-    try {
-      await this.client.invoke(new Api3.auth.SignIn({ phoneNumber: phone, phoneCodeHash, phoneCode: code }));
-      return "authorized";
-    } catch (error) {
-      const name = String(error?.errorMessage || error.message || "");
-      if (name.includes("SESSION_PASSWORD_NEEDED")) return "password_needed";
-      throw error;
-    }
-  }
-  async signInPassword(password) {
-    let captured;
-    await this.client.signInWithPassword(this.credentials, {
-      password: async () => password,
-      onError: async (error) => {
-        captured = error;
-        return true;
-      }
-    }).catch((error) => {
-      throw captured || error;
-    });
-  }
-  async getMe() {
-    return await this.client.getMe();
-  }
-  saveSession() {
-    return this.client.session.save();
-  }
-  disconnect() {
-    return this.client.disconnect();
-  }
-  destroy() {
-    return this.client.destroy();
-  }
-};
-var telegramUserWebLogin = new TelegramUserWebLoginFlows({
-  credentials: getTelegramUserCredentials,
-  createClient: (credentials) => new GramJsWebLoginClient(makeClient2("", credentials), credentials),
-  persistAndActivate
-});
-async function getTelegramUserAccountStatus() {
-  const session = await migrateLegacyTelegramUserSession();
-  const enabled = await getSetting(TELEGRAM_USER_ENABLED_SETTING, "false") === "true";
-  const userId = await getSetting(TELEGRAM_USER_ID_SETTING, "");
-  const username = await getSetting(TELEGRAM_USER_USERNAME_SETTING, "");
-  return {
-    configured: Boolean(session),
-    enabled,
-    connected: isTelegramUserClientReady(),
-    account: userId ? { userId, username: username || null, displayName: null } : null
-  };
-}
-async function disableTelegramUserAccount() {
-  await setSetting(TELEGRAM_USER_ENABLED_SETTING, "false");
-  for (const account of await listTelegramUserAccounts()) {
-    if (account.isLegacy) {
-      await telegramAccountRepository.setEnabled(account.id, false);
-      await telegramUserClientPool.deactivateAccount(account.id);
-    }
-  }
-  await stopLegacyClient();
-  recordTelegramUserClientFailure("disabled", "");
-}
-async function enableTelegramUserAccount() {
-  await setSetting(TELEGRAM_USER_ENABLED_SETTING, "true");
-  for (const account of await listTelegramUserAccounts()) {
-    if (account.isLegacy) await telegramAccountRepository.setEnabled(account.id, true);
-  }
-  await initTelegramUserClient();
-}
-async function unlinkTelegramUserAccount() {
-  await stopLegacyClient();
-  for (const account of await listTelegramUserAccounts()) {
-    if (account.isLegacy) await deleteTelegramUserAccount(account.id);
-  }
-  await deleteSettings([TELEGRAM_USER_SESSION_SETTING, TELEGRAM_USER_ENABLED_SETTING, TELEGRAM_USER_ID_SETTING, TELEGRAM_USER_USERNAME_SETTING]);
-  const legacyPath = getSessionFilePath();
-  if (fs8.existsSync(legacyPath)) fs8.rmSync(legacyPath, { force: true });
-  recordTelegramUserClientFailure("missing_session", "\u5C1A\u672A\u767B\u5F55 Telegram \u7528\u6237\u8D26\u53F7");
-}
-function getTelegramUserClient() {
-  return telegramUserClientPool.getDefaultClient() || userClient;
-}
-function isTelegramUserClientReady() {
-  return Boolean(getTelegramUserClient()?.connected);
-}
-function getTelegramUserSessionFilePath() {
-  return userSessionFilePath || path8.resolve(getSessionFilePath());
-}
-
-// src/services/telegramUpload.ts
-init_settings();
-init_telegramState();
-
-// src/utils/telegramMedia.ts
-import { Api as Api4 } from "telegram";
-function getDownloadableMedia(message) {
-  if (!message.media) return null;
-  const media = message.media;
-  if (message.sticker) return null;
-  if (message.document || message.photo || message.video || message.audio || message.voice) {
-    return message.media;
-  }
-  if (media.document || media.photo) {
-    return media.document || media.photo;
-  }
-  if (media.webpage?.document || media.webpage?.photo) {
-    return media.webpage.document || media.webpage.photo;
-  }
-  return null;
-}
-function isTelegramPhotoMedia(media) {
-  const inner = media?.photo || media;
-  return media?.className === "MessageMediaPhoto" || inner?.className === "Photo" || Boolean(inner?.sizes);
-}
-function getEstimatedFileSize(message) {
-  const media = getDownloadableMedia(message);
-  if (isTelegramPhotoMedia(media)) {
-    return 0;
-  }
-  const document = media?.document || media;
-  if (document?.size) {
-    return Number(document.size) || 0;
-  }
-  return 0;
-}
-function getDocumentFilename(document, fallback) {
-  const fileNameAttr = document.attributes?.find((a) => a.className === "DocumentAttributeFilename");
-  return fileNameAttr?.fileName || fallback;
-}
-function isGeneratedTelegramName(fileName, messageId) {
-  const lower = fileName.toLowerCase();
-  return new RegExp(`^(?:file|video|audio|voice)_${messageId}(?:\\.[^.]+)?$`, "i").test(lower);
-}
-function extractFileInfo(message) {
-  const downloadableMedia = getDownloadableMedia(message);
-  if (!downloadableMedia) return null;
-  let fileName = "unknown";
-  let mimeType = "application/octet-stream";
-  let generatedName = false;
-  try {
-    if (message.document) {
-      const doc = message.document;
-      const fileNameAttr = doc.attributes?.find((a) => a.className === "DocumentAttributeFilename");
-      generatedName = !fileNameAttr?.fileName;
-      fileName = fileNameAttr?.fileName || `file_${message.id}`;
-      mimeType = doc.mimeType || getMimeTypeFromFilename(fileName);
-      if (isGeneratedTelegramName(fileName, message.id)) {
-        const videoAttr = doc.attributes?.find((a) => a.className === "DocumentAttributeVideo");
-        const audioAttr = doc.attributes?.find((a) => a.className === "DocumentAttributeAudio");
-        if (videoAttr) fileName = `video_${message.id}.mp4`;
-        else if (audioAttr) fileName = `audio_${message.id}.mp3`;
-      }
-    } else if (message.photo) {
-      generatedName = true;
-      fileName = `image_${message.id}.jpg`;
-      mimeType = "image/jpeg";
-    } else if (message.video) {
-      const video = message.video;
-      const fileNameAttr = video.attributes?.find((a) => a.className === "DocumentAttributeFilename");
-      generatedName = !fileNameAttr?.fileName;
-      fileName = fileNameAttr?.fileName || `video_${message.id}.mp4`;
-      mimeType = video.mimeType || "video/mp4";
-    } else if (message.audio) {
-      const audio = message.audio;
-      const fileNameAttr = audio.attributes?.find((a) => a.className === "DocumentAttributeFilename");
-      generatedName = !fileNameAttr?.fileName;
-      fileName = fileNameAttr?.fileName || `audio_${message.id}.mp3`;
-      mimeType = audio.mimeType || "audio/mpeg";
-    } else if (message.voice) {
-      generatedName = true;
-      fileName = `audio_${message.id}.ogg`;
-      mimeType = "audio/ogg";
-    } else {
-      const media = message.media;
-      if (media.document && media.document instanceof Api4.Document) {
-        const doc = media.document;
-        const fileNameAttr = doc.attributes?.find((a) => a.className === "DocumentAttributeFilename");
-        generatedName = !fileNameAttr?.fileName;
-        fileName = fileNameAttr?.fileName || `file_${message.id}`;
-        mimeType = doc.mimeType || getMimeTypeFromFilename(fileName);
-      } else {
-        const document = downloadableMedia.document || downloadableMedia;
-        const photo = downloadableMedia.photo || downloadableMedia;
-        if (document?.className === "Document" || document?.attributes) {
-          const documentFileName = getDocumentFilename(document, "");
-          generatedName = !documentFileName;
-          fileName = documentFileName || `file_${message.id}`;
-          mimeType = document.mimeType || getMimeTypeFromFilename(fileName);
-        } else if (photo?.className === "Photo" || photo?.sizes) {
-          generatedName = true;
-          fileName = `image_${message.id}.jpg`;
-          mimeType = "image/jpeg";
-        } else {
-          return null;
-        }
-      }
-    }
-  } catch (e) {
-    console.error("\u{1F916} \u63D0\u53D6\u6587\u4EF6\u4FE1\u606F\u51FA\u9519:", e);
-    return null;
-  }
-  return { fileName: sanitizeFilename(fileName), mimeType, generatedName };
-}
-
 // src/utils/fileUtils.ts
-import path9 from "path";
+import path10 from "path";
 import crypto11 from "crypto";
 async function getUniqueStoredName(originalName, _folder = null, _storageAccountId = null) {
   const sanitizedName = sanitizeFilename(originalName);
-  const ext = path9.extname(sanitizedName);
+  const ext = path10.extname(sanitizedName);
   const rawBaseName = ext ? sanitizedName.slice(0, -ext.length) : sanitizedName;
   const suffix = `--${crypto11.randomUUID()}`;
   const maxBaseLength = Math.max(1, 255 - ext.length - suffix.length);
@@ -9447,7 +9529,7 @@ async function getUniqueStoredName(originalName, _folder = null, _storageAccount
 }
 
 // src/utils/storagePath.ts
-import path10 from "path";
+import path11 from "path";
 function shouldClassifyStoragePath() {
   return true;
 }
@@ -9466,7 +9548,7 @@ function hasAny(value, keywords) {
 }
 function getDetailedTypeFolder(mimeType, fileName) {
   const lowerMime = (mimeType || "").toLowerCase();
-  const ext = path10.extname(fileName || "").toLowerCase();
+  const ext = path11.extname(fileName || "").toLowerCase();
   const installerExts = /* @__PURE__ */ new Set([
     ".apk",
     ".apks",
@@ -9605,7 +9687,7 @@ async function getTelegramBatchFolderName(message, fallback) {
 }
 
 // src/utils/telegramNaming.ts
-import path11 from "path";
+import path12 from "path";
 import crypto12 from "crypto";
 function normalizeExtension(extension) {
   if (!extension) return "";
@@ -9646,25 +9728,25 @@ function firstCaptionLine(caption) {
 }
 function replaceCaptionExtension(fileName, extension) {
   if (!extension) return fileName;
-  const captionExtension = path11.extname(fileName);
+  const captionExtension = path12.extname(fileName);
   if (!captionExtension) return `${fileName}${extension}`;
   if (captionExtension.toLowerCase() === extension.toLowerCase()) return fileName;
   return `${fileName.slice(0, -captionExtension.length)}${extension}`;
 }
 function isGeneratedTelegramDisplayName(fileName, messageId) {
   if (messageId === void 0) return false;
-  const base = path11.basename(fileName).toLowerCase();
+  const base = path12.basename(fileName).toLowerCase();
   const escapedMessageId = String(messageId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`^(?:image|video|audio|voice|file)_${escapedMessageId}(?:\\.[^.]+)?$`, "i").test(base);
 }
 function hasMeaningfulBaseName(fileName) {
-  const base = path11.extname(fileName) ? fileName.slice(0, -path11.extname(fileName).length) : fileName;
+  const base = path12.extname(fileName) ? fileName.slice(0, -path12.extname(fileName).length) : fileName;
   return /[\p{L}\p{N}]/u.test(base);
 }
 function appendSequenceNumber(fileName, sequenceNumber) {
   if (sequenceNumber === void 0) return fileName;
   const sequence = String(sequenceNumber).padStart(2, "0");
-  const existingExtension = path11.extname(fileName);
+  const existingExtension = path12.extname(fileName);
   const base = existingExtension ? fileName.slice(0, -existingExtension.length) : fileName;
   return `${base}_${sequence}${existingExtension}`;
 }
@@ -9688,7 +9770,7 @@ function resolveTelegramGeneratedFileName(options) {
   return buildTelegramGeneratedFileName({
     caption: firstCaptionLine(options.caption) || firstCaptionLine(options.sharedCaption),
     mimeType: options.mimeType,
-    extension: path11.extname(options.currentFileName) || extensionFromMimeType(options.mimeType),
+    extension: path12.extname(options.currentFileName) || extensionFromMimeType(options.mimeType),
     randomSuffix: options.messageId === void 0 ? options.randomSuffix : String(options.messageId),
     sequenceNumber: options.sequenceNumber
   });
@@ -11271,16 +11353,16 @@ function normalizeFileDownloadConcurrency(value) {
   const parsed = parseInt(String(value ?? process.env.TELEGRAM_FILE_DOWNLOAD_CONCURRENCY ?? "2"), 10);
   return [1, 2, 3, 4].includes(parsed) ? parsed : 2;
 }
-var TG_DEBUG_LOG_PATH = process.env.TG_STATUS_DEBUG_LOG || path12.join(process.cwd(), "data", "logs", "tg_silent_debug.log");
+var TG_DEBUG_LOG_PATH = process.env.TG_STATUS_DEBUG_LOG || path13.join(process.cwd(), "data", "logs", "tg_silent_debug.log");
 var TG_DEBUG_LOG_MAX_BYTES = Math.max(1024 * 1024, parseInt(process.env.TG_DEBUG_LOG_MAX_MB || "5", 10) * 1024 * 1024);
 function appendTelegramDebugLog(line) {
   if (process.env.TG_STATUS_DEBUG !== "1") return;
   try {
-    fs9.mkdirSync(path12.dirname(TG_DEBUG_LOG_PATH), { recursive: true });
-    if (fs9.existsSync(TG_DEBUG_LOG_PATH) && fs9.statSync(TG_DEBUG_LOG_PATH).size > TG_DEBUG_LOG_MAX_BYTES) {
-      fs9.renameSync(TG_DEBUG_LOG_PATH, `${TG_DEBUG_LOG_PATH}.${Date.now()}.old`);
+    fs10.mkdirSync(path13.dirname(TG_DEBUG_LOG_PATH), { recursive: true });
+    if (fs10.existsSync(TG_DEBUG_LOG_PATH) && fs10.statSync(TG_DEBUG_LOG_PATH).size > TG_DEBUG_LOG_MAX_BYTES) {
+      fs10.renameSync(TG_DEBUG_LOG_PATH, `${TG_DEBUG_LOG_PATH}.${Date.now()}.old`);
     }
-    fs9.appendFileSync(TG_DEBUG_LOG_PATH, line);
+    fs10.appendFileSync(TG_DEBUG_LOG_PATH, line);
   } catch {
   }
 }
@@ -11377,7 +11459,7 @@ async function getCanonicalTelegramFileName(message, currentFileName, mimeType, 
   return rebuildGeneratedTelegramDisplayName(message, currentFileName, mimeType, sharedCaption, sequenceNumber);
 }
 async function getDiskWatermarkState(requiredBytes = 0) {
-  const statfs = await fs9.promises.statfs(UPLOAD_DIR);
+  const statfs = await fs10.promises.statfs(UPLOAD_DIR);
   const availableBytes = Number(statfs.bavail) * Number(statfs.bsize);
   return { availableBytes, ok: availableBytes - requiredBytes >= TG_MIN_FREE_DISK_BYTES };
 }
@@ -12220,19 +12302,19 @@ var mediaGroupDebouncer = createTelegramMediaGroupDebouncer({
   onReady: (mediaGroupId) => processBatchUpload(void 0, mediaGroupId)
 });
 async function downloadAndSaveFile(client2, message, originalFileName, targetDir, onProgress, signal) {
-  const ext = path12.extname(originalFileName) || "";
+  const ext = path13.extname(originalFileName) || "";
   const tempStoredName = `${crypto15.randomUUID()}${ext}`;
   let saveDir = targetDir || UPLOAD_DIR;
-  if (!fs9.existsSync(saveDir)) {
+  if (!fs10.existsSync(saveDir)) {
     try {
-      fs9.mkdirSync(saveDir, { recursive: true });
+      fs10.mkdirSync(saveDir, { recursive: true });
     } catch (err) {
       console.error(`\u{1F916} \u521B\u5EFA\u4E0B\u8F7D\u76EE\u5F55\u5931\u8D25: ${saveDir}`, err);
       if (saveDir === UPLOAD_DIR) throw err;
       saveDir = UPLOAD_DIR;
     }
   }
-  const filePath = path12.join(saveDir, tempStoredName);
+  const filePath = path13.join(saveDir, tempStoredName);
   const totalSize = getEstimatedFileSize(message);
   let downloadedSize = 0;
   try {
@@ -12251,11 +12333,11 @@ async function downloadAndSaveFile(client2, message, originalFileName, targetDir
         outputFile: filePath,
         progressCallback: onProgress ? ((downloaded2, total) => onProgress(Number(downloaded2), Number(total))) : void 0
       });
-      if (!downloaded || !fs9.existsSync(filePath)) {
+      if (!downloaded || !fs10.existsSync(filePath)) {
         throw new Error("Telegram \u56FE\u7247\u4E0B\u8F7D\u672A\u751F\u6210\u6587\u4EF6");
       }
     } else if (workers > 1 && totalSize > 0) {
-      const fileHandle = await fs9.promises.open(filePath, "w");
+      const fileHandle = await fs10.promises.open(filePath, "w");
       try {
         await fileHandle.truncate(totalSize);
         await Promise.all(Array.from({ length: workers }, async (_, workerIndex) => {
@@ -12285,7 +12367,7 @@ async function downloadAndSaveFile(client2, message, originalFileName, targetDir
         await fileHandle.close();
       }
     } else {
-      const writeStream = fs9.createWriteStream(filePath);
+      const writeStream = fs10.createWriteStream(filePath);
       for await (const chunk of client2.iterDownload({
         file: media,
         requestSize: TELEGRAM_DOWNLOAD_PART_SIZE
@@ -12303,15 +12385,15 @@ async function downloadAndSaveFile(client2, message, originalFileName, targetDir
         writeStream.on("error", reject);
       });
     }
-    const stats = fs9.statSync(filePath);
+    const stats = fs10.statSync(filePath);
     if (totalSize > 0 && stats.size !== totalSize) {
       throw new Error(`\u4E0B\u8F7D\u6587\u4EF6\u5927\u5C0F\u4E0D\u4E00\u81F4: expected=${totalSize}, actual=${stats.size}`);
     }
     return { filePath, actualSize: stats.size, tempStoredName };
   } catch (error) {
     console.error("\u{1F916} \u4E0B\u8F7D\u6587\u4EF6\u5931\u8D25:", error);
-    if (fs9.existsSync(filePath)) {
-      fs9.unlinkSync(filePath);
+    if (fs10.existsSync(filePath)) {
+      fs10.unlinkSync(filePath);
     }
     return null;
   }
@@ -12419,7 +12501,7 @@ async function processFileUpload(client2, file, queue2, groupId, getExecutionCon
             if (batchId) updateBatch(chatIdStr, batchId, { folderPath: storageFolder || void 0, providerName: storageManager.getProvider().name });
             rememberTransferDestination(chatIdStr, storageFolder, storageManager.getProvider().name);
           }
-          if (localFilePath && fs9.existsSync(localFilePath)) fs9.unlinkSync(localFilePath);
+          if (localFilePath && fs10.existsSync(localFilePath)) fs10.unlinkSync(localFilePath);
           return true;
         }
       }
@@ -12541,7 +12623,7 @@ async function processFileUpload(client2, file, queue2, groupId, getExecutionCon
         } else {
           await leasedSave();
         }
-        if (fs9.existsSync(localFilePath)) fs9.unlinkSync(localFilePath);
+        if (fs10.existsSync(localFilePath)) fs10.unlinkSync(localFilePath);
         localFilePath = void 0;
         if (signal?.aborted && !file.leaseSettled) {
           const compensation = indexedFileId ? await compensateIndexedWriteAfterCancel({
@@ -12576,9 +12658,9 @@ async function processFileUpload(client2, file, queue2, groupId, getExecutionCon
         await markStorageAccountCooldown(error.storageAccountId || file.storageTarget?.accountId, error.provider, error.reason, error.cooldownUntil, error.message);
         file.storageCooldownUntil = error.cooldownUntil;
         file.error = formatStorageCooldownNotice(error.cooldownUntil);
-        if (localFilePath && fs9.existsSync(localFilePath)) {
+        if (localFilePath && fs10.existsSync(localFilePath)) {
           try {
-            fs9.unlinkSync(localFilePath);
+            fs10.unlinkSync(localFilePath);
           } catch {
           }
         }
@@ -12586,9 +12668,9 @@ async function processFileUpload(client2, file, queue2, groupId, getExecutionCon
       } else {
         file.error = error.message;
       }
-      if (localFilePath && fs9.existsSync(localFilePath)) {
+      if (localFilePath && fs10.existsSync(localFilePath)) {
         try {
-          fs9.unlinkSync(localFilePath);
+          fs10.unlinkSync(localFilePath);
           console.log(`\u{1F916} \u4E0A\u4F20\u5C1D\u8BD5\u5931\u8D25\uFF0C\u5DF2\u81EA\u52A8\u6E05\u7406\u672C\u5730\u5783\u573E\u7F13\u5B58: ${localFilePath}`);
         } catch (e) {
           console.error("\u{1F916} \u81EA\u52A8\u6E05\u7406\u5783\u573E\u7F13\u5B58\u5931\u8D25:", e);
@@ -12708,9 +12790,9 @@ async function processBatchUploadSnapshot(client2, queueKey, queue2) {
     queuePending: 0
   });
   const sanitizedFolderName = sanitizeFilename(folderName);
-  const targetDir = path12.join(UPLOAD_DIR, sanitizedFolderName);
-  if (!fs9.existsSync(targetDir)) {
-    fs9.mkdirSync(targetDir, { recursive: true });
+  const targetDir = path13.join(UPLOAD_DIR, sanitizedFolderName);
+  if (!fs10.existsSync(targetDir)) {
+    fs10.mkdirSync(targetDir, { recursive: true });
   }
   queue2.folderName = sanitizedFolderName;
   for (const file of queue2.files) {
@@ -12830,8 +12912,8 @@ async function handleCleanupCallback(cleanupId, locale = DEFAULT_LOCALE) {
     return { success: false, message: t(locale, "upload.cleanup.expired") };
   }
   try {
-    if (cleanupInfo.localPath && fs9.existsSync(cleanupInfo.localPath)) {
-      fs9.unlinkSync(cleanupInfo.localPath);
+    if (cleanupInfo.localPath && fs10.existsSync(cleanupInfo.localPath)) {
+      fs10.unlinkSync(cleanupInfo.localPath);
     }
     pendingCleanups.delete(cleanupId);
     return {
@@ -13447,7 +13529,7 @@ async function handleFileUpload(client2, event) {
         if (duplicateMode === "skip") {
           const duplicate = await findDuplicateFile(finalFileName, storageFolder, actualSize, activeAccountId);
           if (duplicate) {
-            if (fs9.existsSync(localFilePath)) fs9.unlinkSync(localFilePath);
+            if (fs10.existsSync(localFilePath)) fs10.unlinkSync(localFilePath);
             lastLocalPath = void 0;
             updateUploadPhase(chatIdStr, uploadId, { phase: "success", size: actualSize, providerName: provider.name, fileType, folder: storageFolder });
             rememberTransferDestination(chatIdStr, storageFolder, provider.name);
@@ -13507,7 +13589,7 @@ async function handleFileUpload(client2, event) {
               indexedFileId = String(inserted.rows[0].id);
             })
           );
-          if (fs9.existsSync(localFilePath)) fs9.unlinkSync(localFilePath);
+          if (fs10.existsSync(localFilePath)) fs10.unlinkSync(localFilePath);
           lastLocalPath = void 0;
           localFilePath = void 0;
         } catch (err) {
@@ -13549,9 +13631,9 @@ async function handleFileUpload(client2, event) {
         } else {
           lastError = error instanceof Error ? error.message : "\u672A\u77E5\u9519\u8BEF";
         }
-        if (localFilePath && fs9.existsSync(localFilePath)) {
+        if (localFilePath && fs10.existsSync(localFilePath)) {
           try {
-            fs9.unlinkSync(localFilePath);
+            fs10.unlinkSync(localFilePath);
           } catch (e) {
           }
         }
@@ -13567,9 +13649,9 @@ async function handleFileUpload(client2, event) {
       let success = await attemptSingleUpload(signal, reportQueueProgress);
       if (!success && !signal.aborted && !storageCooldownUntil && retryCount < maxRetries) {
         retryCount++;
-        if (lastLocalPath && fs9.existsSync(lastLocalPath)) {
+        if (lastLocalPath && fs10.existsSync(lastLocalPath)) {
           try {
-            fs9.unlinkSync(lastLocalPath);
+            fs10.unlinkSync(lastLocalPath);
           } catch (e) {
           }
         }
@@ -13689,9 +13771,6 @@ async function handleFileUpload(client2, event) {
   }
 }
 
-// src/services/telegramCommands.ts
-init_storage();
-
 // src/services/telegramChannelJobs.ts
 init_db();
 init_storage();
@@ -13757,6 +13836,19 @@ function parseTelegramDateRange(startDateText, endDateText, options = {}) {
     dayCount,
     requiresLargeRangeConfirmation: dayCount > threshold
   };
+}
+
+// src/services/telegramChannelSource.ts
+function normalizeTelegramChannelSource(input) {
+  const trimmed = input.trim();
+  const markdown = trimmed.match(/^\[[^\]]*\]\((https?:\/\/[^\s)]+)\)$/i);
+  const source = markdown?.[1] || trimmed;
+  const publicLink = source.match(/^(?:https?:\/\/)?(?:www\.)?(?:t\.me|telegram\.me)\/(?:s\/)?([A-Za-z][A-Za-z0-9_]*)(?:\/\d+)*\/?(?:[?#].*)?$/i);
+  if (publicLink && !["joinchat", "c", "s"].includes(publicLink[1].toLowerCase())) {
+    return `@${publicLink[1]}`;
+  }
+  if (!source || source.startsWith("@") || /^-?\d+$/.test(source) || /^https?:\/\//i.test(source)) return source;
+  return `@${source}`;
 }
 
 // src/services/telegramNotificationDelivery.ts
@@ -14401,8 +14493,7 @@ function requireUserClient(locale = DEFAULT_LOCALE) {
 function normalizeSource(source, locale = DEFAULT_LOCALE) {
   const trimmed = source.trim();
   if (!trimmed) throw new Error(t(locale, "channels.errors.sourceRequired"));
-  if (trimmed.startsWith("@") || /^-?\d+$/.test(trimmed) || /^https?:\/\//i.test(trimmed)) return trimmed;
-  return `@${trimmed}`;
+  return normalizeTelegramChannelSource(trimmed);
 }
 function parseTelegramPrivateInviteHash(source) {
   const trimmed = source.trim();
@@ -16372,23 +16463,42 @@ async function stopTelegramBackgroundWorkers(timeoutMs2 = 3e4) {
   }
 }
 
+// src/services/telegramBot.ts
+init_storage();
+init_telegramState();
+import { StringSession as StringSession4 } from "telegram/sessions/index.js";
+import { NewMessage } from "telegram/events/index.js";
+import { Raw as Raw2 } from "telegram/events/index.js";
+import fs13 from "fs";
+import path17 from "path";
+import crypto19 from "crypto";
+
 // src/services/telegramCommands.ts
+init_db();
+import { Api as Api8 } from "telegram";
+import { getPeerId as getPeerId2 } from "telegram/Utils.js";
+import checkDiskSpaceModule from "check-disk-space";
+import os2 from "os";
+import fs12 from "fs";
+import path16 from "path";
+init_telegramState();
+init_storage();
 init_settings();
 
 // src/services/orphanCleanup.ts
 init_db();
 init_localPath();
-import fs10 from "node:fs/promises";
-import path13 from "node:path";
+import fs11 from "node:fs/promises";
+import path14 from "node:path";
 init_settings();
-var UPLOAD_DIR2 = path13.resolve(process.env.UPLOAD_DIR || "./data/uploads");
+var UPLOAD_DIR2 = path14.resolve(process.env.UPLOAD_DIR || "./data/uploads");
 var ORPHAN_MIN_AGE_MS = Math.max(6e4, parseInt(process.env.ORPHAN_CLEANUP_MIN_AGE_MS || "600000", 10) || 6e5);
 var YIELD_EVERY = Math.max(25, parseInt(process.env.ORPHAN_CLEANUP_YIELD_EVERY || "250", 10) || 250);
 function isReservedTransientUploadPath(filePath, reservedDirs = []) {
-  const resolvedPath = path13.resolve(filePath);
+  const resolvedPath = path14.resolve(filePath);
   return reservedDirs.some((directory) => {
-    const resolvedDirectory = path13.resolve(directory);
-    return resolvedPath === resolvedDirectory || resolvedPath.startsWith(`${resolvedDirectory}${path13.sep}`);
+    const resolvedDirectory = path14.resolve(directory);
+    return resolvedPath === resolvedDirectory || resolvedPath.startsWith(`${resolvedDirectory}${path14.sep}`);
   });
 }
 function isAutoCleanupEnabled() {
@@ -16407,17 +16517,17 @@ async function* walkFiles(dirPath, reservedDirs = [], state = { visited: 0 }) {
   if (isReservedTransientUploadPath(dirPath, reservedDirs)) return;
   let directory;
   try {
-    directory = await fs10.opendir(dirPath);
+    directory = await fs11.opendir(dirPath);
   } catch (error) {
     if (error?.code !== "ENOENT") console.warn(`\u{1F9F9} \u65E0\u6CD5\u8BFB\u53D6\u76EE\u5F55: ${dirPath}`, error);
     return;
   }
   try {
     for await (const entry of directory) {
-      const fullPath = path13.join(dirPath, entry.name);
+      const fullPath = path14.join(dirPath, entry.name);
       if (isReservedTransientUploadPath(fullPath, reservedDirs)) continue;
       try {
-        const stat = await fs10.lstat(fullPath);
+        const stat = await fs11.lstat(fullPath);
         if (stat.isSymbolicLink()) continue;
         if (stat.isDirectory()) {
           yield* walkFiles(fullPath, reservedDirs, state);
@@ -16438,21 +16548,21 @@ async function removeEmptyDirectories(dirPath, reservedDirs = []) {
   if (isReservedTransientUploadPath(dirPath, reservedDirs)) return;
   let entries;
   try {
-    entries = await fs10.readdir(dirPath, { withFileTypes: true });
+    entries = await fs11.readdir(dirPath, { withFileTypes: true });
   } catch (error) {
     if (error?.code !== "ENOENT") console.warn(`\u{1F9F9} \u65E0\u6CD5\u8BFB\u53D6\u5F85\u6E05\u7406\u76EE\u5F55: ${dirPath}`, error);
     return;
   }
   for (const entry of entries) {
-    const fullPath = path13.join(dirPath, entry.name);
+    const fullPath = path14.join(dirPath, entry.name);
     if (isReservedTransientUploadPath(fullPath, reservedDirs) || entry.isSymbolicLink()) continue;
     if (entry.isDirectory()) await removeEmptyDirectories(fullPath, reservedDirs);
   }
-  if (path13.resolve(dirPath) === UPLOAD_DIR2) return;
+  if (path14.resolve(dirPath) === UPLOAD_DIR2) return;
   try {
-    const remaining = await fs10.readdir(dirPath);
+    const remaining = await fs11.readdir(dirPath);
     if (remaining.length === 0) {
-      await fs10.rmdir(dirPath);
+      await fs11.rmdir(dirPath);
       console.log(`\u{1F9F9} \u5220\u9664\u7A7A\u6587\u4EF6\u5939: ${dirPath}`);
     }
   } catch (error) {
@@ -16542,11 +16652,11 @@ init_localPath();
 // src/utils/fileScope.ts
 init_db();
 init_localPath();
-import path14 from "path";
+import path15 from "path";
 var CLOUD_SOURCES = /* @__PURE__ */ new Set(["onedrive", "aliyun_oss", "s3", "webdav", "openlist", "google_drive"]);
-var UPLOAD_DIR3 = path14.resolve(process.env.UPLOAD_DIR || "./data/uploads");
-var THUMBNAIL_DIR2 = path14.resolve(process.env.THUMBNAIL_DIR || "./data/thumbnails");
-var PREVIEW_DIR2 = path14.resolve(process.env.PREVIEW_DIR || "./data/previews");
+var UPLOAD_DIR3 = path15.resolve(process.env.UPLOAD_DIR || "./data/uploads");
+var THUMBNAIL_DIR2 = path15.resolve(process.env.THUMBNAIL_DIR || "./data/thumbnails");
+var PREVIEW_DIR2 = path15.resolve(process.env.PREVIEW_DIR || "./data/previews");
 async function getCurrentStorageScope() {
   const { storageManager: storageManager2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
   const provider = storageManager2.getProvider();
@@ -16580,16 +16690,16 @@ async function removePhysicalFile(file) {
     const provider = storageManager2.getProvider(`${file.source}:${file.storage_account_id}`);
     await provider.deleteFile(resolvePhysicalDeletePath(file));
   } else {
-    const filePath = file.path || path14.join(UPLOAD_DIR3, file.stored_name);
+    const filePath = file.path || path15.join(UPLOAD_DIR3, file.stored_name);
     if (!isPathInside(UPLOAD_DIR3, filePath)) throw new Error("\u62D2\u7EDD\u5220\u9664\u5B58\u50A8\u76EE\u5F55\u4E4B\u5916\u7684\u6587\u4EF6");
     await safeUnlink(filePath, UPLOAD_DIR3);
   }
   if (file.thumbnail_path) {
-    const thumbPath = path14.join(THUMBNAIL_DIR2, path14.basename(file.thumbnail_path));
+    const thumbPath = path15.join(THUMBNAIL_DIR2, path15.basename(file.thumbnail_path));
     await safeUnlink(thumbPath, THUMBNAIL_DIR2);
   }
   if (file.preview_path) {
-    const previewPath = path14.join(PREVIEW_DIR2, path14.basename(file.preview_path));
+    const previewPath = path15.join(PREVIEW_DIR2, path15.basename(file.preview_path));
     await safeUnlink(previewPath, PREVIEW_DIR2);
   }
 }
@@ -17743,18 +17853,18 @@ async function editStorageSwitchMessage(client2, update, toast) {
   await client2.invoke(new Api8.messages.SetBotCallbackAnswer({ queryId: update.queryId, message: toast }));
 }
 async function scanLocalDownloadFiles() {
-  const baseDir = path15.resolve(UPLOAD_DIR4);
+  const baseDir = path16.resolve(UPLOAD_DIR4);
   const paths = [];
   let totalSize = 0;
-  if (!fs11.existsSync(baseDir)) return { count: 0, totalSize: 0, paths };
+  if (!fs12.existsSync(baseDir)) return { count: 0, totalSize: 0, paths };
   async function walk(dir) {
-    const entries = await fs11.promises.readdir(dir, { withFileTypes: true });
+    const entries = await fs12.promises.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
-      const fullPath = path15.join(dir, entry.name);
+      const fullPath = path16.join(dir, entry.name);
       if (entry.isDirectory()) {
         await walk(fullPath);
       } else if (entry.isFile()) {
-        const stat = await fs11.promises.stat(fullPath);
+        const stat = await fs12.promises.stat(fullPath);
         totalSize += stat.size;
         paths.push(fullPath);
       }
@@ -17763,12 +17873,12 @@ async function scanLocalDownloadFiles() {
   await walk(baseDir);
   return { count: paths.length, totalSize, paths };
 }
-async function pruneEmptyDirs(dir, baseDir = path15.resolve(UPLOAD_DIR4)) {
-  if (!fs11.existsSync(dir) || path15.resolve(dir) === baseDir) return;
-  const entries = await fs11.promises.readdir(dir);
+async function pruneEmptyDirs(dir, baseDir = path16.resolve(UPLOAD_DIR4)) {
+  if (!fs12.existsSync(dir) || path16.resolve(dir) === baseDir) return;
+  const entries = await fs12.promises.readdir(dir);
   if (entries.length === 0) {
-    await fs11.promises.rmdir(dir);
-    await pruneEmptyDirs(path15.dirname(dir), baseDir);
+    await fs12.promises.rmdir(dir);
+    await pruneEmptyDirs(path16.dirname(dir), baseDir);
   }
 }
 function buildDownloadWorkersText(current3, locale = DEFAULT_LOCALE) {
@@ -18015,7 +18125,7 @@ async function handleStatus(message, locale) {
     const target = storageManager.getActiveTarget();
     const accounts = await storageManager.getAccounts();
     const account = target.accountId ? accounts.find((row) => row.id === target.accountId) : null;
-    const diskSpace = await checkDiskSpace(path15.resolve(UPLOAD_DIR4));
+    const diskSpace = await checkDiskSpace(path16.resolve(UPLOAD_DIR4));
     const queue2 = getDownloadQueueStats();
     const [subscriptionRows, reconciliation] = await Promise.all([
       query(`SELECT COUNT(*)::int AS enabled, MAX(last_scan_at) AS last_scan_at,
@@ -18284,7 +18394,7 @@ async function handleStorageCleanupCallback(client2, update, data) {
     }
     if (data === "storage_clear_ask") {
       const indexed = await query(`SELECT id, path, stored_name FROM files WHERE source = 'local'`);
-      const indexedPaths = new Set(indexed.rows.map((file) => path15.resolve(file.path || path15.join(UPLOAD_DIR4, file.stored_name))));
+      const indexedPaths = new Set(indexed.rows.map((file) => path16.resolve(file.path || path16.join(UPLOAD_DIR4, file.stored_name))));
       const confirmationToken = destructiveConfirmations.issue({
         actorId: userId,
         chatId,
@@ -18293,7 +18403,7 @@ async function handleStorageCleanupCallback(client2, update, data) {
       });
       pendingStorageClearSnapshots.set(confirmationToken, {
         indexedIds: indexed.rows.map((file) => String(file.id)),
-        orphanPaths: stats.paths.map((filePath) => path15.resolve(filePath)).filter((filePath) => !indexedPaths.has(filePath))
+        orphanPaths: stats.paths.map((filePath) => path16.resolve(filePath)).filter((filePath) => !indexedPaths.has(filePath))
       });
       await client2.editMessage(update.peer, {
         message: Number(update.msgId),
@@ -18327,24 +18437,24 @@ async function handleStorageCleanupCallback(client2, update, data) {
       let deletedBytes = 0;
       const indexed = snapshot.indexedIds.length > 0 ? await query(`SELECT * FROM files WHERE source = 'local' AND id = ANY($1::uuid[])`, [snapshot.indexedIds]) : { rows: [] };
       for (const file of indexed.rows) {
-        const filePath = path15.resolve(file.path || path15.join(UPLOAD_DIR4, file.stored_name));
-        const size = fs11.existsSync(filePath) ? fs11.statSync(filePath).size : Number(file.size || 0);
+        const filePath = path16.resolve(file.path || path16.join(UPLOAD_DIR4, file.stored_name));
+        const size = fs12.existsSync(filePath) ? fs12.statSync(filePath).size : Number(file.size || 0);
         try {
           await removePhysicalFile(file);
           await query("DELETE FROM files WHERE id = $1", [file.id]);
           deletedCount += 1;
           deletedBytes += size;
-          await pruneEmptyDirs(path15.dirname(filePath));
+          await pruneEmptyDirs(path16.dirname(filePath));
         } catch (error) {
           console.warn(`\u{1F916} \u672C\u5730\u6587\u4EF6\u5220\u9664\u5931\u8D25\uFF0C\u4FDD\u7559\u7D22\u5F15\u7B49\u5F85\u91CD\u8BD5: ${file.id}`, error);
         }
       }
       for (const resolved of snapshot.orphanPaths) {
-        const size = fs11.existsSync(resolved) ? fs11.statSync(resolved).size : 0;
+        const size = fs12.existsSync(resolved) ? fs12.statSync(resolved).size : 0;
         if (await safeUnlink(resolved, UPLOAD_DIR4)) {
           deletedCount += 1;
           deletedBytes += size;
-          await pruneEmptyDirs(path15.dirname(resolved));
+          await pruneEmptyDirs(path16.dirname(resolved));
         }
       }
       const after = await scanLocalDownloadFiles();
@@ -18523,7 +18633,7 @@ async function applyPendingTelegramFileMutation(message, actorId, input) {
   } else {
     const name = input.trim();
     if (!name || /[\/\\:*?"<>|]/.test(name)) throw new Error("\u6587\u4EF6\u540D\u5305\u542B\u975E\u6CD5\u5B57\u7B26");
-    const extension = (value) => path15.extname(value).toLowerCase();
+    const extension = (value) => path16.extname(value).toLowerCase();
     if (extension(name) !== extension(String(file.name))) throw new Error("\u4E0D\u5141\u8BB8\u4FEE\u6539\u6587\u4EF6\u540E\u7F00");
     await updateScopedFileById(pending.fileId, "name = $1, updated_at = NOW()", [name]);
     await message.reply({ message: t(locale, "commands.fileRenamed", { name }) });
@@ -20040,7 +20150,7 @@ function recordPinFailure(userId) {
 }
 function consumeTelegramRateLimit(userId, text) {
   const now = Date.now();
-  const normalized = text.trim().split(/\s+/, 1)[0].replace(/@\w+$/, "").toLowerCase();
+  const normalized = parseTelegramMessageLink(text) ? "/tg_download" : text.trim().split(/\s+/, 1)[0].replace(/@\w+$/, "").toLowerCase();
   const checks = [
     { key: `${userId}:all`, windowMs: TELEGRAM_MESSAGE_RATE_WINDOW_MS, max: TELEGRAM_MESSAGE_RATE_MAX }
   ];
@@ -20307,7 +20417,8 @@ async function handleTelegramWizardMessage(message, senderId, text) {
     }
     if (state.kind === "tg_tag" || state.kind === "tg_date") {
       state.step = state.includeComments !== void 0 ? state.kind === "tg_tag" ? "tag" : "start_date" : "comments";
-      await message.reply({ message: buildTelegramWizardPrompt(state, locale), buttons: state.step === "comments" ? buildTelegramCommentsKeyboard(locale) : void 0 });
+      const reply = await message.reply({ message: buildTelegramWizardPrompt(state, locale), buttons: state.step === "comments" ? buildTelegramCommentsKeyboard(locale) : void 0 });
+      refreshTelegramWizardState(senderId, chatKey, state, reply.id);
       return true;
     }
     return true;
@@ -21042,6 +21153,7 @@ async function initTelegramBot(credentialsOverride) {
   }
   try {
     client = new TelegramClient7(new StringSession4(""), apiId, apiHash, {
+      proxy: getTelegramProxy(),
       connectionRetries: 5,
       reconnectRetries: 5,
       retryDelay: 1e3,
@@ -21160,8 +21272,8 @@ async function initTelegramBot(credentialsOverride) {
             const qrDataUrl = await generateOTPAuthUrl();
             const base64Data = qrDataUrl.replace(/^data:image\/png;base64,/, "");
             const buffer = Buffer.from(base64Data, "base64");
-            tempPath = path16.join(process.cwd(), `temp_qr_${senderId}_${Date.now()}_${crypto19.randomBytes(8).toString("hex")}.png`);
-            fs12.writeFileSync(tempPath, buffer, { mode: 384 });
+            tempPath = path17.join(process.cwd(), `temp_qr_${senderId}_${Date.now()}_${crypto19.randomBytes(8).toString("hex")}.png`);
+            fs13.writeFileSync(tempPath, buffer, { mode: 384 });
             const qrMessage = await client.sendFile(chatId, {
               file: tempPath,
               caption: build2FASetupCaption()
@@ -21174,7 +21286,7 @@ async function initTelegramBot(credentialsOverride) {
             console.error("\u751F\u6210 2FA \u4E8C\u7EF4\u7801\u5931\u8D25:", e);
             await client.sendMessage(chatId, { message: MSG.AUTH_2FA_QR_FAIL });
           } finally {
-            if (tempPath && fs12.existsSync(tempPath)) fs12.unlinkSync(tempPath);
+            if (tempPath && fs13.existsSync(tempPath)) fs13.unlinkSync(tempPath);
           }
           return;
         }
@@ -21601,6 +21713,46 @@ ${buildPathPreviewLine(appliedPath.folder)}
               return;
             }
           }
+        }
+        const messageLink = parseTelegramMessageLink(text);
+        if (messageLink) {
+          if (!await isAuthenticatedAsync(senderId)) {
+            await message.reply({ message: MSG.AUTH_REQUIRED_UPLOAD });
+            return;
+          }
+          const locale = await getTelegramUserLocaleOrDefault(senderId);
+          try {
+            const result = await runTelegramMessageLinkDownload(messageLink, {
+              assertSourceAllowed: (source) => assertTelegramSourceAllowed(source, [], locale),
+              getTarget: async () => {
+                const selected3 = await consumeOrGetTelegramTargetState(chatId.toString());
+                return selected3 ? storageManager.getTarget(selected3.provider, selected3.accountId) : storageManager.getActiveTarget();
+              },
+              download: (source, ids, target) => downloadTelegramChannelRange(
+                client,
+                message,
+                source,
+                ids[0],
+                1,
+                "older",
+                ids,
+                void 0,
+                void 0,
+                void 0,
+                void 0,
+                void 0,
+                void 0,
+                senderId,
+                target
+              )
+            });
+            if (!result.successful && !result.failed) {
+              await message.reply({ message: t(locale, "bot.link.empty") });
+            }
+          } catch (error) {
+            await message.reply({ message: t(locale, "bot.link.failed", { error: error instanceof Error ? error.message : String(error) }), parseMode: false });
+          }
+          return;
         }
         if (message.media) {
           await handleFileUpload(client, event);
@@ -22296,26 +22448,26 @@ function buildCloudMediaResponse(input) {
 // src/routes/files.ts
 import { pipeline } from "node:stream/promises";
 var router2 = Router2();
-var UPLOAD_DIR5 = path17.resolve(process.env.UPLOAD_DIR || "./data/uploads");
-var THUMBNAIL_DIR4 = path17.resolve(process.env.THUMBNAIL_DIR || "./data/thumbnails");
-var PREVIEW_DIR3 = path17.resolve(process.env.PREVIEW_DIR || "./data/previews");
+var UPLOAD_DIR5 = path18.resolve(process.env.UPLOAD_DIR || "./data/uploads");
+var THUMBNAIL_DIR4 = path18.resolve(process.env.THUMBNAIL_DIR || "./data/thumbnails");
+var PREVIEW_DIR3 = path18.resolve(process.env.PREVIEW_DIR || "./data/previews");
 async function getSafeLocalFilePath(file) {
-  const candidate = file.path || path17.join(UPLOAD_DIR5, file.stored_name);
-  const resolved = path17.resolve(candidate);
+  const candidate = file.path || path18.join(UPLOAD_DIR5, file.stored_name);
+  const resolved = path18.resolve(candidate);
   if (!isPathInside(UPLOAD_DIR5, resolved)) {
     throw new Error("Unsafe local file path");
   }
-  if (!fs13.existsSync(resolved)) {
+  if (!fs14.existsSync(resolved)) {
     return resolved;
   }
-  const real = await fs13.promises.realpath(resolved);
+  const real = await fs14.promises.realpath(resolved);
   if (!isPathInside(UPLOAD_DIR5, real)) {
     throw new Error("Unsafe local file path");
   }
   return real;
 }
 async function serveLocalPathWithRange(req, res, filePath, mimeType, cacheControl, etag) {
-  const stat = fs13.statSync(filePath);
+  const stat = fs14.statSync(filePath);
   res.set({
     "Content-Type": mimeType || "application/octet-stream",
     "Cache-Control": cacheControl,
@@ -22341,13 +22493,13 @@ async function serveLocalPathWithRange(req, res, filePath, mimeType, cacheContro
       "Content-Range": `bytes ${start}-${end}/${stat.size}`,
       "Content-Length": String(chunkSize)
     });
-    const stream2 = fs13.createReadStream(filePath, { start, end });
+    const stream2 = fs14.createReadStream(filePath, { start, end });
     req.once("aborted", () => stream2.destroy());
     await pipeline(stream2, res);
     return;
   }
   res.set("Content-Length", String(stat.size));
-  const stream = fs13.createReadStream(filePath);
+  const stream = fs14.createReadStream(filePath);
   req.once("aborted", () => stream.destroy());
   await pipeline(stream, res);
 }
@@ -22626,14 +22778,14 @@ router2.get("/:id([0-9a-fA-F-]{36})/media-status", async (req, res) => {
     const file = await getScopedFileById(req.params.id);
     if (!file) return res.status(404).json({ code: "FILE_NOT_FOUND", error: "\u6587\u4EF6\u8BB0\u5F55\u4E0D\u5B58\u5728" });
     if (file.preview_path && (file.type === "image" || file.type === "video")) {
-      const localPreviewPath = path17.join(PREVIEW_DIR3, path17.basename(file.preview_path));
-      if (fs13.existsSync(localPreviewPath)) {
+      const localPreviewPath = path18.join(PREVIEW_DIR3, path18.basename(file.preview_path));
+      if (fs14.existsSync(localPreviewPath)) {
         return res.json({ available: true, source: "local_preview" });
       }
     }
     if (file.source === "local" || file.source === "web") {
       const filePath = await getSafeLocalFilePath(file);
-      return fs13.existsSync(filePath) ? res.json({ available: true, source: "local" }) : res.status(410).json({ code: "MEDIA_SOURCE_MISSING", error: "\u670D\u52A1\u5668\u4E2D\u7684\u6E90\u6587\u4EF6\u5DF2\u4E0D\u5B58\u5728\u3002", reason: "not_found" });
+      return fs14.existsSync(filePath) ? res.json({ available: true, source: "local" }) : res.status(410).json({ code: "MEDIA_SOURCE_MISSING", error: "\u670D\u52A1\u5668\u4E2D\u7684\u6E90\u6587\u4EF6\u5DF2\u4E0D\u5B58\u5728\u3002", reason: "not_found" });
     }
     const { storageManager: storageManager2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
     const provider = storageManager2.getProvider(`${file.source}:${file.storage_account_id}`);
@@ -22658,8 +22810,8 @@ router2.get("/:id([0-9a-fA-F-]{36})/preview", async (req, res) => {
     if (!file) {
       return res.status(404).json({ error: "\u6587\u4EF6\u4E0D\u5B58\u5728" });
     }
-    const localPreviewPath = file.preview_path && (file.type === "image" || file.type === "video") ? path17.join(PREVIEW_DIR3, path17.basename(file.preview_path)) : null;
-    if (localPreviewPath && fs13.existsSync(localPreviewPath)) {
+    const localPreviewPath = file.preview_path && (file.type === "image" || file.type === "video") ? path18.join(PREVIEW_DIR3, path18.basename(file.preview_path)) : null;
+    if (localPreviewPath && fs14.existsSync(localPreviewPath)) {
       await serveLocalPathWithRange(
         req,
         res,
@@ -22695,31 +22847,31 @@ router2.get("/:id([0-9a-fA-F-]{36})/preview", async (req, res) => {
       }
     }
     const filePath = await getSafeLocalFilePath(file);
-    if (!fs13.existsSync(filePath)) {
+    if (!fs14.existsSync(filePath)) {
       return res.status(404).json({ error: "\u6587\u4EF6\u4E0D\u5B58\u5728\u4E8E\u670D\u52A1\u5668" });
     }
     let previewPath = file.preview_path;
-    let preferredPreviewPath = previewPath && (file.type === "image" || file.type === "video") ? path17.join(PREVIEW_DIR3, path17.basename(previewPath)) : null;
-    if (file.type === "image" && (!preferredPreviewPath || !fs13.existsSync(preferredPreviewPath))) {
+    let preferredPreviewPath = previewPath && (file.type === "image" || file.type === "video") ? path18.join(PREVIEW_DIR3, path18.basename(previewPath)) : null;
+    if (file.type === "image" && (!preferredPreviewPath || !fs14.existsSync(preferredPreviewPath))) {
       try {
         const generatedPreview = await generateMediaPreview(filePath, file.stored_name || file.name, file.mime_type || "application/octet-stream");
         if (generatedPreview) {
-          previewPath = path17.basename(generatedPreview);
-          preferredPreviewPath = path17.join(PREVIEW_DIR3, previewPath);
+          previewPath = path18.basename(generatedPreview);
+          preferredPreviewPath = path18.join(PREVIEW_DIR3, previewPath);
           await query("UPDATE files SET preview_path = $1, updated_at = NOW() WHERE id = $2", [previewPath, file.id]);
         }
       } catch (previewError) {
         console.error("\u61D2\u751F\u6210\u56FE\u7247\u9884\u89C8\u5931\u8D25:", previewError);
       }
-    } else if (file.type === "video" && (!preferredPreviewPath || !fs13.existsSync(preferredPreviewPath))) {
+    } else if (file.type === "video" && (!preferredPreviewPath || !fs14.existsSync(preferredPreviewPath))) {
       void generateMediaPreview(filePath, file.stored_name || file.name, file.mime_type || "application/octet-stream").then(async (generatedPreview) => {
         if (!generatedPreview) return;
-        const generatedPreviewName = path17.basename(generatedPreview);
+        const generatedPreviewName = path18.basename(generatedPreview);
         await query("UPDATE files SET preview_path = $1, updated_at = NOW() WHERE id = $2", [generatedPreviewName, file.id]);
         console.log(`[Preview] \u{1F39E}\uFE0F Lazy video preview cached for ${file.id}: ${generatedPreviewName}`);
       }).catch((previewError) => console.error("\u61D2\u751F\u6210\u89C6\u9891\u9884\u89C8\u5931\u8D25:", previewError));
     }
-    const servedPath = preferredPreviewPath && fs13.existsSync(preferredPreviewPath) ? preferredPreviewPath : filePath;
+    const servedPath = preferredPreviewPath && fs14.existsSync(preferredPreviewPath) ? preferredPreviewPath : filePath;
     const servedMime = preferredPreviewPath && servedPath === preferredPreviewPath ? file.type === "video" ? "video/mp4" : "image/webp" : file.mime_type || "application/octet-stream";
     await serveLocalPathWithRange(
       req,
@@ -22764,7 +22916,7 @@ router2.get("/:id([0-9a-fA-F-]{36})/original", async (req, res) => {
       }
     }
     const filePath = await getSafeLocalFilePath(file);
-    if (!fs13.existsSync(filePath)) return res.status(404).json({ error: "\u6587\u4EF6\u4E0D\u5B58\u5728\u4E8E\u670D\u52A1\u5668" });
+    if (!fs14.existsSync(filePath)) return res.status(404).json({ error: "\u6587\u4EF6\u4E0D\u5B58\u5728\u4E8E\u670D\u52A1\u5668" });
     await serveLocalPathWithRange(req, res, filePath, file.mime_type || "application/octet-stream", "public, max-age=86400", `"${file.id}-${file.updated_at}-original"`);
   } catch (error) {
     console.error("\u83B7\u53D6\u539F\u59CB\u6587\u4EF6\u5931\u8D25:", error);
@@ -22830,7 +22982,7 @@ router2.get("/:id([0-9a-fA-F-]{36})/download", async (req, res) => {
     }
     const filePath = await getSafeLocalFilePath(file);
     console.log(`[Download] Serving local file: ${filePath}`);
-    if (!fs13.existsSync(filePath)) {
+    if (!fs14.existsSync(filePath)) {
       console.log(`[Download] File system path not found: ${filePath}`);
       return res.status(404).json({ error: "\u6587\u4EF6\u4E0D\u5B58\u5728\u4E8E\u670D\u52A1\u5668" });
     }
@@ -22854,8 +23006,8 @@ router2.get("/:id([0-9a-fA-F-]{36})/thumbnail", async (req, res) => {
     if (!file.thumbnail_path) {
       return res.status(404).json({ error: "\u65E0\u7F29\u7565\u56FE" });
     }
-    const thumbPath = path17.join(THUMBNAIL_DIR4, path17.basename(file.thumbnail_path));
-    if (!fs13.existsSync(thumbPath)) {
+    const thumbPath = path18.join(THUMBNAIL_DIR4, path18.basename(file.thumbnail_path));
+    if (!fs14.existsSync(thumbPath)) {
       return res.status(404).json({ error: "\u7F29\u7565\u56FE\u6587\u4EF6\u4E0D\u5B58\u5728" });
     }
     await serveLocalPathWithRange(req, res, thumbPath, "image/webp", "public, max-age=604800");
@@ -23451,8 +23603,8 @@ init_db();
 import { Router as Router4 } from "express";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
-import path19 from "path";
-import fs15 from "fs";
+import path20 from "path";
+import fs16 from "fs";
 
 // src/middleware/apiKey.ts
 init_db();
@@ -23547,8 +23699,8 @@ function buildUploadCapabilities(env = process.env) {
 
 // src/services/mediaDerivatives.ts
 init_db();
-import fs14 from "node:fs/promises";
-import path18 from "node:path";
+import fs15 from "node:fs/promises";
+import path19 from "node:path";
 var concurrency = Math.max(1, Math.min(4, Number.parseInt(process.env.MEDIA_DERIVATIVE_CONCURRENCY || "2", 10) || 2));
 var timeoutMs = Math.max(1e4, Number.parseInt(process.env.MEDIA_DERIVATIVE_TIMEOUT_MS || "120000", 10) || 12e4);
 var queue = [];
@@ -23610,7 +23762,7 @@ async function processJob(job) {
                  derivative_source_path = NULL, derivative_cleanup_source = FALSE,
                  derivative_started_at = NULL, updated_at = NOW()
              WHERE id = $5`,
-      [path18.basename(thumbnail), path18.basename(preview), dimensions.width, dimensions.height, job.fileId]
+      [path19.basename(thumbnail), path19.basename(preview), dimensions.width, dimensions.height, job.fileId]
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -23623,7 +23775,7 @@ async function processJob(job) {
     ).catch(() => void 0);
     console.error(`[MediaDerivatives] ${job.fileId} \u5904\u7406\u5931\u8D25:`, error);
   } finally {
-    if (job.cleanupSource) await fs14.rm(job.sourcePath, { force: true }).catch(() => void 0);
+    if (job.cleanupSource) await fs15.rm(job.sourcePath, { force: true }).catch(() => void 0);
   }
 }
 function drain() {
@@ -23708,16 +23860,16 @@ function decodeFilename(filename) {
   }
   return filename;
 }
-var TEMP_DIR = path19.join(process.cwd(), "data", "temp");
-if (!fs15.existsSync(TEMP_DIR)) {
-  fs15.mkdirSync(TEMP_DIR, { recursive: true });
+var TEMP_DIR = path20.join(process.cwd(), "data", "temp");
+if (!fs16.existsSync(TEMP_DIR)) {
+  fs16.mkdirSync(TEMP_DIR, { recursive: true });
 }
 var storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     cb(null, TEMP_DIR);
   },
   filename: (_req, file, cb) => {
-    const ext = path19.extname(file.originalname);
+    const ext = path20.extname(file.originalname);
     const storedName = `${uuidv4()}${ext}`;
     cb(null, storedName);
   }
@@ -23737,7 +23889,7 @@ var handleUpload = async (req, res, source = "web") => {
   const originalName = decodeFilename(file.originalname);
   const mimeType = file.mimetype;
   const size = file.size;
-  const tempPath = path19.resolve(file.path);
+  const tempPath = path20.resolve(file.path);
   let storageLease = null;
   let target;
   try {
@@ -23763,7 +23915,7 @@ var handleUpload = async (req, res, source = "web") => {
       target = storageManager.getActiveTarget();
     }
   } catch (error) {
-    if (fs15.existsSync(tempPath)) fs15.unlinkSync(tempPath);
+    if (fs16.existsSync(tempPath)) fs16.unlinkSync(tempPath);
     return res.status(409).json({ error: error instanceof Error ? error.message : "\u4E0A\u4F20\u76EE\u6807\u65E0\u6548" });
   }
   const { provider, accountId: activeAccountId } = target;
@@ -23771,7 +23923,7 @@ var handleUpload = async (req, res, source = "web") => {
   try {
     requestedFolder = folder ? normalizeFolderPath(folder) : null;
   } catch (error) {
-    if (fs15.existsSync(tempPath)) fs15.unlinkSync(tempPath);
+    if (fs16.existsSync(tempPath)) fs16.unlinkSync(tempPath);
     return res.status(400).json({ error: error instanceof Error ? error.message : "\u6587\u4EF6\u5939\u8DEF\u5F84\u65E0\u6548" });
   }
   const storageRules = await getStoragePathRules();
@@ -23787,7 +23939,7 @@ var handleUpload = async (req, res, source = "web") => {
     if (duplicateMode === "skip") {
       const duplicate = await findDuplicateFile(originalName, storageFolder, size, activeAccountId);
       if (duplicate) {
-        if (fs15.existsSync(tempPath)) fs15.unlinkSync(tempPath);
+        if (fs16.existsSync(tempPath)) fs16.unlinkSync(tempPath);
         return res.json({
           success: true,
           skipped: true,
@@ -23837,8 +23989,8 @@ var handleUpload = async (req, res, source = "web") => {
         mimeType,
         cleanupSource: provider.name !== "local"
       });
-    } else if (fs15.existsSync(tempPath)) {
-      fs15.unlinkSync(tempPath);
+    } else if (fs16.existsSync(tempPath)) {
+      fs16.unlinkSync(tempPath);
     }
     res.json({
       success: true,
@@ -23858,7 +24010,7 @@ var handleUpload = async (req, res, source = "web") => {
     });
   } catch (error) {
     console.error("\u4E0A\u4F20\u5904\u7406\u5931\u8D25:", error);
-    if (fs15.existsSync(tempPath)) fs15.unlinkSync(tempPath);
+    if (fs16.existsSync(tempPath)) fs16.unlinkSync(tempPath);
     if (isStorageCooldownError(error)) {
       return sendStorageCooldownHttpError(res, error);
     }
@@ -23885,8 +24037,8 @@ import checkDiskSpaceModule2 from "check-disk-space";
 init_settings();
 init_authSettings();
 import os3 from "os";
-import path20 from "path";
-import fs16 from "fs";
+import path21 from "path";
+import fs17 from "fs";
 import axios3 from "axios";
 import crypto24 from "crypto";
 import { rateLimit as rateLimit3 } from "express-rate-limit";
@@ -24035,6 +24187,16 @@ function getOAuthRouteConfig(provider, env = process.env) {
     redirectUri: `${callbackOrigin}${CALLBACK_PATHS[provider]}`,
     frontendOrigin
   };
+}
+function getOAuthDisplayConfig(env = process.env) {
+  try {
+    return {
+      redirectUri: getOAuthRouteConfig("onedrive", env).redirectUri,
+      googleDriveRedirectUri: getOAuthRouteConfig("google_drive", env).redirectUri
+    };
+  } catch {
+    return { redirectUri: "", googleDriveRedirectUri: "" };
+  }
 }
 function escapeHtml(value) {
   return value.replace(/[&<>"']/g, (char) => ({
@@ -24340,7 +24502,7 @@ router5.get("/stats", requireAuth, async (_req, res) => {
     const provider = target.provider;
     const activeAccountId = target.accountId;
     const scope = buildStorageScopeForTarget({ providerName: provider.name, accountId: activeAccountId });
-    const diskPath = os3.platform() === "win32" ? "C:" : path20.resolve(UPLOAD_DIR6);
+    const diskPath = os3.platform() === "win32" ? "C:" : path21.resolve(UPLOAD_DIR6);
     const diskSpace = await checkDiskSpace2(diskPath);
     const result = await query(`
             SELECT COUNT(*) as file_count, COALESCE(SUM(size), 0) as total_size
@@ -24435,16 +24597,14 @@ router5.get("/config", requireAuth, async (req, res) => {
     const telegramAllowedUserIds = await getConfiguredTelegramAllowedUsers();
     const telegramAllowedUserIdsFromEnv = parseTelegramAllowedUserIds(process.env.TELEGRAM_ALLOWED_USER_IDS || "").length > 0;
     const telegramUserSessionReady = isTelegramUserClientReady();
-    const oneDriveOAuth = getOAuthRouteConfig("onedrive");
-    const googleDriveOAuth = getOAuthRouteConfig("google_drive");
+    const oauthConfig = getOAuthDisplayConfig();
     res.json({
       provider: provider.name,
       activeAccountId,
       activeAccountName: activeAccount?.name || (provider.name === "local" ? "\u670D\u52A1\u5668\u672C\u5730\u76EE\u5F55" : void 0),
       capabilities: buildStorageCapabilities(provider.name),
       accounts: accounts.map((account) => ({ ...account, capabilities: buildStorageCapabilities(String(account.type)) })),
-      redirectUri: oneDriveOAuth.redirectUri,
-      googleDriveRedirectUri: googleDriveOAuth.redirectUri,
+      ...oauthConfig,
       telegramUserDownloadEnabled: telegramUserDownloadEnabled === "true",
       allowUnsafeWebdavEndpoints: allowUnsafeWebdavEndpoints === "true",
       telegramUserSessionReady,
@@ -24647,7 +24807,7 @@ router5.delete("/config/telegram-bot", requireAuth, async (req, res) => {
       await controls.stop();
       await deleteTelegramBotConfig();
       const sessionPath = getTelegramUserSessionFilePath();
-      if (fs16.existsSync(sessionPath)) fs16.rmSync(sessionPath, { force: true });
+      if (fs17.existsSync(sessionPath)) fs17.rmSync(sessionPath, { force: true });
       const effective = await applyEffectiveTelegramBotConfig();
       if (effective.source === "environment" && effective.enabled && effective.credentials) await controls.restart(effective.credentials);
     });
@@ -24935,7 +25095,7 @@ router5.post("/config/telegram-allowed-users", requireAuth, async (req, res) => 
       message: reconciliation.revoked.length > 0 ? "\u5141\u8BB8\u5217\u8868\u5DF2\u4FDD\u5B58\uFF1B\u79FB\u9664\u7528\u6237\u7684 Bot \u8BA4\u8BC1\u5DF2\u7ACB\u5373\u64A4\u9500\u3002" : "\u5141\u8BB8\u5217\u8868\u5DF2\u4FDD\u5B58\u3002"
     });
   } catch (error) {
-    console.error("\u66F4\u65B0 Telegram \u5141\u8BB8\u7528\u6237\u5217\u8868\u5931\u8D25:", error);
+    console.error(`\u66F4\u65B0 Telegram \u5141\u8BB8\u7528\u6237\u5217\u8868\u5931\u8D25 [request=${res.locals.requestId || "unknown"}]:`, error);
     res.status(500).json({ error: "\u66F4\u65B0 Telegram \u5141\u8BB8\u7528\u6237\u5217\u8868\u5931\u8D25" });
   }
 });
@@ -25417,9 +25577,9 @@ var storage_default = router5;
 init_db();
 import { Router as Router6 } from "express";
 import crypto27 from "node:crypto";
-import fs18 from "node:fs";
+import fs19 from "node:fs";
 import fsPromises2 from "node:fs/promises";
-import path22 from "node:path";
+import path23 from "node:path";
 import { pipeline as pipeline3 } from "node:stream/promises";
 import { rateLimit as rateLimit4 } from "express-rate-limit";
 import checkDiskSpaceModule3 from "check-disk-space";
@@ -25617,9 +25777,9 @@ async function compensateChunkCompletionFailure(input) {
 
 // src/services/chunkUploadSessions.ts
 import crypto26 from "node:crypto";
-import fs17 from "node:fs";
+import fs18 from "node:fs";
 import fsPromises from "node:fs/promises";
-import path21 from "node:path";
+import path22 from "node:path";
 import { pipeline as pipeline2 } from "node:stream/promises";
 var ChunkUploadProtocolError = class extends Error {
   constructor(name, message) {
@@ -25628,7 +25788,7 @@ var ChunkUploadProtocolError = class extends Error {
   }
 };
 async function writeChunkAtomically(input) {
-  await fsPromises.mkdir(path21.dirname(input.finalPath), { recursive: true });
+  await fsPromises.mkdir(path22.dirname(input.finalPath), { recursive: true });
   const committedPath = `${input.finalPath}.${crypto26.randomUUID()}.chunk`;
   const temporaryPath = `${committedPath}.part`;
   const lockPath = `${input.finalPath}.lock`;
@@ -25650,7 +25810,7 @@ async function writeChunkAtomically(input) {
     }
   });
   try {
-    await pipeline2(input.stream, counter, fs17.createWriteStream(temporaryPath, { flags: "wx" }));
+    await pipeline2(input.stream, counter, fs18.createWriteStream(temporaryPath, { flags: "wx" }));
     if (size !== input.expectedSize) throw new ChunkUploadProtocolError("ChunkSizeMismatchError", "\u5206\u5757\u5927\u5C0F\u4E0D\u5339\u914D");
     const sha2562 = hash2.digest("hex");
     if (sha2562 !== input.expectedSha256.toLowerCase()) throw new ChunkUploadProtocolError("ChunkHashMismatchError", "\u5206\u5757\u54C8\u5E0C\u4E0D\u5339\u914D");
@@ -25665,15 +25825,15 @@ async function writeChunkAtomically(input) {
   }
 }
 async function verifyChunkIntegrity(chunk, expectedDirectory, maxChunkBytes) {
-  const chunkPath = path21.resolve(chunk.path);
-  const directory = path21.resolve(expectedDirectory);
-  if (path21.dirname(chunkPath) !== directory) throw new ChunkUploadProtocolError("ChunkPathError", `\u5206\u5757 ${chunk.index} \u8DEF\u5F84\u65E0\u6548`);
+  const chunkPath = path22.resolve(chunk.path);
+  const directory = path22.resolve(expectedDirectory);
+  if (path22.dirname(chunkPath) !== directory) throw new ChunkUploadProtocolError("ChunkPathError", `\u5206\u5757 ${chunk.index} \u8DEF\u5F84\u65E0\u6548`);
   const stat = await fsPromises.stat(chunkPath);
   if (stat.size !== chunk.size || stat.size < 1 || stat.size > maxChunkBytes) {
     throw new ChunkUploadProtocolError("ChunkSizeMismatchError", `\u5206\u5757 ${chunk.index} \u5927\u5C0F\u65E0\u6548`);
   }
   const hash2 = crypto26.createHash("sha256");
-  await pipeline2(fs17.createReadStream(chunkPath), new (await import("node:stream")).Writable({
+  await pipeline2(fs18.createReadStream(chunkPath), new (await import("node:stream")).Writable({
     write(buffer, _encoding, callback) {
       hash2.update(buffer);
       callback();
@@ -26169,13 +26329,13 @@ var DISK_RESERVE_BYTES = Math.max(1024 ** 3, (parseInt(process.env.CHUNK_DISK_RE
 var MAX_TOTAL_CHUNKS = Math.max(1, parseInt(process.env.MAX_TOTAL_CHUNKS || "50000", 10) || 5e4);
 var SESSION_TTL_MS = Math.max(60 * 60 * 1e3, parseInt(process.env.CHUNK_SESSION_TTL_MS || String(24 * 60 * 60 * 1e3), 10));
 var COMPLETION_LEASE_MS = Math.max(6e4, parseInt(process.env.CHUNK_COMPLETION_LEASE_MS || String(30 * 60 * 1e3), 10));
-[UPLOAD_DIR7, THUMBNAIL_DIR5, CHUNK_DIR].forEach((dir) => fs18.mkdirSync(dir, { recursive: true }));
+[UPLOAD_DIR7, THUMBNAIL_DIR5, CHUNK_DIR].forEach((dir) => fs19.mkdirSync(dir, { recursive: true }));
 var chunkRepository = new PostgresChunkUploadSessionRepository(pool);
 var chunkStore = new ChunkUploadSessionStore(chunkRepository, {
   maxTotalBytes: MAX_TOTAL_BYTES,
   globalBudgetBytes: GLOBAL_BUDGET_BYTES,
   diskReserveBytes: DISK_RESERVE_BYTES,
-  getDiskFreeBytes: async () => (await checkDiskSpace3(path22.resolve(CHUNK_DIR))).free
+  getDiskFreeBytes: async () => (await checkDiskSpace3(path23.resolve(CHUNK_DIR))).free
 });
 var runChunkMaintenance = async () => {
   const reconciliationLease = crypto27.randomUUID();
@@ -26191,7 +26351,7 @@ var runChunkMaintenance = async () => {
   }
   const expiredIds = await chunkRepository.deleteExpiredSessions(100);
   await Promise.all(expiredIds.map(
-    (uploadId) => fsPromises2.rm(path22.join(CHUNK_DIR, uploadId), { recursive: true, force: true }).catch((error) => console.error(`\u6E05\u7406\u8FC7\u671F\u5206\u5757\u76EE\u5F55\u5931\u8D25: ${uploadId}`, error))
+    (uploadId) => fsPromises2.rm(path23.join(CHUNK_DIR, uploadId), { recursive: true, force: true }).catch((error) => console.error(`\u6E05\u7406\u8FC7\u671F\u5206\u5757\u76EE\u5F55\u5931\u8D25: ${uploadId}`, error))
   ));
   await chunkRepository.recoverExpiredCompletions(100);
 };
@@ -26228,7 +26388,7 @@ function decodeFilename2(filename) {
   return filename;
 }
 function safeChunkPath(uploadId, chunkIndex) {
-  return path22.join(path22.resolve(CHUNK_DIR), uploadId, `chunk_${chunkIndex}`);
+  return path23.join(path23.resolve(CHUNK_DIR), uploadId, `chunk_${chunkIndex}`);
 }
 function sendProtocolError(res, error) {
   if (error instanceof ChunkUploadProtocolError) {
@@ -26300,7 +26460,7 @@ router6.post("/init", async (req, res) => {
       createdAt: now,
       updatedAt: now
     };
-    uploadDirectory = path22.join(CHUNK_DIR, session.uploadId);
+    uploadDirectory = path23.join(CHUNK_DIR, session.uploadId);
     await fsPromises2.mkdir(uploadDirectory, { recursive: true });
     await chunkStore.reserve(session);
     res.json({
@@ -26370,16 +26530,16 @@ router6.post("/chunk", async (req, res) => {
 });
 async function mergeChunks(uploadId, chunks, targetPath, expectedBytes) {
   const temporary = `${targetPath}.${crypto27.randomUUID()}.part`;
-  await fsPromises2.mkdir(path22.dirname(targetPath), { recursive: true });
-  const output = fs18.createWriteStream(temporary, { flags: "wx" });
+  await fsPromises2.mkdir(path23.dirname(targetPath), { recursive: true });
+  const output = fs19.createWriteStream(temporary, { flags: "wx" });
   try {
     if (chunks.length === 0) throw new Error("\u5206\u5757\u4E0D\u5B8C\u6574");
     for (let index = 0; index < chunks.length; index++) {
       const chunk = chunks[index];
-      const expectedDirectory = path22.dirname(path22.resolve(safeChunkPath(uploadId, index)));
+      const expectedDirectory = path23.dirname(path23.resolve(safeChunkPath(uploadId, index)));
       if (chunk.index !== index) throw new Error(`\u5206\u5757 ${index} \u5143\u6570\u636E\u65E0\u6548`);
       const verifiedPath = await verifyChunkIntegrity(chunk, expectedDirectory, MAX_CHUNK_BYTES);
-      await pipeline3(fs18.createReadStream(verifiedPath), output, { end: false });
+      await pipeline3(fs19.createReadStream(verifiedPath), output, { end: false });
     }
     await new Promise((resolve, reject) => {
       output.end(resolve);
@@ -26450,13 +26610,13 @@ router6.post("/complete", async (req, res) => {
       fileName: session.filename
     }, await getStoragePathRules());
     const storedName = await getUniqueStoredName(session.filename, storageFolder, session.targetAccountId);
-    tempMergedPath = path22.join(path22.resolve(UPLOAD_DIR7), `${uploadId}-${storedName}`);
+    tempMergedPath = path23.join(path23.resolve(UPLOAD_DIR7), `${uploadId}-${storedName}`);
     await mergeChunks(uploadId, claim.chunks, tempMergedPath, session.totalSize);
     const duplicate = await getDuplicateMode() === "skip" ? await findDuplicateFile(session.filename, storageFolder, session.totalSize, session.targetAccountId) : null;
     if (duplicate) {
       await fsPromises2.rm(tempMergedPath, { force: true });
       if (!await chunkStore.complete(uploadId, owner, token, duplicate.id)) throw new Error("\u5B8C\u6210\u79DF\u7EA6\u5DF2\u5931\u6548");
-      await fsPromises2.rm(path22.join(CHUNK_DIR, uploadId), { recursive: true, force: true }).catch((error) => console.error("\u6E05\u7406\u5DF2\u5B8C\u6210\u91CD\u590D\u4E0A\u4F20\u7684\u5206\u5757\u5931\u8D25:", error));
+      await fsPromises2.rm(path23.join(CHUNK_DIR, uploadId), { recursive: true, force: true }).catch((error) => console.error("\u6E05\u7406\u5DF2\u5B8C\u6210\u91CD\u590D\u4E0A\u4F20\u7684\u5206\u5757\u5931\u8D25:", error));
       return res.json({
         success: true,
         skipped: true,
@@ -26549,7 +26709,7 @@ router6.post("/complete", async (req, res) => {
       await compensateAfterCompletionFailure(completionError);
       throw completionError;
     }
-    await fsPromises2.rm(path22.join(CHUNK_DIR, uploadId), { recursive: true, force: true }).catch((error) => console.error("\u6E05\u7406\u5DF2\u5B8C\u6210\u4E0A\u4F20\u7684\u5206\u5757\u5931\u8D25:", error));
+    await fsPromises2.rm(path23.join(CHUNK_DIR, uploadId), { recursive: true, force: true }).catch((error) => console.error("\u6E05\u7406\u5DF2\u5B8C\u6210\u4E0A\u4F20\u7684\u5206\u5757\u5931\u8D25:", error));
     if (derivativeStatus === "queued") {
       enqueueMediaDerivatives({
         fileId: String(file.id),
@@ -26632,7 +26792,7 @@ router6.delete("/:uploadId", async (req, res) => {
   try {
     const result = await chunkStore.cancel(req.params.uploadId, ownerId(req));
     if (result === "busy") return res.status(409).json({ error: "\u4E0A\u4F20\u6B63\u5728\u5B8C\u6210\uFF0C\u6682\u65F6\u4E0D\u80FD\u53D6\u6D88", status: result });
-    if (result === "cancelled") await fsPromises2.rm(path22.join(CHUNK_DIR, req.params.uploadId), { recursive: true, force: true });
+    if (result === "cancelled") await fsPromises2.rm(path23.join(CHUNK_DIR, req.params.uploadId), { recursive: true, force: true });
     res.status(result === "not_found" ? 404 : 200).json({ success: result !== "not_found", status: result });
   } catch (error) {
     sendProtocolError(res, error);
@@ -26666,8 +26826,8 @@ var chunkedUpload_default = router6;
 // src/routes/tasks.ts
 init_db();
 import { Router as Router7 } from "express";
-import fs19 from "node:fs/promises";
-import path23 from "node:path";
+import fs20 from "node:fs/promises";
+import path24 from "node:path";
 
 // src/services/taskCenterDismissals.ts
 init_db();
@@ -27026,7 +27186,7 @@ router7.post("/:sourceType/:id/:action", requireAuth, async (req, res) => {
         [id]
       );
       if ((result.rowCount || 0) === 0) return res.status(409).json({ error: "\u4E0A\u4F20\u6B63\u5728\u5B8C\u6210\u6216\u5DF2\u7ED3\u675F\uFF0C\u4E0D\u80FD\u53D6\u6D88" });
-      await fs19.rm(path23.join(CHUNK_DIR2, id), { recursive: true, force: true });
+      await fs20.rm(path24.join(CHUNK_DIR2, id), { recursive: true, force: true });
       return res.json({ success: true });
     }
     return res.status(400).json({ error: "\u8BE5\u4EFB\u52A1\u7C7B\u578B\u6682\u4E0D\u652F\u6301\u63A7\u5236" });
@@ -27795,7 +27955,7 @@ var APP_VERSION = packageVersion;
 dotenv3.config();
 var runtimeConfigSummary = validateRuntimeConfig();
 logRuntimeConfigSummary(runtimeConfigSummary);
-var app = express();
+var app = express2();
 app.set("trust proxy", process.env.TRUST_PROXY || "loopback");
 var PORT = process.env.PORT || 51947;
 var updateCheckEnabled = !/^(0|false|no|off)$/i.test(process.env.UPDATE_CHECK_ENABLED || "true");
@@ -27830,20 +27990,20 @@ var UPLOAD_DIR8 = process.env.UPLOAD_DIR || "./data/uploads";
 var THUMBNAIL_DIR6 = process.env.THUMBNAIL_DIR || "./data/thumbnails";
 var PREVIEW_DIR4 = process.env.PREVIEW_DIR || "./data/previews";
 var CHUNK_DIR3 = process.env.CHUNK_DIR || "./data/chunks";
-if (!fs20.existsSync(UPLOAD_DIR8)) {
-  fs20.mkdirSync(UPLOAD_DIR8, { recursive: true });
+if (!fs21.existsSync(UPLOAD_DIR8)) {
+  fs21.mkdirSync(UPLOAD_DIR8, { recursive: true });
   console.log(`\u{1F4C1} \u521B\u5EFA\u4E0A\u4F20\u76EE\u5F55: ${UPLOAD_DIR8}`);
 }
-if (!fs20.existsSync(THUMBNAIL_DIR6)) {
-  fs20.mkdirSync(THUMBNAIL_DIR6, { recursive: true });
+if (!fs21.existsSync(THUMBNAIL_DIR6)) {
+  fs21.mkdirSync(THUMBNAIL_DIR6, { recursive: true });
   console.log(`\u{1F4C1} \u521B\u5EFA\u7F29\u7565\u56FE\u76EE\u5F55: ${THUMBNAIL_DIR6}`);
 }
-if (!fs20.existsSync(PREVIEW_DIR4)) {
-  fs20.mkdirSync(PREVIEW_DIR4, { recursive: true });
+if (!fs21.existsSync(PREVIEW_DIR4)) {
+  fs21.mkdirSync(PREVIEW_DIR4, { recursive: true });
   console.log(`\u{1F39E}\uFE0F \u521B\u5EFA\u9884\u89C8\u76EE\u5F55: ${PREVIEW_DIR4}`);
 }
-if (!fs20.existsSync(CHUNK_DIR3)) {
-  fs20.mkdirSync(CHUNK_DIR3, { recursive: true });
+if (!fs21.existsSync(CHUNK_DIR3)) {
+  fs21.mkdirSync(CHUNK_DIR3, { recursive: true });
   console.log(`\u{1F4C1} \u521B\u5EFA\u5206\u5757\u76EE\u5F55: ${CHUNK_DIR3}`);
 }
 var configuredCorsOrigin = process.env.CORS_ORIGIN || "";
@@ -27860,7 +28020,7 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "X-API-Key", "X-Upload-Id", "X-Chunk-Index", "X-Chunk-Size", "X-Chunk-Sha256", "X-Confirmation-Token", "Authorization"]
 }));
-app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "2mb" }));
+app.use(express2.json({ limit: process.env.JSON_BODY_LIMIT || "2mb" }));
 app.use((req, res, next) => {
   const provided = normalizeRequestId(req.headers["x-request-id"]);
   const requestId = provided || crypto29.randomUUID();
@@ -27872,7 +28032,7 @@ app.use((req, res, next) => {
   if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
   const origin = req.headers.origin;
   if (!origin) return next();
-  if (!allowAnyOrigin && !allowedOrigins.includes(origin)) {
+  if (!allowAnyOrigin && !allowedOrigins.includes(origin) && !(process.env.FRONTEND_DIR && isSameOriginRequest(req))) {
     return res.status(403).json({ error: "Origin not allowed" });
   }
   next();
@@ -27886,18 +28046,19 @@ app.use(helmet({
       "media-src": ["'self'", "blob:", "https:"],
       "connect-src": ["'self'", "https:"],
       "style-src": ["'self'", "'unsafe-inline'"],
-      "script-src": ["'self'"]
+      "script-src": ["'self'"],
+      "upgrade-insecure-requests": null
     }
   },
   crossOriginResourcePolicy: { policy: "cross-origin" },
   hsts: { maxAge: 31536e3, includeSubDomains: true }
 }));
 app.use("/api/auth", auth_default);
-app.use("/uploads", requireAuth, express.static(UPLOAD_DIR8, {
+app.use("/uploads", requireAuth, express2.static(UPLOAD_DIR8, {
   maxAge: "1d",
   etag: true
 }));
-app.use("/thumbnails", requireAuth, express.static(THUMBNAIL_DIR6, {
+app.use("/thumbnails", requireAuth, express2.static(THUMBNAIL_DIR6, {
   maxAge: "7d",
   etag: true
 }));
@@ -27945,6 +28106,7 @@ app.get("/deepz", async (_req, res) => {
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
 });
+if (process.env.FRONTEND_DIR) mountFrontend(app, process.env.FRONTEND_DIR);
 app.use((err, _req, res, _next) => {
   console.error("\u274C \u9519\u8BEF:", err);
   res.status(500).json({ error: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF" });
@@ -28025,9 +28187,9 @@ async function startApplication() {
 \u{1F680} TG Vault \u540E\u7AEF\u670D\u52A1\u5DF2\u542F\u52A8
 \u{1F3F7}\uFE0F  \u7248\u672C: v${APP_VERSION}
 \u{1F4CD} \u7AEF\u53E3: ${PORT}
-\u{1F4C1} \u4E0A\u4F20\u76EE\u5F55: ${path24.resolve(UPLOAD_DIR8)}
-\u{1F5BC}\uFE0F  \u7F29\u7565\u56FE\u76EE\u5F55: ${path24.resolve(THUMBNAIL_DIR6)}
-\u{1F39E}\uFE0F  \u9884\u89C8\u76EE\u5F55: ${path24.resolve(PREVIEW_DIR4)}
+\u{1F4C1} \u4E0A\u4F20\u76EE\u5F55: ${path25.resolve(UPLOAD_DIR8)}
+\u{1F5BC}\uFE0F  \u7F29\u7565\u56FE\u76EE\u5F55: ${path25.resolve(THUMBNAIL_DIR6)}
+\u{1F39E}\uFE0F  \u9884\u89C8\u76EE\u5F55: ${path25.resolve(PREVIEW_DIR4)}
 \u{1F510} \u5BC6\u7801\u4FDD\u62A4: ${initialSetupRequired ? "\u5F85\u9996\u6B21\u521D\u59CB\u5316" : "\u5DF2\u542F\u7528"}
 \u{1F916} Telegram Bot: ${telegramEnabled ? "\u5DF2\u542F\u7528 (\u6700\u5927 2GB\uFF0C\u8D26\u53F7\u7EA7\u4E0B\u8F7D\u5668\u4E0D\u53D7\u6B64\u9650\u5236)" : "\u672A\u542F\u7528"}
 \u{1F464} Telegram User Download: ${isTelegramUserClientReady() ? "\u5DF2\u542F\u7528" : "\u672A\u542F\u7528"}

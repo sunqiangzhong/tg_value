@@ -513,6 +513,8 @@
   "bot.legacy.tagResult": "✅ Задача по загрузке тегов выполнена.\nТег: {tag}\nИдентификатор: {jobId}\nВ очереди: {found}\nПропущено: {skipped}\nНе удалось: {failed}{commentLine}",
   "bot.legacy.dateResult": "✅ Задача по диапазону дат выполнена.\nИдентификатор: {jobId}\nВ очереди: {found}\nПропущено: {skipped}\nНе удалось: {failed}{commentLine}",
   "bot.legacy.failed": "❌ Не удалось загрузить {mode}: {error}.",
+  "bot.link.empty": "В сообщении нет доступного для загрузки файла. Возможно, оно удалено или недоступно аккаунту.",
+  "bot.link.failed": "Не удалось загрузить по ссылке: {error}",
   "bot.legacy.confirmTag": "⏳ Подтверждено. Запускаем фоновое сканирование {source} на наличие мультимедийных сообщений с помощью {tag}…",
   "bot.legacy.confirmDate": "⏳ Подтверждено. Запуск фонового сканирования {source}: {startDate} → {endDate}…",
   "bot.legacy.submitFailed": "❌ Не удалось отправить задачу: {error}.",

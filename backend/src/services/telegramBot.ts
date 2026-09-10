@@ -1,4 +1,7 @@
 import { TelegramClient, Api } from 'telegram';
+import { parseTelegramMessageLink, runTelegramMessageLinkDownload } from './telegramMessageLink.js';
+import { downloadTelegramChannelRange } from './telegramUpload.js';
+import { assertTelegramSourceAllowed } from './telegramChannelJobs.js';
 import { StringSession } from 'telegram/sessions/index.js';
 import { NewMessage, NewMessageEvent } from 'telegram/events/index.js';
 import { Raw } from 'telegram/events/index.js';
@@ -369,7 +372,7 @@ function clearPinFailures(userId: number): void {
 
 function consumeTelegramRateLimit(userId: number, text: string): { limited: boolean; retryAfterSeconds: number } {
     const now = Date.now();
-    const normalized = text.trim().split(/\s+/, 1)[0].replace(/@\w+$/, '').toLowerCase();
+    const normalized = parseTelegramMessageLink(text) ? '/tg_download' : text.trim().split(/\s+/, 1)[0].replace(/@\w+$/, '').toLowerCase();
     const checks = [
         { key: `${userId}:all`, windowMs: TELEGRAM_MESSAGE_RATE_WINDOW_MS, max: TELEGRAM_MESSAGE_RATE_MAX },
     ];
@@ -2137,6 +2140,34 @@ export async function initTelegramBot(credentialsOverride?: TelegramBotCredentia
                             return;
                         }
                     }
+                }
+
+                const messageLink = parseTelegramMessageLink(text);
+                if (messageLink) {
+                    if (!(await isAuthenticatedAsync(senderId))) {
+                        await message.reply({ message: MSG.AUTH_REQUIRED_UPLOAD });
+                        return;
+                    }
+                    const locale = await getTelegramUserLocaleOrDefault(senderId);
+                    try {
+                        const result = await runTelegramMessageLinkDownload(messageLink, {
+                            assertSourceAllowed: source => assertTelegramSourceAllowed(source, [], locale),
+                            getTarget: async () => {
+                                const selected = await consumeOrGetTelegramTargetState(chatId.toString());
+                                return selected ? storageManager.getTarget(selected.provider, selected.accountId) : storageManager.getActiveTarget();
+                            },
+                            download: (source, ids, target) => downloadTelegramChannelRange(
+                                client!, message, source, ids[0], 1, 'older', ids,
+                                undefined, undefined, undefined, undefined, undefined, undefined, senderId, target,
+                            ),
+                        });
+                        if (!result.successful && !result.failed) {
+                            await message.reply({ message: t(locale, 'bot.link.empty') });
+                        }
+                    } catch (error) {
+                        await message.reply({ message: t(locale, 'bot.link.failed', { error: error instanceof Error ? error.message : String(error) }), parseMode: false });
+                    }
+                    return;
                 }
 
                 // File Handling

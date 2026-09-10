@@ -61,7 +61,7 @@ async function getTelegramSourceAllowlist(): Promise<string[]> {
     return parseTelegramSourceAllowlist(stored || '');
 }
 
-async function assertTelegramSourceAllowed(source: string, extraSources: string[] = [], locale: TelegramLocale = DEFAULT_LOCALE): Promise<void> {
+export async function assertTelegramSourceAllowed(source: string, extraSources: string[] = [], locale: TelegramLocale = DEFAULT_LOCALE): Promise<void> {
     const normalized = normalizeSource(source).toLowerCase();
     const normalizedExtras = extraSources.map(item => normalizeSource(item).toLowerCase());
     const allowlist = await getTelegramSourceAllowlist();

@@ -335,7 +335,7 @@ export const SettingsPage = ({ storageStats, onSignedOut, onOpenTasksForAccount,
         return data;
     };
 
-    const updateAdvancedTask = async (patch: Partial<Pick<AdvancedTaskSettings, 'telegramDownloadWorkers' | 'telegramFileConcurrency' | 'duplicateMode' | 'autoCleanupOrphans' | 'skipTelegramPhotosInBatch' | 'telegramDownloadHistoryPolicy'>>) => {
+    const updateAdvancedTask = async (patch: Partial<Pick<AdvancedTaskSettings, 'telegramProgressIntervalSeconds' | 'telegramDownloadWorkers' | 'telegramFileConcurrency' | 'duplicateMode' | 'autoCleanupOrphans' | 'skipTelegramPhotosInBatch' | 'telegramDownloadHistoryPolicy'>>) => {
         let result: { success: boolean; deletedCount?: number };
         try {
             result = await fileApi.updateAdvancedTaskSetting(patch);
@@ -1320,6 +1320,11 @@ export const SettingsPage = ({ storageStats, onSignedOut, onOpenTasksForAccount,
                     <SettingsRow icon={Gauge} label={t('settings.cards.maintenance.fileConcurrency.title')} description={t('settings.cards.maintenance.fileConcurrency.description')} action={
                         <select className="h-10 rounded-lg border border-border bg-background px-3" value={advancedTasks.telegramFileConcurrency} onChange={event => void updateAdvancedTask({ telegramFileConcurrency: Number(event.target.value) })}>
                             {[1, 2, 3, 4].map(value => <option key={value} value={value}>{value}</option>)}
+                        </select>
+                    } />
+                    <SettingsRow icon={Gauge} label={t('settings.cards.maintenance.progressInterval.title')} description={t('settings.cards.maintenance.progressInterval.description')} action={
+                        <select aria-label={t('settings.cards.maintenance.progressInterval.title')} className="h-10 rounded-lg border border-border bg-background px-3" value={advancedTasks.telegramProgressIntervalSeconds} onChange={event => void updateAdvancedTask({ telegramProgressIntervalSeconds: Number(event.target.value) })}>
+                            {[3, 5, 10, 15, 30, 60].map(value => <option key={value} value={value}>{t('settings.cards.maintenance.progressInterval.seconds', { count: value })}</option>)}
                         </select>
                     } />
                     <SettingsRow icon={Copy} label={t('settings.cards.maintenance.duplicateMode.title')} description={t('settings.cards.maintenance.duplicateMode.description')} action={

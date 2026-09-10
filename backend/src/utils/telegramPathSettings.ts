@@ -111,6 +111,11 @@ export function getTelegramPathState(chatId: string): ChatPathState {
     return { ...(chatPathState.get(chatId) || {}) };
 }
 
+export async function refreshTelegramPathState(chatId: string): Promise<void> {
+    const saved = await previewTelegramPersistentPath(chatId);
+    chatPathState.set(chatId, { nextFolder: saved.once || undefined, sessionFolder: saved.session || undefined });
+}
+
 export function setNextTelegramPath(chatId: string, folder: string): string {
     const normalized = rememberRecentTelegramPath(chatId, folder);
     const state = chatPathState.get(chatId) || {};
@@ -138,7 +143,7 @@ export function setSessionTelegramPath(chatId: string, folder: string): string {
 
 export async function setSessionTelegramPathPersistent(chatId: string, folder: string): Promise<string> {
     const normalized = await rememberRecentTelegramPathPersistent(chatId, folder);
-    await setTelegramPathStateRow(undefined, chatId, 'session', normalized, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+    await setTelegramPathStateRow(undefined, chatId, 'session', normalized, 'infinity');
     const state = chatPathState.get(chatId) || {};
     state.sessionFolder = normalized;
     chatPathState.set(chatId, state);

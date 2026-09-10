@@ -24,6 +24,7 @@ export const securityCards = {
 } as const;
 
 export const maintenanceCards = {
+  progressInterval: { title: 'Telegram download progress interval', description: 'Updates the existing progress message without sending repeated messages. Applies to running tasks too.', seconds: '{{count}} seconds' },
   chunkConcurrency: { title: 'Chunks per file', description: 'Shared with Bot /download_workers; 12 and 16 require confirmation.' },
   fileConcurrency: { title: 'Concurrent file downloads', description: 'Shared with Bot /file_concurrency; 4 requires confirmation.' },
   duplicateMode: { title: 'Duplicate-file handling', description: 'One policy for files with the same name, folder, and size.', copy: 'Create a copy', skip: 'Skip duplicates' },

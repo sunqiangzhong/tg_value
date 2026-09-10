@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BOT_COMMANDS, buildBotCommandMenu, buildBotHelpSections, findBotCommand } from './telegramCommandRegistry.js';
+import { t, TELEGRAM_LOCALES } from '../i18n/telegram.js';
 
 test('Bot command registry is the single source for menu and help', () => {
     const menu = buildBotCommandMenu();
@@ -20,4 +21,17 @@ test('high-frequency commands lead the menu and legacy aliases stay hidden', () 
 test('cleanup command labels name the affected object instead of generic cleanup', () => {
     assert.match(findBotCommand('/cleanup_settings')!.description, /临时文件/);
     assert.match(findBotCommand('/storage')!.description, /本地实体文件/);
+});
+
+test('message link download is discoverable with localized folder examples', () => {
+    assert.equal(findBotCommand('/tg_link')?.menu, true);
+    assert.equal(findBotCommand('/tg_link')?.help, true);
+    for (const locale of Object.values(TELEGRAM_LOCALES)) {
+        const entry = buildBotCommandMenu(locale.code).find(command => command.command === 'tg_link');
+        assert.ok(entry?.description);
+        const help = t(locale.code, 'bot.link.help');
+        assert.match(help, /https:\/\/t.me\/lspyanxi\/4375/);
+        assert.match(help, /2026-09-09/);
+        assert.match(help, /\/ps/);
+    }
 });

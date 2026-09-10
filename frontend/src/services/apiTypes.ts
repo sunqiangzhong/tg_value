@@ -476,6 +476,7 @@ export interface BatchDeletePreview {
 export type { BatchDeleteResult };
 
 export interface AdvancedTaskSettings {
+    telegramProgressIntervalSeconds: number;
     telegramDownloadWorkers: number;
     telegramFileConcurrency: number;
     duplicateMode: 'copy' | 'skip';

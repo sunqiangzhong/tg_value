@@ -24,10 +24,14 @@ test('path setters persist chat scope, mode and expiry while clear removes both 
     await clearTelegramPathStateRows(run, '-99');
     assert.match(calls[0].sql, /ON CONFLICT \(chat_id, mode\)/);
     assert.deepEqual(calls[0].params.slice(0, 3), ['-99', 'session', '相册/2026-07']);
+    assert.equal(calls[0].params[3], 'infinity');
     assert.match(calls[1].sql, /DELETE FROM telegram_path_states WHERE chat_id = \$1/);
 });
 
-test('expired session path is not returned', async () => {
-    const folder = await getTelegramSessionPath(async () => ({ rows: [], rowCount: 0 } as any), '42');
-    assert.equal(folder, null);
+test('session paths survive the old expiry until manually changed', async () => {
+    const folder = await getTelegramSessionPath(async sql => {
+        assert.doesNotMatch(sql, /expires_at > NOW/);
+        return { rows: [{ folder: 'telegram' }], rowCount: 1 };
+    }, '42');
+    assert.equal(folder, 'telegram');
 });

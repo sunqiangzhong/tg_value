@@ -12,6 +12,7 @@ test('advanced task settings expose one shared Web and Bot contract', () => {
         telegramDownloadHistoryPolicy: 'all',
     }), {
         telegramDownloadWorkers: 8,
+        telegramProgressIntervalSeconds: 5,
         telegramFileConcurrency: 3,
         duplicateMode: 'skip',
         autoCleanupOrphans: false,

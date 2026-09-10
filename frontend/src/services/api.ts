@@ -637,7 +637,7 @@ class FileAPI {
         return response.json();
     }
 
-    async updateAdvancedTaskSetting(patch: Partial<Pick<AdvancedTaskSettings, 'telegramDownloadWorkers' | 'telegramFileConcurrency' | 'duplicateMode' | 'autoCleanupOrphans' | 'skipTelegramPhotosInBatch' | 'telegramDownloadHistoryPolicy'>>, confirmed = false): Promise<{ success: boolean; deletedCount?: number }> {
+    async updateAdvancedTaskSetting(patch: Partial<Pick<AdvancedTaskSettings, 'telegramProgressIntervalSeconds' | 'telegramDownloadWorkers' | 'telegramFileConcurrency' | 'duplicateMode' | 'autoCleanupOrphans' | 'skipTelegramPhotosInBatch' | 'telegramDownloadHistoryPolicy'>>, confirmed = false): Promise<{ success: boolean; deletedCount?: number }> {
         const response = await apiRequest(`${API_BASE}/api/storage/config/advanced-tasks`, {
             credentials: 'include', method: 'PATCH',
             headers: getHeaders({ 'Content-Type': 'application/json' }),

@@ -1022,25 +1022,25 @@ var init_contracts = __esm({
 
 // src/utils/localPath.ts
 import fs5 from "fs";
-import path5 from "path";
+import path6 from "path";
 function isPathInside(baseDir, targetPath) {
-  const resolvedBase = path5.resolve(baseDir);
-  const resolvedTarget = path5.resolve(targetPath);
-  return resolvedTarget === resolvedBase || resolvedTarget.startsWith(resolvedBase + path5.sep);
+  const resolvedBase = path6.resolve(baseDir);
+  const resolvedTarget = path6.resolve(targetPath);
+  return resolvedTarget === resolvedBase || resolvedTarget.startsWith(resolvedBase + path6.sep);
 }
 function safeJoin(baseDir, ...segments) {
-  const resolvedBase = path5.resolve(baseDir);
-  const resolvedTarget = path5.resolve(resolvedBase, ...segments);
+  const resolvedBase = path6.resolve(baseDir);
+  const resolvedTarget = path6.resolve(resolvedBase, ...segments);
   if (!isPathInside(resolvedBase, resolvedTarget)) {
     throw new Error("Unsafe path outside storage directory");
   }
   return resolvedTarget;
 }
 function getRelativeStoragePath(baseDir, targetPath) {
-  const resolvedBase = path5.resolve(baseDir);
-  const resolvedTarget = path5.resolve(targetPath);
+  const resolvedBase = path6.resolve(baseDir);
+  const resolvedTarget = path6.resolve(targetPath);
   if (!isPathInside(resolvedBase, resolvedTarget)) return null;
-  return path5.relative(resolvedBase, resolvedTarget).split(path5.sep).join("/");
+  return path6.relative(resolvedBase, resolvedTarget).split(path6.sep).join("/");
 }
 async function safeUnlink(filePath, baseDir) {
   if (!filePath) return false;
@@ -1060,7 +1060,7 @@ var init_localPath = __esm({
 
 // src/services/storage/localStorageProvider.ts
 import fs6 from "node:fs";
-import path6 from "node:path";
+import path7 from "node:path";
 var LocalStorageProvider;
 var init_localStorageProvider = __esm({
   "src/services/storage/localStorageProvider.ts"() {
@@ -1071,7 +1071,7 @@ var init_localStorageProvider = __esm({
       name = "local";
       uploadDir;
       constructor(uploadDir = process.env.UPLOAD_DIR || "./data/uploads") {
-        this.uploadDir = path6.resolve(uploadDir);
+        this.uploadDir = path7.resolve(uploadDir);
         if (!fs6.existsSync(this.uploadDir)) {
           fs6.mkdirSync(this.uploadDir, { recursive: true });
         }
@@ -1100,8 +1100,8 @@ var init_localStorageProvider = __esm({
         return destPath;
       }
       async getFileStream(storedPath) {
-        const safePath = safeJoin(this.uploadDir, path6.relative(this.uploadDir, storedPath));
-        if (safePath !== path6.resolve(storedPath)) {
+        const safePath = safeJoin(this.uploadDir, path7.relative(this.uploadDir, storedPath));
+        if (safePath !== path7.resolve(storedPath)) {
           throw new Error("Unsafe local file path");
         }
         if (!fs6.existsSync(safePath)) {
@@ -1113,8 +1113,8 @@ var init_localStorageProvider = __esm({
         return "";
       }
       async deleteFile(storedPath) {
-        const safePath = safeJoin(this.uploadDir, path6.relative(this.uploadDir, storedPath));
-        if (safePath !== path6.resolve(storedPath)) {
+        const safePath = safeJoin(this.uploadDir, path7.relative(this.uploadDir, storedPath));
+        if (safePath !== path7.resolve(storedPath)) {
           throw new Error("Unsafe local file path");
         }
         if (fs6.existsSync(safePath)) {
@@ -1572,20 +1572,20 @@ var init_networkSecurity = __esm({
 import fs7 from "node:fs";
 import os from "node:os";
 import crypto9 from "node:crypto";
-import path7 from "node:path";
+import path8 from "node:path";
 import { Readable } from "node:stream";
 function normalizeAddress(value) {
   return value.trim().replace(/\/+$/g, "");
 }
 function normalizeRoot(value) {
-  const normalized = path7.posix.normalize(`/${String(value || "/").replace(/\\/g, "/")}`);
+  const normalized = path8.posix.normalize(`/${String(value || "/").replace(/\\/g, "/")}`);
   return normalized === "." ? "/" : normalized;
 }
 function joinRemotePath(root, folder, name) {
   const segments = [root];
   if (folder) segments.push(String(folder).replace(/\\/g, "/"));
   if (name) segments.push(name);
-  return path7.posix.join(...segments);
+  return path8.posix.join(...segments);
 }
 function encodeFilePath(value) {
   return encodeURIComponent(value);
@@ -1795,7 +1795,7 @@ var init_openListStorage = __esm({
         this.requestTimeoutMs = Math.min(originalRequestTimeout, timeoutMs2);
         this.uploadTimeoutMs = Math.min(originalUploadTimeout, timeoutMs2);
         const markerName = `.tgvault-probe-${crypto9.randomUUID()}.txt`;
-        const tempPath = path7.join(os.tmpdir(), markerName);
+        const tempPath = path8.join(os.tmpdir(), markerName);
         const expected = Buffer.from(`tg-vault-openlist-probe:${markerName}`, "utf8");
         await fs7.promises.writeFile(tempPath, expected, { flag: "wx" });
         let storedPath = null;
@@ -1904,7 +1904,7 @@ var init_openListStorage = __esm({
         await this.api("/api/fs/remove", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dir: path7.posix.dirname(normalized), names: [path7.posix.basename(normalized)] })
+          body: JSON.stringify({ dir: path8.posix.dirname(normalized), names: [path8.posix.basename(normalized)] })
         });
       }
     };
@@ -3781,22 +3781,3124 @@ import axios2 from "axios";
 // src/services/telegramBot.ts
 import { TelegramClient as TelegramClient7, Api as Api9 } from "telegram";
 
+// src/utils/folderPath.ts
+var INVALID_SEGMENT_CHARACTERS = /[\\:*?"<>|\x00-\x1f\x7f]/;
+var MAX_FOLDER_PATH_LENGTH = 255;
+function normalizeFolderPath(value) {
+  if (typeof value !== "string") throw new Error("\u6587\u4EF6\u5939\u8DEF\u5F84\u683C\u5F0F\u9519\u8BEF");
+  const normalized = value.trim().replace(/^\/+|\/+$/g, "");
+  if (!normalized) throw new Error("\u6587\u4EF6\u5939\u8DEF\u5F84\u4E0D\u80FD\u4E3A\u7A7A");
+  if (normalized.length > MAX_FOLDER_PATH_LENGTH) throw new Error(`\u6587\u4EF6\u5939\u8DEF\u5F84\u4E0D\u80FD\u8D85\u8FC7 ${MAX_FOLDER_PATH_LENGTH} \u4E2A\u5B57\u7B26`);
+  const segments = normalized.split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === "..")) {
+    throw new Error("\u6587\u4EF6\u5939\u8DEF\u5F84\u5305\u542B\u7A7A\u76EE\u5F55\u6216\u76F8\u5BF9\u8DEF\u5F84");
+  }
+  if (segments.some((segment) => segment !== segment.trim() || INVALID_SEGMENT_CHARACTERS.test(segment))) {
+    throw new Error("\u6587\u4EF6\u5939\u8DEF\u5F84\u5305\u542B\u975E\u6CD5\u5B57\u7B26");
+  }
+  return segments.join("/");
+}
+function normalizeFolderName(value) {
+  const name = normalizeFolderPath(value);
+  if (name.includes("/")) throw new Error("\u6587\u4EF6\u5939\u540D\u79F0\u4E0D\u80FD\u5305\u542B\u8DEF\u5F84\u5206\u9694\u7B26");
+  return name;
+}
+function folderBaseName(folder) {
+  const segments = folder.split("/");
+  return segments[segments.length - 1];
+}
+function folderParent(folder) {
+  const segments = folder.split("/");
+  return segments.length > 1 ? segments.slice(0, -1).join("/") : null;
+}
+function joinFolderPath(parent, name) {
+  return normalizeFolderPath(parent ? `${parent}/${name}` : name);
+}
+function isFolderWithin(folder, ancestor) {
+  return folder === ancestor || folder.startsWith(`${ancestor}/`);
+}
+
 // src/services/telegramMessageLink.ts
 function parseTelegramMessageLink(input) {
-  const trimmed = input.trim();
-  const markdown = trimmed.match(/^\[[^\]]*\]\((https?:\/\/[^\s)]+)\)$/i);
-  const link = markdown?.[1] || trimmed;
+  const trimmed = input.trim().replace(/^\/tg_link(?:@\w+)?(?:\s+|$)/i, "");
+  const markdown = trimmed.match(/^\[[^\]]*\]\((https?:\/\/[^\s)]+)\)(?:\s+([\s\S]*))?$/i);
+  const plain = trimmed.match(/^(\S+)(?:\s+([\s\S]*))?$/);
+  const link = markdown?.[1] || plain?.[1] || trimmed;
+  const folderName = (markdown ? markdown[2] : plain?.[2])?.trim();
   const match = link.match(/^(?:https?:\/\/)?(?:www\.)?(?:t\.me|telegram\.me)\/(?:(c)\/(\d+)|(?:s\/)?([A-Za-z][A-Za-z0-9_]*))\/(\d+)\/?(?:[?#][^\s]*)?$/i);
   if (!match || match[3] && ["c", "s", "joinchat"].includes(match[3].toLowerCase())) return null;
   const messageId = Number(match[4]);
   if (!Number.isSafeInteger(messageId) || messageId < 1 || messageId > 2147483647) return null;
   if (match[1] && !/^[1-9]\d*$/.test(match[2])) return null;
-  return { source: match[1] ? `-100${match[2]}` : `@${match[3]}`, messageId };
+  return { source: match[1] ? `-100${match[2]}` : `@${match[3]}`, messageId, ...folderName ? { folderName } : {} };
 }
-async function runTelegramMessageLinkDownload(link, dependencies) {
+function telegramMessageLinkFolderName(link, now = /* @__PURE__ */ new Date()) {
+  if (link.folderName) {
+    if (/[\/\\]/.test(link.folderName)) throw new Error("\u6587\u4EF6\u5939\u540D\u79F0\u4E0D\u80FD\u5305\u542B\u8DEF\u5F84\u5206\u9694\u7B26");
+    return normalizeFolderName(link.folderName);
+  }
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(now);
+  const part = (type) => parts.find((value) => value.type === type).value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+async function runTelegramMessageLinkDownload(link, dependencies, now = /* @__PURE__ */ new Date()) {
+  const folderName = telegramMessageLinkFolderName(link, now);
   await dependencies.assertSourceAllowed(link.source);
+  const folder = joinFolderPath(await dependencies.getBaseFolder(), folderName);
   const target = await dependencies.getTarget();
-  return dependencies.download(link.source, [link.messageId], target);
+  return dependencies.download(link.source, [link.messageId], target, folder);
+}
+
+// src/utils/telegramPathSettings.ts
+import { Api } from "telegram";
+
+// src/utils/telegramUtils.ts
+import path4 from "path";
+
+// src/utils/fileMetadata.ts
+function getFileType(mimeType) {
+  const normalized = mimeType?.toLowerCase() || "";
+  if (normalized.startsWith("image/")) return "image";
+  if (normalized.startsWith("video/")) return "video";
+  if (normalized.startsWith("audio/")) return "audio";
+  if (normalized.startsWith("text/") || normalized.includes("pdf") || normalized.includes("document") || normalized.includes("sheet") || normalized.includes("presentation") || normalized.includes("word") || normalized.includes("excel") || normalized.includes("powerpoint")) return "document";
+  return "other";
+}
+function formatBytes(bytes, binary = false) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const base = 1024;
+  const units = binary ? ["B", "KiB", "MiB", "GiB", "TiB"] : ["B", "KB", "MB", "GB", "TB"];
+  const unit = Math.min(Math.floor(Math.log(bytes) / Math.log(base)), units.length - 1);
+  const value = bytes / base ** unit;
+  return `${Number(value.toFixed(unit === 0 ? 0 : 2))} ${units[unit]}`;
+}
+
+// src/utils/telegramUtils.ts
+function getTypeEmoji(mimeType) {
+  if (!mimeType) return "\u{1F4C1}";
+  if (mimeType.startsWith("image/")) return "\u{1F5BC}\uFE0F";
+  if (mimeType.startsWith("video/")) return "\u{1F3AC}";
+  if (mimeType.startsWith("audio/")) return "\u{1F3B5}";
+  if (mimeType === "application/pdf") return "\u{1F4D5}";
+  if (mimeType === "text/markdown" || mimeType.includes("markdown")) return "\u{1F4DD}";
+  if (mimeType.startsWith("text/") || mimeType === "application/json" || mimeType === "application/xml") return "\u{1F4C4}";
+  if (mimeType.includes("word") || mimeType.includes("officedocument.wordprocessingml")) return "\u{1F4DD}";
+  if (mimeType.includes("excel") || mimeType.includes("spreadsheetml") || mimeType === "text/csv") return "\u{1F4CA}";
+  if (mimeType.includes("powerpoint") || mimeType.includes("presentationml")) return "\u{1F4C9}";
+  if (mimeType.includes("zip") || mimeType.includes("rar") || mimeType.includes("7z") || mimeType.includes("tar") || mimeType.includes("compressed")) return "\u{1F4E6}";
+  if (mimeType.includes("epub") || mimeType.includes("mobi")) return "\u{1F4DA}";
+  if (mimeType.includes("executable") || mimeType.includes("msdownload") || mimeType.includes("apk")) return "\u2699\uFE0F";
+  if (mimeType.includes("sql") || mimeType.includes("database")) return "\u{1F5C4}\uFE0F";
+  if (mimeType.includes("key") || mimeType.includes("pem") || mimeType.includes("certificate") || mimeType.includes("pkcs")) return "\u{1F511}";
+  if (mimeType.includes("javascript") || mimeType.includes("typescript") || mimeType.includes("python") || mimeType.includes("php") || mimeType.includes("java") || mimeType.includes("cplusplus") || mimeType.includes("x-httpd-php")) return "\u{1F4BB}";
+  if (mimeType.includes("pdf") || mimeType.includes("document")) return "\u{1F4C4}";
+  return "\u{1F4C1}";
+}
+function getMimeTypeFromFilename(filename) {
+  const ext = path4.extname(filename).toLowerCase();
+  const mimeTypes = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+    ".svg": "image/svg+xml",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".avi": "video/x-msvideo",
+    ".mov": "video/quicktime",
+    ".mkv": "video/x-matroska",
+    ".flv": "video/x-flv",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".flac": "audio/flac",
+    ".pdf": "application/pdf",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".txt": "text/plain",
+    ".csv": "text/csv",
+    ".md": "text/markdown",
+    ".html": "text/html",
+    ".css": "text/css",
+    ".js": "application/javascript",
+    ".ts": "application/typescript",
+    ".json": "application/json",
+    ".xml": "application/xml",
+    ".py": "text/x-python",
+    ".java": "text/x-java-source",
+    ".sql": "application/sql",
+    ".zip": "application/zip",
+    ".rar": "application/x-rar-compressed",
+    ".7z": "application/x-7z-compressed",
+    ".tar": "application/x-tar",
+    ".gz": "application/x-gzip",
+    ".epub": "application/epub+zip",
+    ".mobi": "application/x-mobipocket-ebook",
+    ".exe": "application/x-msdownload",
+    ".apk": "application/vnd.android.package-archive",
+    ".iso": "application/x-iso9660-image",
+    ".dmg": "application/x-apple-diskimage",
+    ".crt": "application/x-x509-ca-cert",
+    ".pem": "application/x-pem-file",
+    ".key": "application/octet-stream"
+  };
+  return mimeTypes[ext] || "application/octet-stream";
+}
+function sanitizeFilename(name) {
+  if (!name) return "unknown";
+  const firstLine = name.split("\n")[0].trim();
+  const originalExt = path4.extname(firstLine);
+  const ext = originalExt && originalExt.length <= 15 ? originalExt : "";
+  const withoutExt = ext ? firstLine.slice(0, -ext.length) : firstLine;
+  let sanitized = withoutExt.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/\s+/g, " ").trim();
+  sanitized = sanitized.replace(/[.\s]+$/, "");
+  if (!sanitized) return "unknown";
+  const MAX_CHARS = 50;
+  const baseMaxChars = Math.max(1, MAX_CHARS - ext.length);
+  let base = sanitized.substring(0, baseMaxChars);
+  let result = `${base}${ext}`;
+  const MAX_BYTES = 150;
+  while (Buffer.byteLength(result, "utf8") > MAX_BYTES && base.length > 0) {
+    base = base.substring(0, base.length - 1);
+    result = `${base}${ext}`;
+  }
+  return result || "unknown";
+}
+
+// src/utils/telegramPathSettings.ts
+init_settings();
+
+// src/utils/telegramPathStateStore.ts
+init_db();
+var defaultQuery = (sql, params) => query(sql, params);
+async function setTelegramPathStateRow(runQuery = defaultQuery, chatId, mode, folder, expiresAt) {
+  await runQuery(
+    `INSERT INTO telegram_path_states (chat_id, mode, folder, expires_at)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (chat_id, mode)
+         DO UPDATE SET folder = EXCLUDED.folder, expires_at = EXCLUDED.expires_at, updated_at = NOW()`,
+    [chatId, mode, folder, mode === "session" ? "infinity" : expiresAt]
+  );
+}
+async function consumeTelegramOncePath(runQuery = defaultQuery, chatId) {
+  const result = await runQuery(
+    `DELETE FROM telegram_path_states
+         WHERE chat_id = $1 AND mode = 'once' AND expires_at > NOW()
+         RETURNING folder`,
+    [chatId]
+  );
+  return result.rows[0]?.folder || null;
+}
+async function getTelegramSessionPath(runQuery = defaultQuery, chatId) {
+  const result = await runQuery(
+    `SELECT folder FROM telegram_path_states
+         WHERE chat_id = $1 AND mode = 'session'`,
+    [chatId]
+  );
+  return result.rows[0]?.folder || null;
+}
+async function previewTelegramPersistentPath(chatId) {
+  const result = await defaultQuery(
+    `SELECT mode, folder FROM telegram_path_states
+         WHERE chat_id = $1 AND (mode = 'session' OR expires_at > NOW())`,
+    [chatId]
+  );
+  return {
+    once: result.rows.find((row) => row.mode === "once")?.folder || null,
+    session: result.rows.find((row) => row.mode === "session")?.folder || null
+  };
+}
+async function clearTelegramPathStateRows(runQuery = defaultQuery, chatId) {
+  await runQuery("DELETE FROM telegram_path_states WHERE chat_id = $1", [chatId]);
+}
+
+// src/utils/telegramPathSettings.ts
+init_scopedInteractionMap();
+
+// src/i18n/telegramRussian.json
+var telegramRussian_default = {
+  "bot.wizard.confirmSource": "\u{1F4CC} \u041A\u0430\u043D\u0430\u043B: {source}",
+  "bot.wizard.confirmComments": "\u{1F4AC} \u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438: {value}",
+  "bot.wizard.folder.defaultValue": "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0446\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "bot.wizard.storage.current": "\u0422\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435",
+  "bot.wizard.storage.currentAccount": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u0430\u043A\u043A\u0430\u0443\u043D\u0442",
+  "bot.wizard.confirmTitle": "\u041F\u043E\u0436\u0430\u043B\u0443\u0439\u0441\u0442\u0430, \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u043E\u0431\u044A\u0435\u043C \u0437\u0430\u0434\u0430\u0447\u0438:",
+  "bot.wizard.confirmTagRange": "\u0422\u0435\u0433: #{tag}",
+  "bot.wizard.confirmDateRange": "\u0414\u0430\u0442\u044B: {startDate} \u2192 {endDate}",
+  "bot.wizard.confirmDays": "\u{1F4C5} {days} \u0434\u043D\u0435\u0439 \u0432\u043A\u043B\u044E\u0447\u0438\u0442\u0435\u043B\u044C\u043D\u043E",
+  "bot.wizard.confirmLargeRange": "\u26A0\uFE0F\u042D\u0442\u043E \u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0430\u0441\u0441\u043E\u0440\u0442\u0438\u043C\u0435\u043D\u0442. \u041F\u043E\u0441\u043B\u0435 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0431\u0443\u0434\u0435\u0442 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0442\u044C\u0441\u044F \u043F\u043E \u0441\u0435\u0433\u043C\u0435\u043D\u0442\u0430\u043C. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0434\u0430\u0442\u044B \u0438 \u043C\u0435\u0441\u0442\u043E \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F.",
+  "bot.wizard.confirmCommentsOn": "\u0412\u043A\u043B\u044E\u0447\u0435\u043D\u043E (\u0434\u043E {count} \u0437\u0430 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435)",
+  "bot.wizard.confirmCommentsOff": "\u041D\u0435 \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u043E",
+  "bot.wizard.confirmFolder": "\u{1F4C1} \u041F\u0430\u043F\u043A\u0430: {folder}",
+  "bot.wizard.confirmStorage": "\u2601\uFE0F \u0424\u0438\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435: {provider} / {account}.",
+  "bot.wizard.confirmNote": "\u0421\u043A\u0430\u043D\u0438\u0440\u0443\u0439\u0442\u0435 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F \u043F\u0440\u043E\u0433\u0440\u0435\u0441\u0441\u0430 \u0432 \u0440\u0435\u0436\u0438\u043C\u0435 \u0440\u0435\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u0432\u0440\u0435\u043C\u0435\u043D\u0438. \u0412\u044B \u043C\u043E\u0436\u0435\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0435\u0433\u043E \u0438\u0437 \u0446\u0435\u043D\u0442\u0440\u0430 \u0437\u0430\u0434\u0430\u0447.",
+  "bot.wizard.subscriptionIndexInvalid": "\u274C\u0422\u0430\u043A\u043E\u0433\u043E \u043D\u043E\u043C\u0435\u0440\u0430 \u043D\u0435\u0442 \u043D\u0438 \u0432 \u043E\u0434\u043D\u043E\u0439 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0435. \u041E\u0442\u0432\u0435\u0442\u044C\u0442\u0435, \u0443\u043A\u0430\u0437\u0430\u0432 \u043D\u043E\u043C\u0435\u0440 \u0441\u043F\u0438\u0441\u043A\u0430, \u0438\u043B\u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F/\u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430 \u043A\u0430\u043D\u0430\u043B, \u0447\u0442\u043E\u0431\u044B \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0435\u0433\u043E.",
+  "bot.wizard.subscriptionInputInvalid": "\u274C \u041E\u0442\u0432\u0435\u0442\u044C\u0442\u0435 \u043D\u043E\u043C\u0435\u0440\u043E\u043C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438, \u0447\u0442\u043E\u0431\u044B \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0435\u0435, \u0438\u043B\u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F/\u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430 \u043A\u0430\u043D\u0430\u043B, \u0447\u0442\u043E\u0431\u044B \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0435\u0435, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 `@channel_username`.",
+  "bot.wizard.pathInvalid": "\u274C \u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043F\u0443\u0442\u044C: {error}.\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \u0435\u0449\u0435 \u0440\u0430\u0437 \u0438\u043B\u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u043F\u0440\u043E\u043F\u0443\u0441\u0442\u0438\u0442\u044C\xBB, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u043F\u0440\u0430\u0432\u0438\u043B\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E.",
+  "bot.wizard.subscriptionUpdated": "\u2705 \u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u043F\u0430\u043F\u043A\u0430 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438: {source}.",
+  "bot.wizard.subscriptionNotFound": "\u274C \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430",
+  "bot.wizard.subscriptionFolder": "\u{1F4C1} \u041E\u0442\u0434\u0435\u043B\u044C\u043D\u0430\u044F \u043F\u0430\u043F\u043A\u0430: {folder}.\n{preview}",
+  "bot.wizard.defaultFolder": "\u{1F4C1} \u041F\u0440\u0430\u0432\u0438\u043B\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044F",
+  "bot.wizard.subscribed": "\u2705 \u041F\u043E\u0434\u043F\u0438\u0441\u0430\u043D \u043D\u0430 {source}",
+  "bot.wizard.subscriptionFolderLabel": "\u{1F4C1} \u0414\u043B\u044F \u044D\u0442\u043E\u0439 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438 \u0432\u044B\u0434\u0435\u043B\u0435\u043D\u0430 \u043F\u0430\u043F\u043A\u0430: {folder}.\n{preview}",
+  "bot.wizard.subscriptionDefaultLabel": "\u{1F4C1} \u0412 \u044D\u0442\u043E\u0439 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u043F\u0440\u0430\u0432\u0438\u043B\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E.",
+  "bot.wizard.subscriptionStart": "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F \u043D\u0430\u0447\u0438\u043D\u0430\u0435\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0433\u043E \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F {messageId}.",
+  "bot.wizard.subscriptionFailed": "\u274C \u041E\u0448\u0438\u0431\u043A\u0430 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438: {error}.",
+  "bot.wizard.dateRangeInvalid": "\u274C {error}",
+  "bot.callback.taskCardInvalid": "\u041A\u0430\u0440\u0442\u043E\u0447\u043A\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u0430 \u0438\u043B\u0438 \u043D\u0435 \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0438\u0442 \u044D\u0442\u043E\u043C\u0443 \u0447\u0430\u0442\u0443.",
+  "bot.callback.retryCount": "\u041F\u043E\u0432\u0442\u043E\u0440\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B {count}",
+  "bot.callback.noRetry": "\u041D\u0438\u043A\u0430\u043A\u0438\u0435 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u044B\u0435 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B \u043D\u0435 \u043C\u043E\u0433\u0443\u0442 \u0431\u044B\u0442\u044C \u043F\u043E\u0432\u0442\u043E\u0440\u0435\u043D\u044B.",
+  "bot.callback.failureDetailsTitle": "\u274C **\u0421\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0441\u0431\u043E\u0435**",
+  "bot.callback.failureDetailsEmpty": "\u0417\u0430\u043F\u0438\u0441\u0438 \u043E\u0431 \u043E\u0448\u0438\u0431\u043A\u0430\u0445 \u0431\u044B\u043B\u0438 \u0443\u0434\u0430\u043B\u0435\u043D\u044B \u0438\u043B\u0438 \u0437\u0430\u0434\u0430\u0447\u0430 \u0431\u044B\u043B\u0430 \u043F\u043E\u0432\u0442\u043E\u0440\u0435\u043D\u0430.",
+  "bot.callback.failureDetailsSent": "\u0421\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0441\u0431\u043E\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u044B",
+  "bot.callback.taskUnavailable": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0430, \u0441\u0440\u043E\u043A \u0435\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u043D\u0435 \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0438\u0442 \u044D\u0442\u043E\u043C\u0443 \u0447\u0430\u0442\u0443.",
+  "bot.callback.queuePaused": "\u041E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
+  "bot.callback.noPausableTasks": "\u041D\u0435\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043C\u044B\u0445 \u0437\u0430\u0434\u0430\u0447, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u043C\u043E\u0436\u043D\u043E \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C.",
+  "bot.callback.queueResumed": "\u041E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
+  "bot.callback.noWaitingTasks": "\u041D\u0435\u0442 \u043E\u0436\u0438\u0434\u0430\u044E\u0449\u0438\u0445 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A",
+  "bot.callback.backgroundCancelled": "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u0437\u0430\u0434\u0430\u0447\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
+  "bot.callback.operationFailed": "\u041E\u043F\u0435\u0440\u0430\u0446\u0438\u044F \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C: {error}",
+  "bot.callback.sendChannel": "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043A\u0430\u043D\u0430\u043B",
+  "bot.callback.subscriptionInvalid": "\u041A\u043D\u043E\u043F\u043A\u0430 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u0430 \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
+  "bot.callback.subscriptionRefreshed": "\u0421\u043F\u0438\u0441\u043E\u043A \u043F\u043E\u0434\u043F\u0438\u0441\u043E\u043A \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D.",
+  "bot.callback.subscriptionConfirmInvalid": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043E\u0442\u043C\u0435\u043D\u044B \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u043F\u043E\u0434\u043F\u0438\u0441\u043E\u043A.",
+  "bot.callback.subscriptionCancelled": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
+  "bot.callback.subscriptionMissing": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u0438\u043B\u0438 \u0443\u0436\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
+  "bot.callback.subscriptionBack": "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u043A \u0441\u043F\u0438\u0441\u043A\u0443 \u043F\u043E\u0434\u043F\u0438\u0441\u043E\u043A",
+  "bot.callback.syncRequested": "\u0417\u0430\u043F\u0440\u043E\u0448\u0435\u043D\u0430 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F",
+  "bot.callback.subscriptionResumed": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
+  "bot.callback.subscriptionPaused": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
+  "bot.callback.cursorUpdated": "\u041A\u0443\u0440\u0441\u043E\u0440 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D \u0434\u043E \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0433\u043E \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F",
+  "bot.callback.followGlobal": "\u0422\u0435\u043F\u0435\u0440\u044C \u0441\u043B\u0435\u0434\u0443\u044F \u0433\u043B\u043E\u0431\u0430\u043B\u044C\u043D\u043E\u0439 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0435",
+  "bot.callback.fixedTarget": "\u0424\u0438\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u043A \u0442\u0435\u043A\u0443\u0449\u0435\u0439 \u0446\u0435\u043B\u0438",
+  "bot.callback.noResult": "\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442\u043E\u0432 \u0437\u0430\u043F\u0443\u0441\u043A\u0430 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442",
+  "bot.callback.retryLatest": "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u043B \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u044B\u0435 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B",
+  "bot.callback.enterBackfillDate": "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0434\u0430\u0442\u0443 \u043D\u0430\u0447\u0430\u043B\u0430 \u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u044F",
+  "bot.callback.currentFolder": "\u0412\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u0430\u044F \u043F\u0430\u043F\u043A\u0430: {folder}.",
+  "bot.callback.defaultPath": "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435 \u043C\u0435\u0441\u0442\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "bot.callback.sendFolder": "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043D\u043E\u0432\u0443\u044E \u0432\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u0443\u044E \u043F\u0430\u043F\u043A\u0443",
+  "bot.callback.folderCleared": "\u0412\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u0430\u044F \u043F\u0430\u043F\u043A\u0430 \u043E\u0447\u0438\u0449\u0435\u043D\u0430",
+  "bot.callback.confirmUnsubscribe": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435, \u0441\u0442\u043E\u0438\u0442 \u043B\u0438 \u043E\u0442\u043F\u0438\u0441\u044B\u0432\u0430\u0442\u044C\u0441\u044F",
+  "bot.callback.cleanupSuccess": "\u2705 \u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043F\u0440\u043E\u0448\u043B\u0430 \u0443\u0441\u043F\u0435\u0448\u043D\u043E",
+  "bot.callback.cleanupFailed": "\u274C \u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C",
+  "language.choose": "\u041F\u043E\u0436\u0430\u043B\u0443\u0439\u0441\u0442\u0430, \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u044F\u0437\u044B\u043A",
+  "language.title": "\u{1F310} **\u042F\u0437\u044B\u043A**",
+  "language.current": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u044F\u0437\u044B\u043A: {language}",
+  "language.changed": "\u2705 \u042F\u0437\u044B\u043A \u0438\u0437\u043C\u0435\u043D\u0451\u043D \u043D\u0430 \u0440\u0443\u0441\u0441\u043A\u0438\u0439",
+  "language.chinese": "\u0423\u043F\u0440\u043E\u0449\u0451\u043D\u043D\u044B\u0439 \u043A\u0438\u0442\u0430\u0439\u0441\u043A\u0438\u0439",
+  "language.english": "\u0410\u043D\u0433\u043B\u0438\u0439\u0441\u043A\u0438\u0439",
+  "language.russian": "\u0420\u0443\u0441\u0441\u043A\u0438\u0439",
+  "language.hint": "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u044F\u0437\u044B\u043A \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430 \u0431\u043E\u0442\u0430. \u042D\u0442\u043E \u043C\u0435\u043D\u044F\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u0438\u0435.",
+  "auth.required": "\u{1F510} \u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /start \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 PIN-\u043A\u043E\u0434.",
+  "auth.requiredUpload": "\u{1F510} \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /start \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 PIN-\u043A\u043E\u0434 \u043F\u0435\u0440\u0435\u0434 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u043E\u0439 \u0444\u0430\u0439\u043B\u043E\u0432.",
+  "auth.inputPrompt": "\u{1F510} \u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 PIN-\u043A\u043E\u0434 \u0441 \u043F\u043E\u043C\u043E\u0449\u044C\u044E \u043A\u043B\u0430\u0432\u0438\u0430\u0442\u0443\u0440\u044B \u043D\u0438\u0436\u0435:",
+  "auth.cancelled": "\u{1F6AB} \u0412\u0432\u043E\u0434 PIN-\u043A\u043E\u0434\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C/\u043D\u0430\u0447\u0430\u0442\u044C, \u0447\u0442\u043E\u0431\u044B \u043D\u0430\u0447\u0430\u0442\u044C \u0437\u0430\u043D\u043E\u0432\u043E",
+  "auth.wrong": "\u274C \u041D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u044B\u0439 \u041F\u0418\u041D-\u043A\u043E\u0434. \u041F\u043E\u0436\u0430\u043B\u0443\u0439\u0441\u0442\u0430, \u043F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0435 \u0440\u0430\u0437:",
+  "auth.success": "\u2705 PIN-\u043A\u043E\u0434 \u043F\u0440\u043E\u0432\u0435\u0440\u0435\u043D!",
+  "auth.startPrompt": "\u{1F44B} **\u0414\u043E\u0431\u0440\u043E \u043F\u043E\u0436\u0430\u043B\u043E\u0432\u0430\u0442\u044C \u0432 TG Vault Bot!**\n\n\u{1F510} \u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 PIN-\u043A\u043E\u0434 \u0441 \u043F\u043E\u043C\u043E\u0449\u044C\u044E \u043A\u043B\u0430\u0432\u0438\u0430\u0442\u0443\u0440\u044B \u043D\u0438\u0436\u0435:",
+  "auth.welcomeBack": "\u{1F44B} **\u0421 \u0432\u043E\u0437\u0432\u0440\u0430\u0449\u0435\u043D\u0438\u0435\u043C!**\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043B\u0438 \u043F\u0435\u0440\u0435\u0448\u043B\u0438\u0442\u0435 \u0444\u0430\u0439\u043B, \u0447\u0442\u043E\u0431\u044B \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0435\u0433\u043E.\n\n\u041D\u0430\u0447\u043D\u0438\u0442\u0435 \u0441 \u043E\u0434\u043D\u043E\u0433\u043E \u0438\u0437 \u0447\u0435\u0442\u044B\u0440\u0435\u0445 \u044F\u0440\u043B\u044B\u043A\u043E\u0432 \u043D\u0438\u0436\u0435 \u0438\u043B\u0438 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0434\u043B\u044F \u0432\u0441\u0435\u0433\u043E /help.",
+  "auth.successBody": "\u2705 **\u041F\u0418\u041D-\u043A\u043E\u0434 \u043F\u0440\u043E\u0432\u0435\u0440\u0435\u043D!**\n\n\u0422\u0435\u043F\u0435\u0440\u044C \u0432\u044B \u043C\u043E\u0436\u0435\u0442\u0435:\n\u{1F4E4} \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043B\u0438 \u043F\u0435\u0440\u0435\u0448\u043B\u0438\u0442\u0435 \u043B\u044E\u0431\u043E\u0439 \u0444\u0430\u0439\u043B \u0434\u043B\u044F \u0435\u0433\u043E \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 (\u0434\u043E 2 \u0413\u0411; \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0430 \u043D\u0435 \u043F\u043E\u0434\u043F\u0430\u0434\u0430\u0435\u0442 \u043F\u043E\u0434 \u044D\u0442\u043E\u0442 \u043B\u0438\u043C\u0438\u0442)\n\u{1F4CA} /storage \u2014 \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430.",
+  "auth.twoFactorPrompt": "\u{1F510} PIN-\u043A\u043E\u0434 \u043F\u0440\u043E\u0432\u0435\u0440\u0435\u043D!\n\n\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 **6-\u0437\u043D\u0430\u0447\u043D\u044B\u0439 \u043A\u043E\u0434 2FA**, \u0447\u0442\u043E\u0431\u044B \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044C \u0432\u0445\u043E\u0434:",
+  "auth.twoFactorToast": "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 \u043A\u043E\u0434 2FA",
+  "auth.twoFactorWrong": "\u274C \u041D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u044B\u0439 \u043A\u043E\u0434. \u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043D\u043E\u0432\u044B\u0439 6-\u0437\u043D\u0430\u0447\u043D\u044B\u0439 \u043A\u043E\u0434:",
+  "auth.twoFactorActivated": "\u2705 **2FA \u0443\u0441\u043F\u0435\u0448\u043D\u043E \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u0430!**\n\n\u{1F6E1}\uFE0F \u0412\u0430\u0448\u0430 \u0443\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u0442\u0435\u043F\u0435\u0440\u044C \u0437\u0430\u0449\u0438\u0449\u0435\u043D\u0430 \u0434\u0432\u0443\u0445\u0444\u0430\u043A\u0442\u043E\u0440\u043D\u043E\u0439 \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0435\u0439.",
+  "auth.twoFactorLoginOk": "\u2705 **\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043E 2FA**\n\n\u0414\u043E\u0431\u0440\u043E \u043F\u043E\u0436\u0430\u043B\u043E\u0432\u0430\u0442\u044C \u043E\u0431\u0440\u0430\u0442\u043D\u043E!",
+  "auth.twoFactorQrFail": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C QR-\u043A\u043E\u0434. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043B\u043E\u0433\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430.",
+  "common.unknownText": "\u2753 \u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043A\u043E\u043C\u0430\u043D\u0434\u0430\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /start, \u0447\u0442\u043E\u0431\u044B \u043D\u0430\u0447\u0430\u0442\u044C \u0438\u043B\u0438 /help \u0434\u043B\u044F \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u0438\u044F \u043F\u043E\u043C\u043E\u0449\u0438.",
+  "common.unsupportedMedia": "\u26A0\uFE0F \u042D\u0442\u043E\u0442 \u043C\u0435\u0434\u0438\u0430\u0444\u043E\u0440\u043C\u0430\u0442 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F.",
+  "common.emptyFiles": "\u{1F4EE} \u041F\u043E\u043A\u0430 \u043D\u0435\u0442 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A",
+  "common.emptyTasks": "\u{1F4EE} \u041D\u0435\u0442 \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0445 \u0437\u0430\u0434\u0430\u0447",
+  "common.fileCount": "{count, plural, one {{count} \u0444\u0430\u0439\u043B} other {{count} \u0444\u0430\u0439\u043B\u0430}}",
+  "common.refresh": "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C",
+  "common.confirm": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0430\u0442\u044C",
+  "common.cancel": "\u041E\u0442\u043C\u0435\u043D\u0430",
+  "common.back": "\u041D\u0430\u0437\u0430\u0434",
+  "common.failed": "\u041D\u0435\u0443\u0441\u043F\u0435\u0448\u043D\u044B\u0439",
+  "common.success": "\u0423\u0434\u0430\u043B\u043E\u0441\u044C",
+  "messages.storage.title": "\u{1F4CA} **\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430**",
+  "messages.storage.disk": "**\u{1F4BF} \u0421\u0435\u0440\u0432\u0435\u0440\u043D\u044B\u0439 \u0434\u0438\u0441\u043A**",
+  "messages.storage.total": "\u0412\u0441\u0435\u0433\u043E{value}",
+  "messages.storage.used": "\u0411/\u0443{value} ({percent}%)",
+  "messages.storage.free": "\u0411\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u043E{value}",
+  "messages.storage.indexed": "**\u{1F4C1} \u041F\u0440\u043E\u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B**",
+  "messages.storage.fileCount": "\u0424\u0430\u0439\u043B\u044B{count}",
+  "messages.storage.size": "\u0420\u0430\u0437\u043C\u0435\u0440{value}",
+  "messages.storage.local": "**\u{1F5A5}\uFE0F\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u0434\u043B\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438**",
+  "messages.storage.location": "\u041C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A/\u043A\u044D\u0448\u0430.",
+  "messages.storage.queue": "**\u{1F4E1} \u041E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438**",
+  "messages.storage.queueCounts": "\u{1F504} \u0410\u043A\u0442\u0438\u0432\u0435\u043D {active}\u23F3 \u041E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F {pending}",
+  "messages.files.title": "\u{1F4CB} **\u041D\u0435\u0434\u0430\u0432\u043D\u043E \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B** ({count} \u043D\u0430 \u044D\u0442\u043E\u0439 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435)",
+  "messages.files.unnamed": "\u0411\u0435\u0437\u044B\u043C\u044F\u043D\u043D\u044B\u0439 \u0444\u0430\u0439\u043B",
+  "messages.files.hint": "\u{1F4A1} \u0414\u043B\u044F \u043F\u043E\u0438\u0441\u043A\u0430 \u0444\u0430\u0439\u043B\u043E\u0432 \u0438\u043B\u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F \u0438\u043C\u0438 \u043E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \xAB\u041F\u043E\u0438\u0441\u043A \u0444\u0430\u0439\u043B\u043E\u0432 \u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0438\u043C\u0438\xBB.",
+  "fileBrowser.detail": "\u041F\u043E\u0434\u0440\u043E\u0431\u043D\u043E\u0441\u0442\u0438",
+  "fileBrowser.copyId": "\u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440",
+  "fileBrowser.favorite": "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435",
+  "fileBrowser.unfavorite": "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E",
+  "fileBrowser.signedLink": "\u041F\u043E\u0434\u043F\u0438\u0441\u0430\u043D\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430",
+  "fileBrowser.move": "\u0414\u0432\u0438\u0433\u0430\u0442\u044C\u0441\u044F",
+  "fileBrowser.rename": "\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C",
+  "fileBrowser.delete": "\u0423\u0434\u0430\u043B\u0438\u0442\u044C\u2026",
+  "fileBrowser.unnamed": "\u0411\u0435\u0437\u044B\u043C\u044F\u043D\u043D\u044B\u0439 \u0444\u0430\u0439\u043B",
+  "fileBrowser.other": "\u0414\u0440\u0443\u0433\u043E\u0439",
+  "fileBrowser.localStorage": "\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435",
+  "fileBrowser.rootFolder": "\u041A\u043E\u0440\u043D\u0435\u0432\u0430\u044F \u043F\u0430\u043F\u043A\u0430",
+  "fileBrowser.unknown": "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439",
+  "fileBrowser.search": "\u041F\u043E\u0438\u0441\u043A \u0444\u0430\u0439\u043B\u043E\u0432",
+  "fileBrowser.recentFiles": "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u0444\u0430\u0439\u043B\u044B",
+  "fileBrowser.noMatches": "\u041D\u0435\u0442 \u0441\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0445 \u0444\u0430\u0439\u043B\u043E\u0432.",
+  "fileBrowser.hint": "\u041A\u043E\u0441\u043D\u0438\u0442\u0435\u0441\u044C \u0444\u0430\u0439\u043B\u0430, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u044F, \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0435\u0433\u043E \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440, \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0435\u0433\u043E \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435, \u0441\u043E\u0437\u0434\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443, \u043F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C/\u043F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C \u0435\u0433\u043E \u0438\u043B\u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044C \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435.",
+  "messages.delete.success": "\u2705 **\u0424\u0430\u0439\u043B \u0443\u0434\u0430\u043B\u0435\u043D**",
+  "keyboard.upload": "\u{1F4E4} \u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0438\u043D\u0441\u0442\u0440\u0443\u043A\u0446\u0438\u044E",
+  "keyboard.tasks": "\u{1F527} \u0417\u0430\u0434\u0430\u0447\u0438",
+  "keyboard.storage": "\u{1F4CA} \u0425\u0440\u0430\u043D\u0435\u043D\u0438\u0435",
+  "keyboard.more": "\u2630 \u0415\u0449\u0435",
+  "keyboard.cancel": "\u041E\u0442\u043C\u0435\u043D\u0430",
+  "help.body": "\u{1F4D6} **\u041F\u043E\u043C\u043E\u0449\u044C**\n\n\u{1F4E4} \u041E\u0442\u043F\u0440\u0430\u0432\u043A\u0430 \u0438\u043B\u0438 \u043F\u0435\u0440\u0435\u0441\u044B\u043B\u043A\u0430 \u0444\u0430\u0439\u043B\u043E\u0432: \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043D\u0430\u043F\u0440\u044F\u043C\u0443\u044E\n\u{1F517} \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0441\u0441\u044B\u043B\u043A\u0443 Telegram [\u043F\u0430\u043F\u043A\u0430]: \u043F\u0440\u044F\u043C\u0430\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430; \u0431\u0435\u0437 \u043F\u0430\u043F\u043A\u0438 \u2014 \u0442\u0435\u043A\u0443\u0449\u0430\u044F \u0434\u0430\u0442\u0430\n\u{1F4E5} \u0417\u0430\u0434\u0430\u0447\u0438: \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u043F\u0440\u043E\u0433\u0440\u0435\u0441\u0441\u0430, \u043F\u0430\u0443\u0437\u0430 \u0438\u043B\u0438 \u043E\u0442\u043C\u0435\u043D\u0430.\n\u{1F4C1} \u041C\u0435\u0441\u0442\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \u0438 \u043C\u0435\u0441\u0442\u043E \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F.\n\u{1F4E1} \u041A\u0430\u043D\u0430\u043B\u044B: \u0441\u043A\u0430\u0447\u0438\u0432\u0430\u0439\u0442\u0435 \u043F\u043E \u0434\u0430\u0442\u0435/\u0442\u0435\u0433\u0443 \u0438\u043B\u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u044F\u0439\u0442\u0435 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0430\u043C\u0438.\n\u{1F310} /language: \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u044F\u0437\u044B\u043A \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430.\n\n\u{1F447} \u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0443\u043D\u043A\u0446\u0438\u044E \u043D\u0438\u0436\u0435.",
+  "notification.digestTitle": "\u{1F4EC} **\u0414\u0430\u0439\u0434\u0436\u0435\u0441\u0442 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439**",
+  "notification.settingsTitle": "\u{1F514} **\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439**",
+  "notification.securityImmediate": "\u041F\u0440\u0435\u0434\u0443\u043F\u0440\u0435\u0436\u0434\u0435\u043D\u0438\u044F \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438 \u0432\u0441\u0435\u0433\u0434\u0430 \u0434\u043E\u0441\u0442\u0430\u0432\u043B\u044F\u044E\u0442\u0441\u044F \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E.",
+  "notification.clickToChange": "\u{1F447} \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0443.",
+  "notifications.digestTitle": "\u{1F4EC} **\u0414\u0430\u0439\u0434\u0436\u0435\u0441\u0442 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439**",
+  "notifications.title": "\u{1F514} **\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439**",
+  "notifications.securityAlways": "\u041F\u0440\u0435\u0434\u0443\u043F\u0440\u0435\u0436\u0434\u0435\u043D\u0438\u044F \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438 \u0432\u0441\u0435\u0433\u0434\u0430 \u0434\u043E\u0441\u0442\u0430\u0432\u043B\u044F\u044E\u0442\u0441\u044F \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E.",
+  "notifications.clickToChange": "\u{1F447} \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0443.",
+  "notifications.successImmediate": "\u0423\u0441\u043F\u0435\u0445 \xB7 \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u044B\u0439",
+  "notifications.successDigest": "\u0423\u0441\u043F\u0435\u0445 \xB7 \u0434\u0430\u0439\u0434\u0436\u0435\u0441\u0442",
+  "notifications.successOff": "\u0423\u0441\u043F\u0435\u0445 \xB7 \u0432\u044B\u043A\u043B.",
+  "notifications.invalidTimezone": "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u0447\u0430\u0441\u043E\u0432\u043E\u0439 \u043F\u043E\u044F\u0441",
+  "notifications.failureImmediate": "\u041D\u0435\u0443\u0434\u0430\u0447\u0430 \xB7 \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u0430\u044F",
+  "notifications.failureDigest": "\u041D\u0435\u0443\u0434\u0430\u0447\u0430 \xB7 \u043F\u0435\u0440\u0435\u0432\u0430\u0440\u0438\u0442\u044C",
+  "notifications.subscriptionImmediate": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \xB7 \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u0430\u044F",
+  "notifications.subscriptionDigest": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \xB7 \u0434\u0430\u0439\u0434\u0436\u0435\u0441\u0442",
+  "notifications.quietPreset": "\u0422\u0438\u0445\u043E 22:00\u201307:00",
+  "notifications.quietOff": "\u041E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0442\u0438\u0445\u0438\u0435 \u0447\u0430\u0441\u044B",
+  "notifications.timezoneShanghai": "\u0427\u0430\u0441\u043E\u0432\u043E\u0439 \u043F\u043E\u044F\u0441 \xB7 \u0428\u0430\u043D\u0445\u0430\u0439",
+  "notifications.timezoneUtc": "\u0427\u0430\u0441\u043E\u0432\u043E\u0439 \u043F\u043E\u044F\u0441 \xB7 UTC",
+  "notifications.modeImmediate": "\u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u044B\u0439",
+  "notifications.modeDigest": "\u043F\u0435\u0440\u0435\u0432\u0430\u0440\u0438\u0432\u0430\u0442\u044C",
+  "notifications.modeDigestCombined": "\u043F\u0435\u0440\u0435\u0432\u0430\u0440\u0438\u0432\u0430\u0442\u044C",
+  "notifications.modeOff": "\u0432\u044B\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044B\u0439",
+  "notifications.quietDisabled": "\u0432\u044B\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044B\u0439",
+  "notifications.settingsModes": "\u041E\u0448\u0438\u0431\u043A\u0430: {failure} | \u0423\u0441\u043F\u0435\u0445: {success}",
+  "notifications.settingsSchedule": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430: {subscription} | \u0422\u0438\u0445\u043E: {quiet}",
+  "notifications.settingsTimezone": "\u0427\u0430\u0441\u043E\u0432\u043E\u0439 \u043F\u043E\u044F\u0441: {timezone}",
+  "notifications.error.timezoneRequired": "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0447\u0430\u0441\u043E\u0432\u043E\u0439 \u043F\u043E\u044F\u0441, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 \u0410\u0437\u0438\u044F/\u0428\u0430\u043D\u0445\u0430\u0439.",
+  "notifications.error.quietFormat": "\u0412 \u0442\u0438\u0445\u0438\u0435 \u0447\u0430\u0441\u044B \u043D\u0435\u043E\u0431\u0445\u043E\u0434\u0438\u043C\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0444\u043E\u0440\u043C\u0430\u0442 \u0427\u0427:\u041C\u041C-\u0427\u0427:\u041C\u041C, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 22:00\u201307:00; \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0442\u0438\u0445\u043E\u0435 \u0432\u044B\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435, \u0447\u0442\u043E\u0431\u044B \u043E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0438\u0445",
+  "notifications.error.successMode": "\u0423\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F \u043E\u0431 \u0443\u0441\u043F\u0435\u0445\u0435 \u0434\u043E\u043B\u0436\u043D\u044B \u0431\u044B\u0442\u044C \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u044B\u043C\u0438, \u043A\u0440\u0430\u0442\u043A\u0438\u043C\u0438 \u0438\u043B\u0438 \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044B\u043C\u0438.",
+  "notifications.error.deliveryMode": "\u0414\u043E\u0441\u0442\u0430\u0432\u043A\u0430 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439 \u0434\u043E\u043B\u0436\u043D\u0430 \u0431\u044B\u0442\u044C \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E\u0439 \u0438\u043B\u0438 \u0434\u0430\u0439\u0434\u0436\u0435\u0441\u0442\u043E\u0432\u043E\u0439.",
+  "notifications.error.unknownSetting": "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430. \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /\u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F, \u0447\u0442\u043E\u0431\u044B \u0443\u0432\u0438\u0434\u0435\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0435 \u0432\u0430\u0440\u0438\u0430\u043D\u0442\u044B.",
+  "channels.errors.sourceAllowlistRequired": "\u0411\u0435\u043B\u044B\u0439 \u0441\u043F\u0438\u0441\u043E\u043A \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u043E\u0432 Telegram \u043D\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D. \u0427\u0438\u0441\u043B\u043E\u0432\u044B\u0435 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u044B, \u0447\u0430\u0441\u0442\u043D\u044B\u0435 \u0447\u0430\u0442\u044B \u0438 \u0447\u0430\u0441\u0442\u043D\u044B\u0435 \u0433\u0440\u0443\u043F\u043F\u044B \u0437\u0430\u043F\u0440\u0435\u0449\u0435\u043D\u044B. \u041D\u0430\u0441\u0442\u0440\u043E\u0439\u0442\u0435 TELEGRAM_ALLOWED_SOURCES.",
+  "channels.errors.sourceNotAllowed": "\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A {source} \u043D\u0435 \u0432\u043D\u0435\u0441\u0435\u043D \u0432 \u0441\u043F\u0438\u0441\u043E\u043A \u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u043D\u044B\u0445 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A Telegram.",
+  "channels.errors.downloaderNotReady": "\u0417\u0430\u0433\u0440\u0443\u0437\u0447\u0438\u043A \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u043D\u0435 \u0433\u043E\u0442\u043E\u0432",
+  "channels.errors.sourceRequired": "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u0430\u043D\u0430\u043B",
+  "channels.errors.inviteExpired": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u044F \u043D\u0430 \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0443 \u0438\u0441\u0442\u0435\u043A. \u041F\u043E\u043B\u0443\u0447\u0438\u0442\u0435 \u043D\u043E\u0432\u043E\u0435 \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u0438\u043B\u0438 \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0438\u0442\u0435\u0441\u044C \u043A \u0442\u043E\u0439 \u0436\u0435 \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438 Telegram, \u043A\u043E\u0442\u043E\u0440\u0430\u044F \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043B\u0430\u0441\u044C \u0434\u043B\u044F \u0441\u043E\u0437\u0434\u0430\u043D\u0438\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u043E\u0433\u043E \u0441\u0435\u0430\u043D\u0441\u0430, \u0430 \u0437\u0430\u0442\u0435\u043C \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443.",
+  "channels.errors.inviteInvalid": "\u042D\u0442\u043E \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u043D\u0430 \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u0432 \u0433\u0440\u0443\u043F\u043F\u0443 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E. \u0423\u0431\u0435\u0434\u0438\u0442\u0435\u0441\u044C, \u0447\u0442\u043E \u0441\u0441\u044B\u043B\u043A\u0430 \u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u0430, \u0438\u043B\u0438 \u0441\u043E\u0437\u0434\u0430\u0439\u0442\u0435 \u043D\u043E\u0432\u043E\u0435 \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435.",
+  "channels.errors.inviteAlreadyJoined": "\u0410\u043A\u043A\u0430\u0443\u043D\u0442 \u0443\u0436\u0435 \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0438\u043B\u0441\u044F, \u043D\u043E Telegram \u0432\u0435\u0440\u043D\u0443\u043B \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u043E\u0435 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u043A\u0430\u043D\u0430\u043B \u0435\u0449\u0435 \u0440\u0430\u0437.",
+  "channels.errors.inviteResolutionFailed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u0432 \u0433\u0440\u0443\u043F\u043F\u0443: {error}.",
+  "channels.errors.inviteNotJoined": "\u0423\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u043D\u0435 \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0438\u043B\u0430\u0441\u044C \u043A \u044D\u0442\u043E\u043C\u0443 \u0447\u0430\u0441\u0442\u043D\u043E\u043C\u0443 \u043A\u0430\u043D\u0430\u043B\u0443 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0435, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u0435\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u043D\u0435\u0432\u043E\u0437\u043C\u043E\u0436\u043D\u043E \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u0438 \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0438\u0442\u0435\u0441\u044C, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044F \u0442\u0443 \u0436\u0435 \u0443\u0447\u0435\u0442\u043D\u0443\u044E \u0437\u0430\u043F\u0438\u0441\u044C, \u043A\u043E\u0442\u043E\u0440\u0430\u044F \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043B\u0430\u0441\u044C \u0434\u043B\u044F \u0441\u043E\u0437\u0434\u0430\u043D\u0438\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u043E\u0433\u043E \u0441\u0435\u0430\u043D\u0441\u0430, \u0437\u0430\u0442\u0435\u043C \u0441\u043D\u043E\u0432\u0430 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443 \u0438\u043B\u0438 \u043A\u043E\u043C\u0430\u043D\u0434\u0443 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
+  "channels.errors.inviteMissingEntity": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u0432 \u0433\u0440\u0443\u043F\u043F\u0443, \u043F\u043E\u0441\u043A\u043E\u043B\u044C\u043A\u0443 Telegram \u043D\u0435 \u0432\u0435\u0440\u043D\u0443\u043B \u0447\u0438\u0442\u0430\u0435\u043C\u044B\u0439 \u043E\u0431\u044A\u0435\u043A\u0442. \u0423\u0431\u0435\u0434\u0438\u0442\u0435\u0441\u044C, \u0447\u0442\u043E \u0443\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u0432\u0441\u0435 \u0435\u0449\u0435 \u044F\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u043E\u043C.",
+  "channels.errors.hashtagRequired": "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0445\u044D\u0448\u0442\u0435\u0433",
+  "channels.errors.hashtagInvalid": "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0445\u0435\u0448\u0442\u0435\u0433 \u0432 \u0444\u043E\u0440\u043C\u0430\u0442\u0435 #example \u0431\u0435\u0437 \u043F\u0440\u043E\u0431\u0435\u043B\u043E\u0432.",
+  "channels.errors.subscriptionNotFound": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430",
+  "channels.errors.subscriptionDisabled": "\u042D\u0442\u0430 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u0430",
+  "channels.errors.noDownloadableMessages": "\u041D\u0435\u0442 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439, \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0445 \u0434\u043B\u044F \u0441\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u044F",
+  "channels.errors.sourceMessageUnavailable": "\u0418\u0441\u0445\u043E\u0434\u043D\u043E\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u0438\u043B\u0438 \u043D\u0435 \u0438\u043C\u0435\u0435\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043C\u043E\u0433\u043E \u043D\u043E\u0441\u0438\u0442\u0435\u043B\u044F.",
+  "channels.errors.fixedTargetProviderRequired": "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043F\u043E\u0441\u0442\u0430\u0432\u0449\u0438\u043A\u0430 \u0434\u043B\u044F \u0444\u0438\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u043E\u0439 \u0446\u0435\u043B\u0438 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438",
+  "channels.storageCooldown": "\u23F8\uFE0F \u041D\u0430 Google \u0414\u0438\u0441\u043A\u0435 \u0434\u043E\u0441\u0442\u0438\u0433\u043D\u0443\u0442 \u0441\u0435\u0433\u043E\u0434\u043D\u044F\u0448\u043D\u0438\u0439 \u043B\u0438\u043C\u0438\u0442 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.\n\n\u042D\u0442\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u0431\u044B\u043B\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438. \u041E\u0441\u0442\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435 \u0431\u0443\u0434\u0443\u0442 \u043F\u043E\u0442\u0435\u0440\u044F\u043D\u044B, \u0438 \u0432\u0430\u043C \u043D\u0435 \u043D\u0443\u0436\u043D\u043E \u043D\u0430\u0436\u0438\u043C\u0430\u0442\u044C \xAB\u0412\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C\xBB. \u042D\u0442\u043E \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0441\u0431\u0440\u043E\u0441\u0430 \u043A\u0432\u043E\u0442\u044B.\n\n\u0412\u0440\u0435\u043C\u044F \u043F\u043E\u0432\u0442\u043E\u0440\u0430: {retryAt}\n\u0417\u0430\u0434\u0430\u0447\u0430: {jobId}",
+  "channels.recoveryComplete": "\u267B\uFE0F \u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0438 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 {jobId}: {successful} \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D \u0443\u0441\u043F\u0435\u0448\u043D\u043E, {skipped} \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D, {failed} \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D.",
+  "subscriptions.syncComplete": "\u2705 \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u0443\u0435\u0442 \u043D\u043E\u0432\u044B\u0435 \u0444\u0430\u0439\u043B\u044B {found}; {skipped} \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D, \u0430 {failed} \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D.",
+  "subscriptions.syncCompleteContinues": "\u2705 \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u0443\u0435\u0442 \u043D\u043E\u0432\u044B\u0435 \u0444\u0430\u0439\u043B\u044B {found}; {skipped} \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D, \u0430 {failed} \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D. \u042D\u0442\u043E \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0434\u043E\u0441\u0442\u0438\u0433\u043B\u043E \u043F\u0440\u0435\u0434\u0435\u043B\u0430 \u0438\u043B\u0438 \u0432\u043E\u0437\u043D\u0438\u043A\u043B\u0438 \u0441\u0431\u043E\u0438, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u043E\u0441\u0442\u0430\u0432\u0448\u0438\u0435\u0441\u044F \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B \u0431\u0443\u0434\u0443\u0442 \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u0430\u043D\u044B \u043F\u0440\u0438 \u0431\u043E\u043B\u0435\u0435 \u043F\u043E\u0437\u0434\u043D\u0435\u043C \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0438.",
+  "subscriptions.disabled.inviteExpired": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430: \u0441\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u044F \u043D\u0430 \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0443 \u0438\u0441\u0442\u0435\u043A, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u043A\u043E\u043D\u0442\u0435\u043D\u0442 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435\u043B\u044C\u0437\u044F \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C. \u041F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u044F\u0439\u0442\u0435\u0441\u044C \u0441\u043D\u043E\u0432\u0430 \u0438\u043B\u0438 \u043E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u0441\u044B\u043B\u043A\u0443 \u043F\u0435\u0440\u0435\u0434 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0439 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u043E\u0439.",
+  "subscriptions.disabled.inviteInvalid": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430: \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u043D\u0430 \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u0432 \u0433\u0440\u0443\u043F\u043F\u0443 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u043A\u043E\u043D\u0442\u0435\u043D\u0442 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435\u043B\u044C\u0437\u044F \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0441\u0441\u044B\u043B\u043A\u0443 \u043F\u0435\u0440\u0435\u0434 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0439 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u043E\u0439.",
+  "subscriptions.disabled.notParticipant": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430: \u0443\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u044F\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0447\u043B\u0435\u043D\u043E\u043C \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0441\u0442\u043D\u043E\u0433\u043E \u043A\u0430\u043D\u0430\u043B\u0430 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u044B. \u041F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u044F\u0439\u0442\u0435\u0441\u044C \u043A \u043D\u0435\u043C\u0443 \u0435\u0449\u0435 \u0440\u0430\u0437, \u043F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443.",
+  "subscriptions.disabled.inaccessible": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430: \u0443\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u044D\u0442\u043E\u043C\u0443 \u043A\u0430\u043D\u0430\u043B\u0443 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0435. \u0412\u043E\u0437\u043C\u043E\u0436\u043D\u043E, \u043E\u043D \u0443\u0448\u0435\u043B, \u0431\u044B\u043B \u0443\u0434\u0430\u043B\u0435\u043D, \u0438\u043B\u0438 \u043A\u0430\u043D\u0430\u043B \u0442\u0435\u043F\u0435\u0440\u044C \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u0447\u0430\u0441\u0442\u043D\u044B\u043C. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0443 \u043F\u0435\u0440\u0435\u0434 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0439 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u043E\u0439.",
+  "subscriptions.disabled.unknown": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430: \u043A \u044D\u0442\u043E\u043C\u0443 \u043A\u0430\u043D\u0430\u043B\u0443 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0435 \u043D\u0435\u0432\u043E\u0437\u043C\u043E\u0436\u043D\u043E \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C ({error}). \u041F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443, \u0443\u0431\u0435\u0434\u0438\u0442\u0435\u0441\u044C, \u0447\u0442\u043E \u0443 \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438 \u0432\u0441\u0435 \u0435\u0449\u0435 \u0435\u0441\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F.",
+  "subscriptions.paused.inviteExpired": "\u26A0\uFE0F \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u044F \u043D\u0430 \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0443 \u0438\u0441\u0442\u0435\u043A, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u043A\u043E\u043D\u0442\u0435\u043D\u0442 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435\u043B\u044C\u0437\u044F \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C.\n\n\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u043E\u043F\u043E\u0432\u0435\u0449\u0435\u043D\u0438\u0435 \u0432 /tg_subs \u0438\u043B\u0438 /tg_sub. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u0441\u044B\u043B\u043A\u0443 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438, \u043F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0441\u043D\u043E\u0432\u0430 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443.",
+  "subscriptions.paused.inviteInvalid": "\u26A0\uFE0F \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u041F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u043D\u0430 \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u0432 \u0433\u0440\u0443\u043F\u043F\u0443 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u043A\u043E\u043D\u0442\u0435\u043D\u0442 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435\u043B\u044C\u0437\u044F \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C.\n\n\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u043E\u043F\u043E\u0432\u0435\u0449\u0435\u043D\u0438\u0435 \u0432 /tg_subs \u0438\u043B\u0438 /tg_sub. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0441\u0441\u044B\u043B\u043A\u0443 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0443, \u043F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0441\u043D\u043E\u0432\u0430 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443.",
+  "subscriptions.paused.notParticipant": "\u26A0\uFE0F \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0423\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u044F\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0447\u043B\u0435\u043D\u043E\u043C \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0441\u0442\u043D\u043E\u0433\u043E \u043A\u0430\u043D\u0430\u043B\u0430 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u044B, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0435\u043D\u0430.\n\n\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u043E\u043F\u043E\u0432\u0435\u0449\u0435\u043D\u0438\u0435 \u0432 /tg_subs \u0438\u043B\u0438 /tg_sub. \u041F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u044F\u0439\u0442\u0435\u0441\u044C \u0435\u0449\u0435 \u0440\u0430\u0437 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438, \u043F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0441\u043D\u043E\u0432\u0430 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443.",
+  "subscriptions.paused.inaccessible": "\u26A0\uFE0F \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0423\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u044D\u0442\u043E\u043C\u0443 \u043A\u0430\u043D\u0430\u043B\u0443 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0435. \u0412\u043E\u0437\u043C\u043E\u0436\u043D\u043E, \u043E\u043D \u0443\u0448\u0435\u043B, \u0431\u044B\u043B \u0443\u0434\u0430\u043B\u0435\u043D, \u0438\u043B\u0438 \u043A\u0430\u043D\u0430\u043B \u0442\u0435\u043F\u0435\u0440\u044C \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u0447\u0430\u0441\u0442\u043D\u044B\u043C.\n\n\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u043E\u043F\u043E\u0432\u0435\u0449\u0435\u043D\u0438\u0435 \u0432 /tg_subs \u0438\u043B\u0438 /tg_sub. \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438, \u043F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0441\u043D\u043E\u0432\u0430 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443.",
+  "subscriptions.paused.unknown": "\u26A0\uFE0F \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u041A \u044D\u0442\u043E\u043C\u0443 \u043A\u0430\u043D\u0430\u043B\u0443 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0435 \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C ({error}).\n\n\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u043E\u043F\u043E\u0432\u0435\u0449\u0435\u043D\u0438\u0435 \u0432 /tg_subs \u0438\u043B\u0438 /tg_sub. \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438, \u043F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0441\u043D\u043E\u0432\u0430 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443.",
+  "ads.reason.allowRule": "\u0421\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u0440\u0430\u0437\u0440\u0435\u0448\u0430\u044E\u0449\u0435\u043C\u0443 \u043F\u0440\u0430\u0432\u0438\u043B\u0443",
+  "ads.reason.blockedTemplate": "\u0421\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043D\u043E\u043C\u0443 \u0440\u0435\u043A\u043B\u0430\u043C\u043D\u043E\u043C\u0443 \u0448\u0430\u0431\u043B\u043E\u043D\u0443.",
+  "ads.reason.blockRule": "\u0421\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u043F\u0440\u0430\u0432\u0438\u043B\u0443 \u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u043A\u0438",
+  "ads.reason.normalTemplate": "\u041F\u043E\u0445\u043E\u0436\u0435 \u043D\u0430 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043D\u044B\u0439 \u043D\u043E\u0440\u043C\u0430\u043B\u044C\u043D\u044B\u0439 \u043A\u043E\u043D\u0442\u0435\u043D\u0442",
+  "ads.reason.adHistoryTemplate": "\u041E\u0447\u0435\u043D\u044C \u043F\u043E\u0445\u043E\u0436\u0435 \u043D\u0430 \u043F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0438\u0439 \u0440\u0435\u043A\u043B\u0430\u043C\u043D\u044B\u0439 \u0448\u0430\u0431\u043B\u043E\u043D.",
+  "ads.reason.transactionContact": "\u0421\u043E\u0434\u0435\u0440\u0436\u0438\u0442 \u043A\u043E\u043C\u043C\u0435\u0440\u0447\u0435\u0441\u043A\u043E\u0435 \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0438 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0443\u044E \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044E \u0437\u0430 \u043F\u0440\u0435\u0434\u0435\u043B\u0430\u043C\u0438 \u043F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u044B.",
+  "ads.reason.transactionIntent": "\u0421\u043E\u0434\u0435\u0440\u0436\u0438\u0442 \u043F\u0440\u043E\u0434\u0430\u044E\u0449\u0438\u0435 \u0438\u043B\u0438 \u0440\u0435\u043A\u043B\u0430\u043C\u043D\u044B\u0435 \u0442\u0435\u043A\u0441\u0442\u044B",
+  "ads.reason.ctaLink": "\u0421\u043E\u0434\u0435\u0440\u0436\u0438\u0442 \u043F\u0440\u0438\u0437\u044B\u0432 \u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044E \u0438 \u0432\u043D\u0435\u0448\u043D\u0438\u0439 \u043F\u0443\u043D\u043A\u0442 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F.",
+  "ads.reason.callToAction": "\u0421\u043E\u0434\u0435\u0440\u0436\u0438\u0442 \u0437\u0430\u043C\u0435\u0442\u043D\u044B\u0439 \u043F\u0440\u0438\u0437\u044B\u0432 \u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044E.",
+  "ads.reason.linkDensity": "\u0421\u043E\u0434\u0435\u0440\u0436\u0438\u0442 \u043C\u043D\u043E\u0436\u0435\u0441\u0442\u0432\u043E \u0432\u043D\u0435\u0448\u043D\u0438\u0445 \u0441\u0441\u044B\u043B\u043E\u043A \u0438\u043B\u0438 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u044B\u0445 \u0434\u0430\u043D\u043D\u044B\u0445.",
+  "ads.reason.scarcity": "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442 \u044F\u0437\u044B\u043A \u0441\u0440\u043E\u0447\u043D\u043E\u0441\u0442\u0438 \u0438\u043B\u0438 \u0434\u0435\u0444\u0438\u0446\u0438\u0442\u0430",
+  "ads.reason.decorativeMarketing": "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442 \u043C\u043D\u043E\u0436\u0435\u0441\u0442\u0432\u043E \u0440\u0435\u043A\u043B\u0430\u043C\u043D\u044B\u0445 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432.",
+  "task.pause": "\u23F8 \u041F\u0430\u0443\u0437\u0430",
+  "task.resume": "\u25B6\uFE0F \u0420\u0435\u0437\u044E\u043C\u0435",
+  "task.cancel": "\u{1F6D1} \u041E\u0442\u043C\u0435\u043D\u0430",
+  "task.retryFailed": "\u{1F504} \u041D\u0435\u0443\u0434\u0430\u0447\u043D\u044B\u0435 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u044B\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0438 ({count})",
+  "task.failureDetails": "\u041F\u043E\u0434\u0440\u043E\u0431\u043D\u043E\u0441\u0442\u0438 \u0441\u0431\u043E\u044F",
+  "upload.success": "\u2705 **\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430!**",
+  "upload.failed": "\u274C **\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C**",
+  "upload.downloading": "\u23F3 **\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435**",
+  "upload.saving": "\u{1F4BE} **\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u044E...**",
+  "upload.queued": "\u23F3 **\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D \u0432 \u043E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438**",
+  "upload.retrying": "\u{1F504} **\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C; \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u0430\u044F \u043F\u043E\u043F\u044B\u0442\u043A\u0430...**",
+  "upload.duplicateSkipped": "\u23ED\uFE0F **\u0414\u0443\u0431\u043B\u0438\u043A\u0430\u0442 \u0444\u0430\u0439\u043B\u0430 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D**",
+  "upload.reason": "\u041F\u0440\u0438\u0447\u0438\u043D\u0430: {error}",
+  "upload.currentQueue": "\u{1F4CA} \u041E\u0447\u0435\u0440\u0435\u0434\u044C: \u0437\u0430\u0434\u0430\u0447\u0438 {count}",
+  "upload.wait": "\u{1F4A1} \u0411\u043E\u0442 \u0431\u0443\u0434\u0435\u0442 \u043E\u0431\u0440\u0430\u0431\u0430\u0442\u044B\u0432\u0430\u0442\u044C \u0437\u0430\u0434\u0430\u0447\u0438 \u043F\u043E \u043F\u043E\u0440\u044F\u0434\u043A\u0443. \u041F\u043E\u0436\u0430\u043B\u0443\u0439\u0441\u0442\u0430, \u043F\u043E\u0434\u043E\u0436\u0434\u0438\u0442\u0435.",
+  "upload.duplicateCopiedOutcome": "\u267B\uFE0F \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u043E\u0432: \u043A\u043E\u043F\u0438\u044F \u0441\u043E\u0437\u0434\u0430\u043D\u0430.",
+  "upload.duplicateSkippedOutcome": "\u23ED\uFE0F \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u043E\u0432: \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E.",
+  "upload.manageHint": "\u{1F447} \u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u0435 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u044D\u0442\u0438\u043C \u0444\u0430\u0439\u043B\u043E\u043C \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u041F\u043E\u0438\u0441\u043A \u0444\u0430\u0439\u043B\u043E\u0432 \u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0438\u043C\u0438\xBB.",
+  "upload.failureRetryNote": "\u{1F504} \u0411\u043E\u043B\u044C\u0448\u0438\u0435 \u0444\u0430\u0439\u043B\u044B \u043C\u043E\u0433\u0443\u0442 \u0432\u044B\u0439\u0442\u0438 \u0438\u0437 \u0441\u0442\u0440\u043E\u044F \u0438\u0437-\u0437\u0430 \u043D\u0435\u0441\u0442\u0430\u0431\u0438\u043B\u044C\u043D\u043E\u0441\u0442\u0438 \u0441\u0435\u0442\u0438, \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u0439 \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 Telegram \u0438\u043B\u0438 \u043F\u0440\u0435\u0440\u0432\u0430\u043D\u043D\u043E\u0439 \u043F\u0435\u0440\u0435\u0434\u0430\u0447\u0438. \u0411\u043E\u0442 \u0443\u0436\u0435 \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u043B \u043F\u043E\u043F\u044B\u0442\u043A\u0443.",
+  "upload.failureAdvice": "\u{1F4A1} \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0444\u0430\u0439\u043B \u0435\u0449\u0435 \u0440\u0430\u0437 \u0438\u043B\u0438 \u0443\u043C\u0435\u043D\u044C\u0448\u0438\u0442\u0435 \u043F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u0438\u0437\u043C \u0441 \u043F\u043E\u043C\u043E\u0449\u044C\u044E /download_workers \u043F\u0435\u0440\u0435\u0434 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0439 \u043F\u043E\u043F\u044B\u0442\u043A\u043E\u0439.",
+  "upload.receipt.saved": "\u2705 **\u0424\u0430\u0439\u043B \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D**",
+  "upload.receipt.partial": "\u26A0\uFE0F **\u041F\u0430\u0440\u0442\u0438\u044F \u0447\u0430\u0441\u0442\u0438\u0447\u043D\u043E \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430**",
+  "upload.receipt.failed": "\u274C **\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C**",
+  "upload.receipt.processing": "\u23F3 **\u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430**",
+  "upload.receipt.stats": "\u{1F4CA} \u0412\u0441\u0435\u0433\u043E {total} \xB7 \u0443\u0441\u043F\u0435\u0448\u043D\u043E {successful} \xB7 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u043E {failed}",
+  "upload.receipt.duplicateCopied": "\u267B\uFE0F \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u043E\u0432: \u043A\u043E\u043F\u0438\u044F \u0441\u043E\u0437\u0434\u0430\u043D\u0430.",
+  "upload.receipt.duplicateSkipped": "\u23ED\uFE0F \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u043E\u0432: \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E.",
+  "upload.receipt.task": "\u0417\u0430\u0434\u0430\u0447\u0430: {taskId}",
+  "upload.receipt.findFolder": "\u0418\u0441\u043A\u0430\u0442\u044C \u0432 \u0442\u043E\u0439 \u0436\u0435 \u043F\u0430\u043F\u043A\u0435",
+  "upload.receipt.deleteFile": "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0444\u0430\u0439\u043B",
+  "upload.existingId": "\u{1F194} \u0421\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0439: {id}",
+  "upload.duplicateCopyAdvice": "\u0427\u0442\u043E\u0431\u044B \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0435\u0449\u0435 \u043E\u0434\u043D\u0443 \u043A\u043E\u043F\u0438\u044E, \u043E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \xAB\u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u043E\u0432 \u0444\u0430\u0439\u043B\u043E\u0432\xBB \u0438 \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \xAB\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u043A\u043E\u043F\u0438\u044E\xBB.",
+  "upload.taskCancelled.title": "\u{1F6D1} **\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u0437\u0430\u0434\u0430\u0447\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430**",
+  "upload.taskCancelled.id": "\u{1F194} \u0417\u0430\u0434\u0430\u0447\u0430: `{taskId}`",
+  "upload.taskCancelled.completed": "\u2705 \u0412\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043E: \u0444\u0430\u0439\u043B\u044B {count}.",
+  "upload.taskCancelled.failed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C: \u0444\u0430\u0439\u043B\u044B {count}.",
+  "upload.taskCancelled.stopped": "\u{1F6AB} \u041E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E/\u043E\u0447\u0438\u0449\u0435\u043D\u043E: \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 {count} \u0438\u043B\u0438 \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0435 \u0437\u0430\u0434\u0430\u0447\u0438.",
+  "upload.taskCancelled.controlsRemoved": "\u042D\u043B\u0435\u043C\u0435\u043D\u0442\u044B \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F \u043F\u0430\u0443\u0437\u043E\u0439, \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435\u043C \u0438 \u043E\u0442\u043C\u0435\u043D\u043E\u0439 \u0431\u044B\u043B\u0438 \u0443\u0434\u0430\u043B\u0435\u043D\u044B. \u0421\u0442\u0430\u0440\u044B\u0435 \u043A\u043D\u043E\u043F\u043A\u0438 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0431\u0443\u0434\u0443\u0442 \u0432\u043B\u0438\u044F\u0442\u044C \u043D\u0430 \u044D\u0442\u0443 \u0437\u0430\u0434\u0430\u0447\u0443.",
+  "upload.error.unknown": "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430",
+  "upload.failedDetail.batch": "{name}: \u0441\u0431\u043E\u0438 {count}",
+  "upload.cleanup.expired": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438 \u043E\u0447\u0438\u0441\u0442\u043A\u0438 \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442",
+  "upload.cleanup.success": "\u2705 \u0423\u0434\u0430\u043B\u0435\u043D\u044B \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u0434\u043B\u044F {fileName} ({size})",
+  "upload.cleanup.failed": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C: {error}.",
+  "taskCenter.kind.single": "\u041E\u0434\u0438\u043D \u0444\u0430\u0439\u043B",
+  "taskCenter.kind.album": "\u0410\u043B\u044C\u0431\u043E\u043C",
+  "taskCenter.kind.channel": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430",
+  "taskCenter.state.running": "\u0411\u0435\u0433",
+  "taskCenter.state.waiting": "\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 \u043D\u0430\u0447\u0430\u043B\u0430",
+  "taskCenter.state.pausing": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u0435 \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0444\u0430\u0439\u043B\u0430",
+  "taskCenter.state.paused": "\u041F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E",
+  "taskCenter.state.cooling": "\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u0435",
+  "taskCenter.state.failed": "\u041D\u0435\u0443\u0441\u043F\u0435\u0448\u043D\u044B\u0439",
+  "taskCenter.age.justNow": "\u041F\u0440\u044F\u043C\u043E \u0441\u0435\u0439\u0447\u0430\u0441",
+  "taskCenter.age.minutes": "{count} \u043C\u0438\u043D\u0443\u0442\u0443 \u043D\u0430\u0437\u0430\u0434",
+  "taskCenter.age.hours": "{count} \u0447\u0430\u0441 \u043D\u0430\u0437\u0430\u0434",
+  "taskCenter.age.days": "{count} \u0434\u043D \u043D\u0430\u0437\u0430\u0434",
+  "taskCenter.progress.active": "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 {count}",
+  "taskCenter.progress.pending": "\u041E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F {count}",
+  "taskCenter.progress.failed": "\u041E\u0448\u0438\u0431\u043A\u0430 {count}",
+  "taskCenter.progress.skipped": "\u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D {count}",
+  "taskCenter.title": "\u{1F4E5} **\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0437\u0430\u0434\u0430\u043D\u0438\u044F**",
+  "taskCenter.summary": "\u{1F7E2} \u0417\u0430\u043F\u0443\u0441\u043A {running}\u23F3 \u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 {waiting}\u23F8 \u041F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E {paused}",
+  "taskCenter.summaryCooling": "\u{1F9CA} \u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 {count}",
+  "taskCenter.total": "{count} \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0435 \u0437\u0430\u0434\u0430\u0447\u0438",
+  "taskCenter.totalPaged": "\u0410\u043A\u0442\u0438\u0432\u043D\u044B\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 {count} \xB7 \u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 {page}/{totalPages}",
+  "taskCenter.item.current": "{kind} \xB7 {progress} \xB7 \u0422\u0435\u043A\u0443\u0449\u0438\u0439: {file}",
+  "taskCenter.item.state": "{kind} \xB7 {progress} \xB7 {state}",
+  "taskCenter.openHint": "\u041A\u043E\u0441\u043D\u0438\u0442\u0435\u0441\u044C \u043D\u043E\u043C\u0435\u0440\u0430, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u043F\u043E\u0434\u0440\u043E\u0431\u043D\u043E\u0441\u0442\u0438 \u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u044F\u0442\u044C \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0435\u0439.",
+  "taskCenter.button.previous": "\u25C0\uFE0F \u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0438\u0439",
+  "taskCenter.button.refresh": "\u{1F504} \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C",
+  "taskCenter.button.next": "\u0414\u0430\u043B\u044C\u0448\u0435 \u25B6\uFE0F",
+  "taskCenter.button.start": "\u25B6\uFE0F \u0420\u0430\u0441\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043F\u0440\u0438\u043E\u0440\u0438\u0442\u0435\u0442\u044B",
+  "taskCenter.button.pause": "\u23F8 \u041F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0437\u0430\u0434\u0430\u0447\u0443",
+  "taskCenter.button.resume": "\u25B6\uFE0F \u0420\u0435\u0437\u044E\u043C\u0435",
+  "taskCenter.button.undoPause": "\u25B6\uFE0F \u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0430\u0439\u0442\u0435 \u0431\u0435\u0436\u0430\u0442\u044C",
+  "taskCenter.button.retry": "\u{1F504} \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C \u043F\u043E\u043F\u044B\u0442\u043A\u0443",
+  "taskCenter.button.cancel": "\u{1F6D1} \u041E\u0442\u043C\u0435\u043D\u0430",
+  "taskCenter.button.backList": "\u21A9\uFE0F \u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u043A \u0437\u0430\u0434\u0430\u0447\u0430\u043C",
+  "taskCenter.button.confirmCancel": "\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0443",
+  "taskCenter.button.backDetail": "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u043A \u0434\u0435\u0442\u0430\u043B\u044F\u043C",
+  "taskCenter.untitled": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0431\u0435\u0437 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044F",
+  "taskCenter.detail.type": "\u0422\u0438\u043F: {value}",
+  "taskCenter.detail.source": "\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {value}",
+  "taskCenter.detail.progress": "\u041F\u0440\u043E\u0433\u0440\u0435\u0441\u0441: {value}",
+  "taskCenter.detail.currentFile": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u0444\u0430\u0439\u043B: {value}",
+  "taskCenter.detail.targetFolder": "\u041C\u0435\u0441\u0442\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: {value}.",
+  "taskCenter.detail.reason": "\u041F\u0440\u0438\u0447\u0438\u043D\u0430: {value}",
+  "taskCenter.detail.created": "\u0421\u043E\u0437\u0434\u0430\u043D\u043E: {value}",
+  "taskCenter.detail.updated": "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u044F\u044F \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0441\u0442\u044C: {value}",
+  "taskCenter.detail.id": "\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u0437\u0430\u0434\u0430\u0447\u0438: {value}",
+  "taskCenter.protection.retryAt": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u0438\u0442 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u0443\u044E \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0443 \u043F\u043E\u0441\u043B\u0435 {value} \u0438 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442 \u0440\u0430\u0431\u043E\u0442\u0443.",
+  "taskCenter.protection.recheck": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u0440\u043E\u0432\u0435\u0440\u044F\u0435\u0442 \u043A\u0430\u0436\u0434\u044B\u0435 {count} \u0441\u0435\u043A\u0443\u043D\u0434 \u0438 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u044F\u0435\u0442 \u0440\u0430\u0431\u043E\u0442\u0443, \u043A\u043E\u0433\u0434\u0430 \u043F\u043E\u0437\u0432\u043E\u043B\u044F\u044E\u0442 \u0443\u0441\u043B\u043E\u0432\u0438\u044F.",
+  "taskCenter.protection.autoResume": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0443 \u0438 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442 \u0440\u0430\u0431\u043E\u0442\u0443, \u043A\u043E\u0433\u0434\u0430 \u043F\u043E\u0437\u0432\u043E\u043B\u044F\u0442 \u0443\u0441\u043B\u043E\u0432\u0438\u044F.",
+  "taskCenter.protection.manual": "\u042D\u0442\u043E \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u043D\u0435 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438. \u0423\u0441\u0442\u0440\u0430\u043D\u0438\u0442\u0435 \u043F\u0440\u0438\u0447\u0438\u043D\u0443 \u0438 \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443.",
+  "taskCenter.protection.paused": "\u0417\u0430\u0449\u0438\u0442\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u044B \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438; {recovery}",
+  "taskCenter.note.pausing": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u044F \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0444\u0430\u0439\u043B\u0430.",
+  "taskCenter.note.failed": "\u042D\u0442\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F. \u041A\u0430\u043A \u0442\u043E\u043B\u044C\u043A\u043E \u0432\u043D\u0435\u0448\u043D\u0438\u0435 \u0437\u0430\u043F\u0438\u0441\u0438 \u0431\u0443\u0434\u0443\u0442 \u0441\u043E\u0433\u043B\u0430\u0441\u043E\u0432\u0430\u043D\u044B, \u0432\u044B \u0441\u043C\u043E\u0436\u0435\u0442\u0435 \u0441\u043D\u043E\u0432\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0443.",
+  "taskCenter.note.start": "\xAB\u041F\u0440\u0438\u043E\u0440\u0438\u0442\u0435\u0442\xBB \u043F\u0435\u0440\u0435\u043C\u0435\u0449\u0430\u0435\u0442 \u044D\u0442\u0443 \u0437\u0430\u0434\u0430\u0447\u0443 \u0432 \u043D\u0430\u0447\u0430\u043B\u043E \u043E\u0447\u0435\u0440\u0435\u0434\u0438 \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u044F, \u043D\u0435 \u043F\u0440\u0435\u0440\u044B\u0432\u0430\u044F \u0442\u0435\u043A\u0443\u0449\u0443\u044E \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0443.",
+  "taskCenter.note.pause": "\u041F\u0440\u0438 \u043F\u0430\u0443\u0437\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0430\u0435\u0442\u0441\u044F \u0442\u0435\u043A\u0443\u0449\u0438\u0439 \u0444\u0430\u0439\u043B, \u0430 \u0437\u0430\u0442\u0435\u043C \u043F\u0440\u0435\u043A\u0440\u0430\u0449\u0430\u0435\u0442\u0441\u044F \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u043F\u043E\u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0445 \u0444\u0430\u0439\u043B\u043E\u0432 \u0432 \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0435.",
+  "taskCenter.cancel.title": "\u26A0\uFE0F **\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u044D\u0442\u043E \u0437\u0430\u0434\u0430\u043D\u0438\u0435?**",
+  "taskCenter.cancel.activeWarning": "\u0410\u043A\u0442\u0438\u0432\u043D\u0430\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0431\u0443\u0434\u0435\u0442 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430, \u0430 \u0435\u0435 \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0439 \u0444\u0430\u0439\u043B \u0431\u0443\u0434\u0435\u0442 \u0443\u0434\u0430\u043B\u0435\u043D. \u041E\u0436\u0438\u0434\u0430\u044E\u0449\u0438\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E \u043F\u043E\u043A\u0438\u043D\u0443\u0442 \u043E\u0447\u0435\u0440\u0435\u0434\u044C.",
+  "taskCenter.cancel.waitingWarning": "\u041E\u0436\u0438\u0434\u0430\u044E\u0449\u0438\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E \u043F\u043E\u043A\u0438\u043D\u0443\u0442 \u043E\u0447\u0435\u0440\u0435\u0434\u044C.",
+  "taskCenter.cancel.unaffected": "\u0414\u0440\u0443\u0433\u0438\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0431\u0443\u0434\u0443\u0442 \u0437\u0430\u0442\u0440\u043E\u043D\u0443\u0442\u044B.",
+  "taskCenter.stage.waiting": "\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 \u043D\u0430\u0447\u0430\u043B\u0430",
+  "taskCenter.stage.recovering": "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u043E\u0441\u043B\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438",
+  "taskCenter.stage.downloading": "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0438\u0441\u0445\u043E\u0434\u043D\u043E\u0433\u043E \u0444\u0430\u0439\u043B\u0430",
+  "taskCenter.stage.uploading": "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0432 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435",
+  "taskCenter.stage.processing": "\u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435",
+  "taskCenter.defaultAccount": "\u0423\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "taskCenter.cooldown.storageLimit": "\u0414\u043E\u0441\u0442\u0438\u0433\u043D\u0443\u0442 \u0434\u043D\u0435\u0432\u043D\u043E\u0439 \u043B\u0438\u043C\u0438\u0442 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u043D\u0430 Google \u0414\u0438\u0441\u043A",
+  "taskCenter.cooldown.floodWait": "\u041E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0430 \u0447\u0430\u0441\u0442\u043E\u0442\u0430 \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432 Telegram (FloodWait)",
+  "taskCenter.cooldown.autoResume": "{cause}; \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0443 \u0438 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442 \u0440\u0430\u0431\u043E\u0442\u0443",
+  "taskCenter.cooldown.autoResumeAt": "{cause}; \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u043E\u0435 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u043E\u0441\u043B\u0435 {time}",
+  "taskCenter.cooldown.system": "\u0412\u0440\u0435\u043C\u044F \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F \u0441\u0438\u0441\u0442\u0435\u043C\u044B",
+  "taskCenter.reason.userPaused": "\u041F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u043C",
+  "status.none": "\u041D\u0438\u043A\u0442\u043E",
+  "status.redacted": "[\u043E\u0442\u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u043E]",
+  "status.state.healthy": "\u0417\u0434\u043E\u0440\u043E\u0432\u044B\u0439",
+  "status.state.running": "\u0411\u0435\u0433",
+  "status.state.connected": "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043E",
+  "status.state.disabled": "\u041D\u0435\u043F\u043E\u043B\u043D\u043E\u0446\u0435\u043D\u043D\u044B\u0439",
+  "status.state.expired": "\u0421\u0440\u043E\u043A \u0441\u0435\u0430\u043D\u0441\u0430 \u0438\u0441\u0442\u0435\u043A",
+  "status.state.failed": "\u041E\u0448\u0438\u0431\u043A\u0430",
+  "status.state.unknown": "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439",
+  "status.state.cooldown": "\u041E\u0445\u043B\u0430\u0436\u0434\u0435\u043D\u0438\u0435",
+  "status.title": "\u{1FA7A} **\u0414\u0438\u0430\u0433\u043D\u043E\u0441\u0442\u0438\u043A\u0430 TG Vault**",
+  "status.requestId": "\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u0437\u0430\u043F\u0440\u043E\u0441\u0430: {requestId}",
+  "status.degraded": "(\u0434\u0435\u0433\u0440\u0430\u0434\u0438\u0440\u043E\u0432\u0430\u043B)",
+  "status.bot": "\u0411\u043E\u0442: {status}{degraded} \xB7 \u041F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0435 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435: {reconnectCount}",
+  "status.userClient": "\u0417\u0430\u0433\u0440\u0443\u0437\u0447\u0438\u043A \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0430: {status}{username}",
+  "status.accountRecovery": "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0430: {action}",
+  "status.storage": "\u0422\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435: {provider} \xB7 {accountName}",
+  "status.probe": "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0441\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u044F: {status}",
+  "status.recoveryTime": "\u0412\u0440\u0435\u043C\u044F \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F: {time}",
+  "status.storageError": "\u041E\u0448\u0438\u0431\u043A\u0430 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: {error}.",
+  "status.disk": "\u0412\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0439 \u0434\u0438\u0441\u043A: {free} \u0441\u0432\u043E\u0431\u043E\u0434\u0435\u043D / {total} \xB7 {usedPercent}% \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D.",
+  "status.queue": "\u041E\u0447\u0435\u0440\u0435\u0434\u044C: {active} \u0430\u043A\u0442\u0438\u0432\u0435\u043D \xB7 \u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 {pending} \xB7 \u041E\u0448\u0438\u0431\u043A\u0430 {failed}{paused}",
+  "status.queuePaused": "\xB7 \u043F\u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D \u043D\u0430 \u043F\u0430\u0443\u0437\u0443",
+  "status.subscriptions": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0438: {enabled} \u0432\u043A\u043B\u044E\u0447\u0435\u043D \xB7 \u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0435 \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435: {lastScan}",
+  "status.subscriptionError": "\u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438: {error}.",
+  "status.reconciliation": "\u0421\u043E\u0433\u043B\u0430\u0441\u043E\u0432\u0430\u043D\u0438\u0435: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F {pending} \xB7 \u0414\u043B\u044F {operatorRequired} \u0442\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u043E\u043F\u0435\u0440\u0430\u0442\u043E\u0440",
+  "status.advice": "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0430\u0446\u0438\u044F: {action}",
+  "status.defaultAdvice": "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0430\u0446\u0438\u044F: \u0435\u0441\u043B\u0438 \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442 \u043D\u0435\u0440\u0430\u0431\u043E\u0442\u043E\u0441\u043F\u043E\u0441\u043E\u0431\u0435\u043D, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u0437\u0430\u043F\u0440\u043E\u0441\u0430, \u0447\u0442\u043E\u0431\u044B \u043D\u0430\u0439\u0442\u0438 \u0435\u0433\u043E \u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u0436\u0443\u0440\u043D\u0430\u043B\u044B.",
+  "path.preview": "\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u0435\u0442\u0441\u044F \u0432: {folder}/\u0438\u043C\u044F_\u0444\u0430\u0439\u043B\u0430 (\u043F\u0430\u043F\u043A\u0430 \u0441 \u0438\u043C\u0435\u043D\u0435\u043C \u043A\u0430\u043D\u0430\u043B\u0430 \u0438\u043B\u0438 \u0442\u0438\u043F\u043E\u043C \u0444\u0430\u0439\u043B\u0430 \u043D\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0435\u0442\u0441\u044F)",
+  "path.prompt.onceTitle": "\u{1F4CC} **\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u0430\u043F\u043A\u0443 \u0434\u043B\u044F \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438**",
+  "path.prompt.sessionTitle": "\u{1F4CD} **\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u0430\u043F\u043A\u0443 \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430**",
+  "path.prompt.sendFolder": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u0430\u043F\u043A\u0438:",
+  "path.prompt.onceExample": "\u041F\u0440\u0438\u043C\u0435\u0440: `PIXIV/DailyTop50`",
+  "path.prompt.sessionExample": "\u041F\u0440\u0438\u043C\u0435\u0440: `\u0410\u043B\u044C\u0431\u043E\u043C\u044B/2026-07`",
+  "path.prompt.recent": "\u041D\u0435\u0434\u0430\u0432\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u043F\u0430\u043F\u043A\u0438:",
+  "path.prompt.onceNote": "\u041F\u0440\u0438\u043C\u0435\u0447\u0430\u043D\u0438\u0435. \u042D\u0442\u043E \u043E\u0442\u043D\u043E\u0441\u0438\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043A \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u043C\u0443 \u0444\u0430\u0439\u043B\u0443, \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u0432\u0445\u043E\u0434\u0438\u0442 \u0432 \u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u043F\u0440\u043E\u0446\u0435\u0441\u0441 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
+  "path.prompt.sessionNote": "\u041F\u0440\u0438\u043C\u0435\u0447\u0430\u043D\u0438\u0435. \u042D\u0442\u043E \u043E\u0442\u043D\u043E\u0441\u0438\u0442\u0441\u044F \u043A \u043F\u043E\u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u043C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430\u043C \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435, \u043F\u043E\u043A\u0430 \u0432\u044B \u043D\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u0435 `/pc` \u0438\u043B\u0438 \u043D\u0435 \u043D\u0430\u0436\u043C\u0435\u0442\u0435 \xAB\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C\xBB.",
+  "path.prompt.cancel": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438 \u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043A.",
+  "path.state.current": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u043F\u0443\u043D\u043A\u0442 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F: {value}.",
+  "path.state.custom": "{folder} (\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u0430\u044F \u043F\u0430\u043F\u043A\u0430)",
+  "path.state.automatic": "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044F",
+  "path.state.defaultExample": "\u041F\u0440\u0438\u043C\u0435\u0440 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E: `telegram/resources/images`",
+  "path.state.once": "\u{1F4CC} \u041F\u0430\u043F\u043A\u0430 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438: {value}.",
+  "path.state.session": "\u{1F4CD} \u041F\u0430\u043F\u043A\u0430 \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430: {value}",
+  "path.state.unset": "\u041D\u0435 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E",
+  "path.button.setOnce": "\u{1F4CC} \u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0443\u044E \u043F\u0430\u043F\u043A\u0443",
+  "path.button.setSession": "\u{1F4CD} \u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u0430\u043F\u043A\u0443 \u0447\u0430\u0442\u0430",
+  "path.button.recent": "\u{1F558} \u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u043F\u0430\u043F\u043A\u0438",
+  "path.button.clear": "\u{1F9F9} \u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u0443\u044E \u043F\u0430\u043F\u043A\u0443",
+  "path.settings.title": "\u{1F4C1} **\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435**",
+  "path.settings.defaultLogicTitle": "**\u041F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u0435 \u043F\u0440\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0438 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E**",
+  "path.settings.defaultLogic": "\u0411\u0435\u0437 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u043E\u0439 \u043F\u0430\u043F\u043A\u0438 \u0444\u0430\u0439\u043B\u044B \u0441\u043E\u0440\u0442\u0438\u0440\u0443\u044E\u0442\u0441\u044F \u043F\u043E \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u0443/\u043A\u0430\u043D\u0430\u043B\u0443 \u0438 \u0442\u0438\u043F\u0443 \u0444\u0430\u0439\u043B\u0430.",
+  "path.settings.examples": "\u041F\u0440\u0438\u043C\u0435\u0440\u044B: \xABtelegram/resources/images\xBB, \xABtelegram/resources/videos\xBB.",
+  "path.settings.customLogic": "\u0412 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u043E\u0439 \u043F\u0430\u043F\u043A\u0435 \u0444\u0430\u0439\u043B\u044B \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u044E\u0442\u0441\u044F \u043D\u0435\u043F\u043E\u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0435\u043D\u043D\u043E \u0432 \u043D\u0435\u0439 \u0431\u0435\u0437 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0438\u044F \u043F\u0430\u043F\u043E\u043A \u0441 \u0438\u043C\u0435\u043D\u0435\u043C \u043A\u0430\u043D\u0430\u043B\u0430 \u0438\u043B\u0438 \u0442\u0438\u043F\u0430\u043C\u0438 \u0444\u0430\u0439\u043B\u043E\u0432.",
+  "path.settings.currentTitle": "**\u0422\u0435\u043A\u0443\u0449\u0438\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u0443\u0442\u0438**",
+  "path.settings.choose": "\u{1F447} \u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043C\u0435\u0441\u0442\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F.",
+  "path.recent.title": "\u{1F558} **\u041D\u0435\u0434\u0430\u0432\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u043F\u0430\u043F\u043A\u0438**",
+  "path.recent.hint": "\u0427\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u043F\u0430\u043F\u043A\u0443, \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u0443\u044E \u043F\u0430\u043F\u043A\u0443 \u0438\u043B\u0438 \u043F\u0430\u043F\u043A\u0443 \u0447\u0430\u0442\u0430 \u0432 \xAB\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB, \u0430 \u0437\u0430\u0442\u0435\u043C \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0435\u0435 \u0438\u043C\u044F.",
+  "path.recent.empty": "\u{1F558} \u041D\u0435\u0442 \u043D\u0435\u0434\u0430\u0432\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0445 \u043F\u0430\u043F\u043E\u043A. \u041F\u0430\u043F\u043A\u0438 \u0437\u0430\u043F\u0438\u0441\u044B\u0432\u0430\u044E\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0442\u043E\u0433\u043E, \u043A\u0430\u043A \u0432\u044B \u0438\u0445 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435.",
+  "path.toast.recentSent": "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043D\u044B\u0435 \u043F\u0430\u043F\u043A\u0438",
+  "path.toast.sendFolder": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u0430\u043F\u043A\u0438 \u0438\u043B\u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438.",
+  "path.toast.updated": "\u041C\u0435\u0441\u0442\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u043E.",
+  "path.toast.cancelled": "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430 \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u044F \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.",
+  "bot.home.category.main": "\u042F\u0440\u043B\u044B\u043A\u0438",
+  "bot.home.category.files": "\u0424\u0430\u0439\u043B\u044B \u0438 \u043C\u0435\u0441\u0442\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F",
+  "bot.home.category.channels": "\u041A\u0430\u043D\u0430\u043B\u044B \u0438 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438",
+  "bot.home.category.settings": "\u0417\u0430\u0434\u0430\u0447\u0438 \u0438 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0438\u0441\u0442\u0435\u043C\u044B",
+  "bot.home.category.security": "\u0411\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C",
+  "bot.home.page": "\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 {page}/{totalPages}",
+  "bot.home.hint": "\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u044D\u0442\u0443 \u0444\u0443\u043D\u043A\u0446\u0438\u044E.",
+  "bot.home.uploadHint": "\u{1F4E4} \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043B\u0438 \u043F\u0435\u0440\u0435\u0448\u043B\u0438\u0442\u0435 \u0444\u0430\u0439\u043B \u0434\u043B\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.\n\n\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0438 \u043D\u0438\u0436\u0435 \u0434\u043B\u044F \u0437\u0430\u0434\u0430\u0447 \u0438\u043B\u0438 \u0434\u043E\u043F\u043E\u043B\u043D\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u0445 \u0444\u0443\u043D\u043A\u0446\u0438\u0439.",
+  "bot.home.logoutHint": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /logout, \u0447\u0442\u043E\u0431\u044B \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E \u043E\u0442\u043E\u0437\u0432\u0430\u0442\u044C \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044E \u0431\u043E\u0442\u0430 \u044D\u0442\u043E\u0433\u043E \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram.",
+  "bot.home.twoFactorHint": "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \xAB\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C \u0434\u0432\u0443\u0445\u0444\u0430\u043A\u0442\u043E\u0440\u043D\u0443\u044E \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044E\xBB \u0432 \u043A\u043E\u043C\u0430\u043D\u0434\u043D\u043E\u043C \u043C\u0435\u043D\u044E Telegram.",
+  "bot.home.prompt.oncePath": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0435\u0435 \u0434\u043B\u044F \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
+  "bot.home.prompt.sessionPath": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0430\u0442\u044C \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0435\u0435 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435.",
+  "bot.home.prompt.delete": "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0430\u0439\u043B \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u041F\u043E\u0438\u0441\u043A \u0444\u0430\u0439\u043B\u043E\u0432 \u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0438\u043C\u0438\xBB, \u0437\u0430\u0442\u0435\u043C \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u0423\u0434\u0430\u043B\u0438\u0442\u044C\xBB.",
+  "bot.home.prompt.cancelTask": "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0437\u0430\u0434\u0430\u0447\u0443, \u043A\u043E\u0442\u043E\u0440\u0443\u044E \u043D\u0443\u0436\u043D\u043E \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C, \u0432 \u0446\u0435\u043D\u0442\u0440\u0435 \u0437\u0430\u0434\u0430\u0447.",
+  "bot.home.prompt.unsubscribe": "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443, \u043A\u043E\u0442\u043E\u0440\u0443\u044E \u0445\u043E\u0442\u0438\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C, \u043D\u0430 \u043F\u0430\u043D\u0435\u043B\u0438 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438 \u043D\u0430 \u043A\u0430\u043D\u0430\u043B.",
+  "bot.home.followPrompt": "{description}\n\n\u0421\u043B\u0435\u0434\u0443\u0439\u0442\u0435 \u0438\u043D\u0441\u0442\u0440\u0443\u043A\u0446\u0438\u044F\u043C \u0438\u043B\u0438 \u0432\u0435\u0440\u043D\u0438\u0442\u0435\u0441\u044C \u043A \u0440\u0430\u0437\u0434\u0435\u043B\u0443 \xAB\u0414\u043E\u043F\u043E\u043B\u043D\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u0435 \u0444\u0443\u043D\u043A\u0446\u0438\u0438\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0431\u0440\u0430\u0442\u044C \u0434\u0440\u0443\u0433\u043E\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435.",
+  "bot.home.unavailable": "\u042D\u0442\u043E\u0442 \u044F\u0440\u043B\u044B\u043A \u0432 \u043D\u0430\u0441\u0442\u043E\u044F\u0449\u0435\u0435 \u0432\u0440\u0435\u043C\u044F \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D.",
+  "bot.button.dateMode": "\u{1F5D3}\uFE0F \u0421\u043A\u0430\u0447\u0430\u0442\u044C \u043F\u043E \u0434\u0430\u0442\u0435",
+  "bot.button.tagMode": "\u{1F3F7}\uFE0F \u0421\u043A\u0430\u0447\u0430\u0442\u044C \u043F\u043E \u0442\u0435\u0433\u0443",
+  "bot.button.channelOnly": "\u0422\u043E\u043B\u044C\u043A\u043E \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0438 \u043D\u0430 \u043A\u0430\u043D\u0430\u043B\u0435",
+  "bot.button.channelComments": "\u041A\u0430\u043D\u0430\u043B + \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438",
+  "bot.button.editFolder": "\u270F\uFE0F \u0421\u043C\u0435\u043D\u0438\u0442\u044C \u043F\u0430\u043F\u043A\u0443",
+  "bot.button.clearFolder": "\u{1F9F9} \u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u043F\u0430\u043F\u043A\u0443",
+  "bot.button.unsubscribe": "\u041E\u0442\u043F\u0438\u0441\u0430\u0442\u044C\u0441\u044F",
+  "bot.button.previous": "\u25C0\uFE0F \u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0438\u0439",
+  "bot.button.next": "\u0414\u0430\u043B\u044C\u0448\u0435 \u25B6\uFE0F",
+  "bot.button.addSubscription": "\u2795 \u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443",
+  "bot.button.bestVideo": "\u041B\u0443\u0447\u0448\u0435\u0435 \u0432\u0438\u0434\u0435\u043E",
+  "bot.button.audioOnly": "\u0422\u043E\u043B\u044C\u043A\u043E \u0430\u0443\u0434\u0438\u043E",
+  "bot.wizard.title.subscription": "\u{1F4E1} **\u0423\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0430\u043C\u0438 \u043D\u0430 \u043A\u0430\u043D\u0430\u043B\u044B**",
+  "bot.wizard.title.tag": "\u{1F3F7}\uFE0F **\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435 \u0444\u0430\u0439\u043B\u043E\u0432 \u043A\u0430\u043D\u0430\u043B\u0430 \u043F\u043E \u0442\u0435\u0433\u0443**",
+  "bot.wizard.title.date": "\u{1F5D3}\uFE0F **\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0444\u0430\u0439\u043B\u044B \u043A\u0430\u043D\u0430\u043B\u043E\u0432 \u043F\u043E \u0434\u0430\u0442\u0435**",
+  "bot.wizard.title.download": "\u{1F4E6} **\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0444\u0430\u0439\u043B\u044B \u043A\u0430\u043D\u0430\u043B\u043E\u0432**",
+  "bot.wizard.mode": "{title}\n\n\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0440\u0435\u0436\u0438\u043C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438:\n\u2022 \u041F\u043E \u0434\u0430\u0442\u0435: \u0444\u0430\u0439\u043B\u044B \u0432 \u0434\u0438\u0430\u043F\u0430\u0437\u043E\u043D\u0435 \u0434\u0430\u0442.\n\u2022 \u041F\u043E \u0442\u0435\u0433\u0443: \u0444\u0430\u0439\u043B\u044B \u0441 \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0435\u043D\u043D\u044B\u043C \u0442\u0435\u0433\u043E\u043C.\n\n\u{1F447} \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C.",
+  "bot.wizard.source": "{title}\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u043A\u0430\u043D\u0430\u043B\u0430 \u0438\u043B\u0438 \u0441\u0441\u044B\u043B\u043A\u0443.\n\u041F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u044E\u0442\u0441\u044F \u043E\u0431\u0449\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0435 \u043A\u0430\u043D\u0430\u043B\u044B, \u0447\u0430\u0441\u0442\u043D\u044B\u0435 \u0441\u0441\u044B\u043B\u043A\u0438 \u0434\u043B\u044F \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0439 \u0438 \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u043D\u044B\u0435 \u043A\u0430\u043D\u0430\u043B\u044B.\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB \u0434\u043B\u044F \u0432\u044B\u0445\u043E\u0434\u0430.",
+  "bot.wizard.path": "{title}\n\u{1F4CD} \u041A\u0430\u043D\u0430\u043B: {source}\n\n\u0425\u043E\u0442\u0438\u0442\u0435 \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u0443\u044E \u043F\u0430\u043F\u043A\u0443 \u0434\u043B\u044F \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0434\u043B\u044F {scope}?\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 \xABchannel-backup/wallpapers\xBB.\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 `skip`, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u043F\u0440\u0430\u0432\u0438\u043B\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E.\n\n\u042D\u0442\u0430 \u043F\u0430\u043F\u043A\u0430 \u043F\u0440\u0438\u043C\u0435\u043D\u0438\u043C\u0430 \u0442\u043E\u043B\u044C\u043A\u043E \u043A {scope}; \u044D\u0442\u043E \u043D\u0435 \u043C\u0435\u043D\u044F\u0435\u0442 /path_rules \u0438\u043B\u0438 \u0434\u0440\u0443\u0433\u0438\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB \u0434\u043B\u044F \u0432\u044B\u0445\u043E\u0434\u0430.",
+  "bot.wizard.scope.subscription": "\u044D\u0442\u0430 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0430",
+  "bot.wizard.scope.newSubscription": "\u044D\u0442\u0430 \u043D\u043E\u0432\u0430\u044F \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0430",
+  "bot.wizard.scope.download": "\u044D\u0442\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438",
+  "bot.wizard.comments": "{title}\n\u{1F4CD} \u041A\u0430\u043D\u0430\u043B: {source}\n{folder}\n\n\u0422\u0430\u043A\u0436\u0435 \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0444\u0430\u0439\u043B\u044B \u0432 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u044F\u0445 \u043F\u043E\u0434 \u043F\u043E\u0441\u0442\u0430\u043C\u0438 \u043A\u0430\u043D\u0430\u043B\u0430?\n\n\u041F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u044D\u0442\u043E \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043E. \u0415\u0441\u043B\u0438 \u044D\u0442\u043E\u0442 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u0432\u043A\u043B\u044E\u0447\u0435\u043D, \u0434\u043B\u044F \u043A\u0430\u0436\u0434\u043E\u0433\u043E \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u0441\u043A\u0430\u043D\u0438\u0440\u0443\u0435\u0442\u0441\u044F \u0434\u043E \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0435\u0432 {count}.\n\u0422\u0435\u043A\u0441\u0442\u043E\u0432\u044B\u0435 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438, \u043E\u0431\u044B\u0447\u043D\u044B\u0435 \u0441\u0441\u044B\u043B\u043A\u0438 \u0438 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u0431\u0435\u0437 \u0444\u0430\u0439\u043B\u043E\u0432 \u0438\u0433\u043D\u043E\u0440\u0438\u0440\u0443\u044E\u0442\u0441\u044F.\n\n\u{1F447} \u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435, \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043B\u0438 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438.",
+  "bot.wizard.folder.custom": "\u{1F4C1} \u041F\u0430\u043F\u043A\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: {folder}.",
+  "bot.wizard.folder.default": "\u{1F4C1} \u041F\u0440\u0430\u0432\u0438\u043B\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044F",
+  "bot.wizard.tag": "{title}\n\u{1F4CD} \u041A\u0430\u043D\u0430\u043B: {source}\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0442\u0435\u0433 \u0434\u043B\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 #wallpaper \u0438\u043B\u0438 Wallpaper.\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB \u0434\u043B\u044F \u0432\u044B\u0445\u043E\u0434\u0430.",
+  "bot.wizard.startDate": "{title}\n\u{1F4CD} \u041A\u0430\u043D\u0430\u043B: {source}\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0434\u0430\u0442\u0443 \u043D\u0430\u0447\u0430\u043B\u0430 \u0432 \u0444\u043E\u0440\u043C\u0430\u0442\u0435 \xAB\u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414\xBB, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 \xAB01.06.2026\xBB.\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB \u0434\u043B\u044F \u0432\u044B\u0445\u043E\u0434\u0430.",
+  "bot.wizard.endDate": "{title}\n\u{1F4CD} \u041A\u0430\u043D\u0430\u043B: {source}\n\u{1F5D3}\uFE0F \u0414\u0430\u0442\u0430 \u043D\u0430\u0447\u0430\u043B\u0430: {startDate}.\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0434\u0430\u0442\u0443 \u043E\u043A\u043E\u043D\u0447\u0430\u043D\u0438\u044F \u0432 \u0444\u043E\u0440\u043C\u0430\u0442\u0435 \xAB\u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414\xBB, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 \xAB27 \u0438\u044E\u043D\u044F 2026 \u0433.\xBB.\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB \u0434\u043B\u044F \u0432\u044B\u0445\u043E\u0434\u0430.",
+  "bot.wizard.expired": "\u231B \u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u043C\u0430\u0441\u0442\u0435\u0440\u0430 \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0435\u0433\u043E \u0441\u043D\u043E\u0432\u0430.",
+  "bot.wizard.cancelled": "\u041C\u0430\u0441\u0442\u0435\u0440 \u043A\u0430\u043D\u0430\u043B\u043E\u0432 Telegram \u043E\u0442\u043C\u0435\u043D\u0435\u043D.",
+  "bot.wizard.invalidMode": "\u274C \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u0434\u0430\u0442\u0443\xBB \u0438\u043B\u0438 \xAB\u0442\u0435\u0433\xBB \u0438\u043B\u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438.",
+  "bot.wizard.invalidComments": "\u274C \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u0432\u043A\u043B\xBB \u0438\u043B\u0438 \xAB\u0432\u044B\u043A\u043B\xBB \u0438\u043B\u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0431\u0440\u0430\u0442\u044C, \u0432\u043A\u043B\u044E\u0447\u0430\u0442\u044C \u043B\u0438 \u0444\u0430\u0439\u043B\u044B \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0435\u0432.",
+  "bot.wizard.confirmInput": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xABconfirm\xBB, \u0447\u0442\u043E\u0431\u044B \u043D\u0430\u0447\u0430\u0442\u044C, \u0438\u043B\u0438 \xABCancel\xBB, \u0447\u0442\u043E\u0431\u044B \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C.",
+  "bot.wizard.invalidDate": "\u274C \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 {example}.",
+  "bot.wizard.invalidRange": "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u0434\u0438\u0430\u043F\u0430\u0437\u043E\u043D \u0434\u0430\u0442.",
+  "bot.wizard.callbackExpired": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u043C\u0430\u0441\u0442\u0435\u0440\u0430 \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0435\u0433\u043E \u0441\u043D\u043E\u0432\u0430.",
+  "bot.wizard.downloadCancelled": "\u041C\u0430\u0441\u0442\u0435\u0440 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u043A\u0430\u043D\u0430\u043B\u043E\u0432 \u043E\u0442\u043C\u0435\u043D\u0435\u043D.",
+  "bot.wizard.modeDate": "\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u043F\u043E \u0434\u0430\u0442\u0435",
+  "bot.wizard.modeTag": "\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u043F\u043E \u0442\u0435\u0433\u0443",
+  "bot.wizard.commentsOn": "\u0424\u0430\u0439\u043B\u044B \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0435\u0432 \u0431\u0443\u0434\u0443\u0442 \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u044B",
+  "bot.wizard.commentsOff": "\u0411\u0443\u0434\u0443\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u044B \u0442\u043E\u043B\u044C\u043A\u043E \u0444\u0430\u0439\u043B\u044B \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0439 \u043A\u0430\u043D\u0430\u043B\u0430.",
+  "bot.subscription.confirmTitle": "\u26A0\uFE0F **\u041E\u0442\u043F\u0438\u0441\u0430\u0442\u044C\u0441\u044F \u043E\u0442 \u044D\u0442\u043E\u0433\u043E \u043A\u0430\u043D\u0430\u043B\u0430?**",
+  "bot.subscription.source": "\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {source}",
+  "bot.subscription.folder": "\u0412\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u0430\u044F \u043F\u0430\u043F\u043A\u0430: {folder}.",
+  "bot.subscription.defaultFolder": "\u041F\u0440\u0430\u0432\u0438\u043B\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044F",
+  "bot.subscription.position": "\u041F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0438: \u043F\u043E\u0441\u043B\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F {messageId}",
+  "bot.subscription.panelTitle": "\u{1F4E1} **\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0438 \u043D\u0430 \u043A\u0430\u043D\u0430\u043B\u044B**",
+  "bot.subscription.page": "\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 {page}/{totalPages} \xB7 \u0412\u0441\u0435\u0433\u043E {count}",
+  "bot.subscription.empty": "\u041D\u0438\u043A\u0430\u043A\u0438\u0445 \u043F\u043E\u0434\u043F\u0438\u0441\u043E\u043A.",
+  "bot.subscription.manageHint": "\u{1F447} \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0443\u043F\u0440\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u043E\u0439 \u0438\u043B\u0438 \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0435\u0435.",
+  "bot.subscription.action.sync": "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0435\u0439\u0447\u0430\u0441",
+  "bot.subscription.action.pause": "\u041F\u0430\u0443\u0437\u0430",
+  "bot.subscription.action.resume": "\u0420\u0435\u0437\u044E\u043C\u0435",
+  "bot.subscription.action.target": "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u0446\u0435\u043B\u044C",
+  "bot.subscription.action.fromNow": "\u0421 \u044D\u0442\u043E\u0433\u043E \u043C\u043E\u043C\u0435\u043D\u0442\u0430",
+  "bot.subscription.action.backfill": "\u0417\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 \u043F\u043E \u0434\u0430\u0442\u0435",
+  "bot.subscription.action.result": "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442",
+  "bot.subscription.action.retry": "\u041F\u043E\u0432\u0442\u043E\u0440\u043D\u0430\u044F \u043F\u043E\u043F\u044B\u0442\u043A\u0430 \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C",
+  "bot.subscription.followSystemDefault": "\u0421\u043B\u0435\u0434\u043E\u0432\u0430\u0442\u044C \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u043C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u043C \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "bot.subscription.target": "\u{1F3AF} \u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435: {target}.",
+  "bot.subscription.lastScan": "\u{1F50E} \u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0435 \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435: {time}",
+  "bot.subscription.nextScan": "\u23ED\uFE0F \u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0441\u043A\u0430\u043D: \u043E {time}",
+  "bot.subscription.notScanned": "\u{1F50E} \u0415\u0449\u0435 \u043D\u0435 \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u043E",
+  "bot.subscription.lastResult": "\u{1F4CA} \u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442: {status}, \u043D\u0430\u0439\u0434\u0435\u043D {found}, \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C {failed}.",
+  "bot.subscription.disabledReason": "\u26A0\uFE0F {reason}",
+  "bot.subscription.error": "\u26A0\uFE0F \u041E\u0448\u0438\u0431\u043A\u0430: {error}.",
+  "bot.subscription.result.recorded": "\u0417\u0430\u043F\u0438\u0441\u0430\u043D\u043E",
+  "bot.subscription.result.completed": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043D\u044B\u0439",
+  "bot.subscription.result.partial": "\u0427\u0430\u0441\u0442\u0438\u0447\u043D\u043E \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E",
+  "bot.subscription.result.running": "\u0411\u0435\u0433",
+  "bot.subscription.result.paused": "\u041F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E",
+  "bot.subscription.confirmBody": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043E\u0441\u0442\u0430\u043D\u0430\u0432\u043B\u0438\u0432\u0430\u0435\u0442 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0443\u044E \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044E \u0438 \u0443\u0434\u0430\u043B\u044F\u0435\u0442 \u044D\u0442\u043E\u0442 \u044D\u043B\u0435\u043C\u0435\u043D\u0442 \u0438\u0437 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u043E\u0439. \u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435 \u0443\u0434\u0430\u043B\u044F\u044E\u0442\u0441\u044F.",
+  "bot.subscription.confirmButton": "\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u043E\u0442\u043F\u0438\u0441\u043A\u0443",
+  "bot.subscription.backButton": "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u043A \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0430\u043C",
+  "bot.callback.cancelled": "\u041E\u0442\u043C\u0435\u043D\u0435\u043D\u043E",
+  "bot.callback.expired": "\u0418\u0441\u0442\u0435\u043A\u0448\u0438\u0439",
+  "bot.callback.submitted": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430",
+  "bot.callback.failed": "\u041E\u043F\u0435\u0440\u0430\u0446\u0438\u044F \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C: {error}",
+  "bot.legacy.pausedTitle": "\u23F8\uFE0F **\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430**",
+  "bot.legacy.floodWaitTitle": "\u23F3 **\u0412\u0440\u0435\u043C\u044F \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F Telegram FloodWait**",
+  "bot.legacy.storageCooldownTitle": "\u23F8\uFE0F **\u0412\u0440\u0435\u043C\u044F \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F \u0437\u0430\u0449\u0438\u0442\u044B \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430**",
+  "bot.legacy.cancelledTitle": "\u{1F6D1} **\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430**",
+  "bot.legacy.completedTitle": "\u2705 **\u0417\u0430\u0434\u0430\u043D\u0438\u0435 \u043A\u0430\u043D\u0430\u043B\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043E**",
+  "bot.legacy.runningTitle": "\u{1F50E} **\u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F**",
+  "bot.legacy.controlsPaused": "\u0412\u044B \u043C\u043E\u0436\u0435\u0442\u0435 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0438\u043B\u0438 \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0435\u0433\u043E \u0432 \u0446\u0435\u043D\u0442\u0440\u0435 \u0437\u0430\u0434\u0430\u0447.",
+  "bot.legacy.controlsActive": "\u0412\u044B \u043C\u043E\u0436\u0435\u0442\u0435 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0438\u043B\u0438 \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0435\u0433\u043E \u0432 \u0446\u0435\u043D\u0442\u0440\u0435 \u0437\u0430\u0434\u0430\u0447.",
+  "bot.legacy.job": "\u{1F194} \u0420\u0430\u0431\u043E\u0442\u0430: {jobId}",
+  "bot.legacy.source": "\u{1F4CD} \u041A\u0430\u043D\u0430\u043B: {source}",
+  "bot.legacy.scan": "\u{1F50E} \u0421\u043A\u0430\u043D: {status}",
+  "bot.legacy.channelScan": "\u{1F4C4} \u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u043D\u0430 \u043A\u0430\u043D\u0430\u043B\u0435: \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u043E {scanned}, \u043D\u0430\u0439\u0434\u0435\u043D\u044B \u0444\u0430\u0439\u043B\u044B {found}.",
+  "bot.legacy.commentScan": "\u{1F4AC} \u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438: \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043B {scanned}, \u043D\u0430\u0448\u0435\u043B \u0444\u0430\u0439\u043B\u044B {found}.",
+  "bot.legacy.download": "\u2B07\uFE0F \u0421\u043A\u0430\u0447\u0430\u0442\u044C: {status}",
+  "bot.legacy.counts": "\u2705 \u0423\u0441\u043F\u0435\u0448\u043D\u043E \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D {completed}\u23F3 \u041E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F {pending}\u{1F504} \u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 {downloading}\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C {failed}\u23ED \u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D {skipped}",
+  "bot.legacy.floodWait": "\u23F3 Telegram Flood\u041F\u043E\u0434\u043E\u0436\u0434\u0438\u0442\u0435, \u043F\u043E\u043A\u0430: {until}",
+  "bot.legacy.storageCooldown": "\u23F8\uFE0F \u0417\u0430\u0449\u0438\u0442\u0430 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0434\u043E: {until}",
+  "bot.legacy.scanComplete": "\u{1F50E} **\u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E; \u043D\u0430\u0447\u0430\u043B\u043E \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438**",
+  "bot.legacy.channelScanned": "\u{1F4C4} \u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u043D\u0430 \u043A\u0430\u043D\u0430\u043B\u0435: \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u043E {scanned}, \u043D\u0430\u0439\u0434\u0435\u043D\u044B \u0444\u0430\u0439\u043B\u044B {found}.",
+  "bot.legacy.commentsScanned": "\u{1F4AC} \u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438: \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043B {scanned}, \u043D\u0430\u0448\u0435\u043B \u0444\u0430\u0439\u043B\u044B {found} (\u0434\u043E {max} \u0437\u0430 \u043F\u043E\u0441\u0442)",
+  "bot.legacy.commentsDisabled": "\u{1F4AC} \u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438: \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u044B",
+  "bot.legacy.pending": "\u{1F4E6} \u041E\u0436\u0438\u0434\u0430\u0435\u043C\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438: \u0444\u0430\u0439\u043B\u044B {count}.",
+  "bot.legacy.queueing": "\u23F3 \u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0444\u0430\u0439\u043B\u043E\u0432 \u0432 \u043E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438. \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 /tasks \u0434\u043B\u044F \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430 \u0444\u043E\u043D\u043E\u0432\u044B\u0445 \u0437\u0430\u0434\u0430\u0447.",
+  "bot.legacy.commentLine": "\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438: \u043F\u0440\u043E\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043B {scanned}, \u043D\u0430\u0448\u0435\u043B \u0444\u0430\u0439\u043B\u044B {found}.",
+  "bot.legacy.cancelledResult": "\u{1F6D1} \u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 {mode} \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.\n\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440: {jobId}\n\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E: {successful}\n\u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E: {skipped}{commentLine}",
+  "bot.legacy.tagResult": "\u2705 \u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u043E \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0435 \u0442\u0435\u0433\u043E\u0432 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0430.\n\u0422\u0435\u0433: {tag}\n\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440: {jobId}\n\u0412 \u043E\u0447\u0435\u0440\u0435\u0434\u0438: {found}\n\u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E: {skipped}\n\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C: {failed}{commentLine}",
+  "bot.legacy.dateResult": "\u2705 \u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u043E \u0434\u0438\u0430\u043F\u0430\u0437\u043E\u043D\u0443 \u0434\u0430\u0442 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0430.\n\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440: {jobId}\n\u0412 \u043E\u0447\u0435\u0440\u0435\u0434\u0438: {found}\n\u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E: {skipped}\n\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C: {failed}{commentLine}",
+  "bot.legacy.failed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C {mode}: {error}.",
+  "bot.link.empty": "\u0412 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0438 \u043D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0433\u043E \u0434\u043B\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0444\u0430\u0439\u043B\u0430. \u0412\u043E\u0437\u043C\u043E\u0436\u043D\u043E, \u043E\u043D\u043E \u0443\u0434\u0430\u043B\u0435\u043D\u043E \u0438\u043B\u0438 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0443.",
+  "bot.legacy.emptyResult": "\u0424\u0430\u0439\u043B\u044B \u043F\u043E \u0443\u043A\u0430\u0437\u0430\u043D\u043D\u043E\u0439 \u0434\u0430\u0442\u0435 \u0438\u043B\u0438 \u0442\u0435\u0433\u0443 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B. \u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E. \u0414\u043B\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u043E\u0434\u043D\u043E\u0433\u043E \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u0432 \u043F\u0430\u043F\u043A\u0443 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435: \u0441\u0441\u044B\u043B\u043A\u0430 \u0438\u043C\u044F-\u043F\u0430\u043F\u043A\u0438. \u0418\u043C\u044F \u043F\u0430\u043F\u043A\u0438 \u043D\u0435 \u044F\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0445\u0435\u0448\u0442\u0435\u0433\u043E\u043C.",
+  "bot.link.failed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u043F\u043E \u0441\u0441\u044B\u043B\u043A\u0435: {error}",
+  "menu.tg_link": "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043F\u043E \u0441\u0441\u044B\u043B\u043A\u0435 / \u043F\u0430\u043F\u043A\u0430 \u0438\u043B\u0438 \u0434\u0430\u0442\u0430",
+  "menu.ps": "\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u043F\u043E\u0441\u0442\u043E\u044F\u043D\u043D\u0443\u044E \u043F\u0430\u043F\u043A\u0443 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438",
+  "bot.link.help": "\u{1F517} \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435 \u0438 \u043D\u0435\u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E\u0435 \u0438\u043C\u044F \u043F\u0430\u043F\u043A\u0438.\n\nhttps://t.me/lspyanxi/4375 \u0412\u0438\u0434\u0435\u043E\n\u2192 \u043F\u043E\u0434\u043F\u0430\u043F\u043A\u0430 \u0412\u0438\u0434\u0435\u043E/\n\nhttps://t.me/lspyanxi/4375 2026-09-09\n\u2192 \u043F\u043E\u0434\u043F\u0430\u043F\u043A\u0430 2026-09-09/\n\n\u0411\u0435\u0437 \u0438\u043C\u0435\u043D\u0438 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u0442\u0435\u043A\u0443\u0449\u0430\u044F \u0434\u0430\u0442\u0430 \u0432 \u0447\u0430\u0441\u043E\u0432\u043E\u043C \u043F\u043E\u044F\u0441\u0435 Asia/Shanghai.\n\u0422\u0430\u043A\u0436\u0435: /tg_link \u0441\u0441\u044B\u043B\u043A\u0430 [\u043F\u0430\u043F\u043A\u0430].\n/ps \u2014 \u043F\u043E\u0441\u0442\u043E\u044F\u043D\u043D\u0430\u044F \u0431\u0430\u0437\u043E\u0432\u0430\u044F \u043F\u0430\u043F\u043A\u0430, /p \u2014 \u043F\u0430\u043F\u043A\u0430 \u0434\u043B\u044F \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438, /target \u2014 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435. \u0418\u043C\u044F \u043F\u0440\u0438\u043C\u0435\u043D\u044F\u0435\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043A \u044D\u0442\u043E\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0435 \u0438 \u043D\u0435 \u0444\u0438\u043B\u044C\u0442\u0440\u0443\u0435\u0442 \u0434\u0430\u0442\u0443 \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0438.",
+  "bot.legacy.confirmTag": "\u23F3 \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043E. \u0417\u0430\u043F\u0443\u0441\u043A\u0430\u0435\u043C \u0444\u043E\u043D\u043E\u0432\u043E\u0435 \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 {source} \u043D\u0430 \u043D\u0430\u043B\u0438\u0447\u0438\u0435 \u043C\u0443\u043B\u044C\u0442\u0438\u043C\u0435\u0434\u0438\u0439\u043D\u044B\u0445 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439 \u0441 \u043F\u043E\u043C\u043E\u0449\u044C\u044E {tag}\u2026",
+  "bot.legacy.confirmDate": "\u23F3 \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043E. \u0417\u0430\u043F\u0443\u0441\u043A \u0444\u043E\u043D\u043E\u0432\u043E\u0433\u043E \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u044F {source}: {startDate} \u2192 {endDate}\u2026",
+  "bot.legacy.submitFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0437\u0430\u0434\u0430\u0447\u0443: {error}.",
+  "bot.legacy.usageDate": "\u274C \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435: /tg_date @channel \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414 \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414",
+  "bot.legacy.usageTag": "\u274C \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435: /tg_tag @channel #tag",
+  "bot.auth.rateLimited": "\u23F3 \u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u0447\u0435\u0440\u0435\u0437 {seconds} \u0441\u0435\u043A\u0443\u043D\u0434.",
+  "bot.auth.pinLocked": "\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u043F\u043E\u043F\u044B\u0442\u043E\u043A \u043D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u043E\u0433\u043E \u0432\u0432\u043E\u0434\u0430 PIN-\u043A\u043E\u0434\u0430. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u0447\u0435\u0440\u0435\u0437 {seconds} \u0441\u0435\u043A\u0443\u043D\u0434.",
+  "bot.auth.pinLockedBody": "\u274C \u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u043F\u043E\u043F\u044B\u0442\u043E\u043A \u0432\u0432\u043E\u0434\u0430 \u043D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u043E\u0433\u043E PIN-\u043A\u043E\u0434\u0430. \u0417\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u043D\u0430 {seconds} \u0441\u0435\u043A\u0443\u043D\u0434.",
+  "bot.auth.pinLockedShort": "\u0412\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u0437\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043D\u043E",
+  "bot.auth.pinWrongShort": "\u041D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u044B\u0439 PIN-\u043A\u043E\u0434",
+  "bot.auth.notAllowed": "\u26D4 \u042D\u0442\u043E\u0442 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C Telegram \u043D\u0435 \u0430\u0432\u0442\u043E\u0440\u0438\u0437\u043E\u0432\u0430\u043D. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u0432 TELEGRAM_ALLOWED_USER_IDS \u0438\u043B\u0438 \u0431\u0435\u043B\u044B\u0439 \u0441\u043F\u0438\u0441\u043E\u043A \u0432 \u0432\u0435\u0431-\u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0435.",
+  "bot.auth.notAllowedShort": "\u041D\u0435\u0442 \u0432 \u0431\u0435\u043B\u043E\u043C \u0441\u043F\u0438\u0441\u043A\u0435",
+  "bot.auth.twoFactorEnabled": "\u{1F510} \u0414\u0432\u0443\u0445\u0444\u0430\u043A\u0442\u043E\u0440\u043D\u0430\u044F \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044F \u0443\u0436\u0435 \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u0430. \u0411\u043E\u0442 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0431\u0443\u0434\u0435\u0442 \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0442\u044C QR-\u043A\u043E\u0434, \u043F\u043E\u0441\u043A\u043E\u043B\u044C\u043A\u0443 \u043E\u043D \u0441\u043E\u0434\u0435\u0440\u0436\u0438\u0442 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0439 \u0441\u0435\u043A\u0440\u0435\u0442.",
+  "bot.auth.loggedOut": "\u2705 \u0410\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044F \u0431\u043E\u0442\u0430 \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u043E\u0442\u043E\u0437\u0432\u0430\u043D\u0430. \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /start \u0434\u043B\u044F \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0439 \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438.",
+  "bot.auth.logoutFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0432\u044B\u0439\u0442\u0438. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u043F\u043E\u0437\u0436\u0435.\n\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438: {operationId}",
+  "bot.notification.securityLogin": "\u{1F514} **\u0423\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0435 \u043E \u0432\u0445\u043E\u0434\u0435 \u0432 \u0441\u0438\u0441\u0442\u0435\u043C\u0443 \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438**",
+  "bot.notification.passthrough": "{message}",
+  "menu.start": "\u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C/\u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044C \u043B\u0438\u0447\u043D\u043E\u0441\u0442\u044C",
+  "menu.tasks": "\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0442\u0435\u043A\u0443\u0449\u0438\u0445 \u0437\u0430\u0434\u0430\u0447",
+  "menu.storage": "\u0421\u0442\u0430\u0442\u0443\u0441 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430/\u0443\u0434\u0430\u043B\u0438\u0442\u044C \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B",
+  "menu.path_rules": "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435 / \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u0443\u044E \u043F\u0430\u043F\u043A\u0443",
+  "menu.tg_download": "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0444\u0430\u0439\u043B\u043E\u0432 \u043A\u0430\u043D\u0430\u043B\u043E\u0432 \u043F\u043E \u0434\u0430\u0442\u0435/\u0442\u0435\u0433\u0443",
+  "menu.list": "\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0445 \u0444\u0430\u0439\u043B\u043E\u0432",
+  "menu.find": "\u041F\u043E\u0438\u0441\u043A \u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0444\u0430\u0439\u043B\u0430\u043C\u0438",
+  "menu.tg_sub": "\u0423\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u043E\u0439 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0435\u0439 \u043A\u0430\u043D\u0430\u043B\u043E\u0432",
+  "menu.storage_switch": "\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "menu.target": "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 \u0446\u0435\u043B\u0435\u0432\u043E\u0439 \u043E\u0431\u044A\u0435\u043C \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430 \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430",
+  "menu.help": "\u041F\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u043F\u043E\u043B\u043D\u0443\u044E \u0441\u043F\u0440\u0430\u0432\u043A\u0443",
+  "menu.status": "\u0414\u0438\u0430\u0433\u043D\u043E\u0441\u0442\u0438\u043A\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u044B",
+  "menu.notifications": "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439",
+  "menu.language": "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u044F\u0437\u044B\u043A \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430 \u0431\u043E\u0442\u0430",
+  "commands.auto001": "\u2699\uFE0F **\u041F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u0438\u0437\u043C \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442\u043E\u0432 Telegram**",
+  "commands.auto002": "\u0422\u0435\u043A\u0443\u0449\u0435\u0435 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E \u0447\u0430\u043D\u043A\u043E\u0432: **{value0}**",
+  "commands.auto003": "\u041A\u043E\u043D\u0442\u0440\u043E\u043B\u0438\u0440\u0443\u0435\u0442, \u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442\u043E\u0432 \u043E\u0434\u043D\u043E\u0433\u043E \u0444\u0430\u0439\u043B\u0430 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u0442\u0441\u044F \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E; \u0431\u043E\u043B\u0435\u0435 \u0432\u044B\u0441\u043E\u043A\u0438\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F \u0431\u044B\u0441\u0442\u0440\u0435\u0435, \u043D\u043E \u0441 \u0431\u043E\u043B\u044C\u0448\u0435\u0439 \u0432\u0435\u0440\u043E\u044F\u0442\u043D\u043E\u0441\u0442\u044C\u044E \u043F\u0440\u0438\u0432\u0435\u0434\u0443\u0442 \u043A \u0441\u0440\u0430\u0431\u0430\u0442\u044B\u0432\u0430\u043D\u0438\u044E \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u0439 \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438.",
+  "commands.auto004": "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F: 4 \u0437\u0430 \u0441\u0442\u0430\u0431\u0438\u043B\u044C\u043D\u043E\u0441\u0442\u044C, 8 \u0437\u0430 \u0431\u0430\u043B\u0430\u043D\u0441 \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 \u0438 \u0443\u0441\u0442\u043E\u0439\u0447\u0438\u0432\u043E\u0441\u0442\u0438; 12 \u0438\u043B\u0438 16 \u0430\u0433\u0440\u0435\u0441\u0441\u0438\u0432\u043D\u044B \u0438 \u0442\u0440\u0435\u0431\u0443\u044E\u0442 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F.",
+  "commands.auto005": "\u{1F4E6} **\u041F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u0438\u0437\u043C \u0444\u0430\u0439\u043B\u043E\u0432 Telegram**",
+  "commands.auto006": "\u041E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u0430\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0444\u0430\u0439\u043B\u043E\u0432: **{value0}**",
+  "commands.auto007": "\u0422\u0435\u043A\u0443\u0449\u0430\u044F \u043E\u0447\u0435\u0440\u0435\u0434\u044C: {value0} \u0430\u043A\u0442\u0438\u0432\u0435\u043D, {value1} \u043E\u0436\u0438\u0434\u0430\u0435\u0442.",
+  "commands.auto008": "\u041A\u043E\u043D\u0442\u0440\u043E\u043B\u0438\u0440\u0443\u0435\u0442 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E \u0444\u0430\u0439\u043B\u043E\u0432, \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043C\u044B\u0445 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E.",
+  "commands.auto009": "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F: 1 \u0434\u043B\u044F \u043C\u0430\u043A\u0441\u0438\u043C\u0430\u043B\u044C\u043D\u043E\u0439 \u0441\u0442\u0430\u0431\u0438\u043B\u044C\u043D\u043E\u0441\u0442\u0438, 2 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E, 3 \u0434\u043B\u044F \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438; 4 \u0430\u0433\u0440\u0435\u0441\u0441\u0438\u0432\u0435\u043D \u0438 \u0442\u0440\u0435\u0431\u0443\u0435\u0442 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F.",
+  "commands.auto010": "\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u043F\u0440\u0438\u043C\u0435\u043D\u044F\u044E\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043A \u0432\u043D\u043E\u0432\u044C \u0437\u0430\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u043C \u0444\u0430\u0439\u043B\u0430\u043C; \u0443\u0436\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043C\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435 \u0431\u0443\u0434\u0443\u0442 \u043F\u0440\u0435\u0440\u0432\u0430\u043D\u044B.",
+  "commands.auto011": "{value0} \u041F\u0440\u043E\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u044B",
+  "commands.auto012": "{value0} \u0421\u043E\u0437\u0434\u0430\u043D\u0438\u0435 \u043A\u043E\u043F\u0438\u0439",
+  "commands.auto013": "\u{1F9EC} **\u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u043F\u043E\u0432\u0442\u043E\u0440\u044F\u044E\u0449\u0438\u0445\u0441\u044F \u0444\u0430\u0439\u043B\u043E\u0432**",
+  "commands.auto014": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u0440\u0435\u0436\u0438\u043C: {value0}",
+  "commands.auto015": "\u2022 \u041F\u0440\u043E\u043F\u0443\u0441\u043A\u0430\u0442\u044C \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u044B: \u043D\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u0442\u044C, \u0435\u0441\u043B\u0438 \u0438\u043C\u044F, \u043F\u0430\u043F\u043A\u0430 \u0438 \u0440\u0430\u0437\u043C\u0435\u0440 \u0441\u043E\u0432\u043F\u0430\u0434\u0430\u044E\u0442.",
+  "commands.auto016": "\u2022 \u0421\u043E\u0437\u0434\u0430\u0432\u0430\u0439\u0442\u0435 \u043A\u043E\u043F\u0438\u0438: \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u043F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u044B\u0432\u0430\u0439\u0442\u0435 \u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u0439\u0442\u0435 \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u0443\u044E \u043A\u043E\u043F\u0438\u044E.",
+  "commands.auto017": "\u0412\u043B\u0438\u044F\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u0444\u0430\u0439\u043B\u044B, \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043D\u044B\u0435 \u0441 \u044D\u0442\u043E\u0433\u043E \u043C\u043E\u043C\u0435\u043D\u0442\u0430.",
+  "commands.auto018": "{value0} \u041E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0443\u044E \u043E\u0447\u0438\u0441\u0442\u043A\u0443",
+  "commands.auto019": "{value0} \u0412\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0443\u044E \u043E\u0447\u0438\u0441\u0442\u043A\u0443",
+  "commands.auto020": "\u{1F9F9} **\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0447\u0438\u0441\u0442\u043A\u0430 \u043D\u0435\u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0445 \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0445 \u0444\u0430\u0439\u043B\u043E\u0432**",
+  "commands.auto021": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u0441\u0442\u0430\u0442\u0443\u0441: {value0}",
+  "commands.auto022": "\u0415\u0441\u043B\u0438 \u044D\u0442\u043E\u0442 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u0432\u043A\u043B\u044E\u0447\u0435\u043D, \u0435\u0436\u0435\u0447\u0430\u0441\u043D\u043E \u043F\u0440\u043E\u0432\u0435\u0440\u044F\u0435\u0442 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0438 \u0443\u0434\u0430\u043B\u044F\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u0441\u0442\u0430\u0440\u0448\u0435 10 \u043C\u0438\u043D\u0443\u0442, \u043A\u043E\u0442\u043E\u0440\u044B\u0445 \u043D\u0435\u0442 \u0432 \u0441\u043F\u0438\u0441\u043A\u0435 \u0444\u0430\u0439\u043B\u043E\u0432.",
+  "commands.auto023": "\u0417\u0430\u043F\u0438\u0441\u0438 \u0437\u0430\u0434\u0430\u0447, \u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u043E\u0431\u043B\u0430\u0447\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435 \u0443\u0434\u0430\u043B\u044F\u044E\u0442\u0441\u044F.",
+  "commands.auto024": "\u041E\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u044D\u0442\u043E \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044B\u043C, \u0435\u0441\u043B\u0438 \u0432\u044B \u0437\u0430\u043F\u0438\u0441\u044B\u0432\u0430\u0435\u0442\u0435 \u043D\u0435\u043F\u043E\u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0435\u043D\u043D\u043E \u0432 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0437\u0430 \u043F\u0440\u0435\u0434\u0435\u043B\u0430\u043C\u0438 TG Vault.",
+  "commands.auto025": "\u{1F4CC} \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0442\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u043E\u0434\u0438\u043D \u0440\u0430\u0437",
+  "commands.auto026": "\u{1F4CD} \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0442\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430",
+  "commands.auto027": "\u{1F9F9} \u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0438\u0441\u0442\u0435\u043C\u044B \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "commands.auto028": "\u{1F3AF} **\u041E\u0431\u044A\u0435\u043A\u0442 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430**",
+  "commands.auto029": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "commands.auto031": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "commands.auto033": "\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E: {value0}.",
+  "commands.auto034": "\u{1F447} \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u0443\u044E \u0446\u0435\u043B\u044C, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044F \u0442\u0435\u043A\u0443\u0449\u0443\u044E \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u0443\u044E \u043F\u0430\u043C\u044F\u0442\u044C.",
+  "commands.auto035": "\u2705 \u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 \u0446\u0435\u043B\u044C {value0}: {value1} / {value2}.\n\u042D\u0442\u043E \u043D\u0435 \u043C\u0435\u043D\u044F\u0435\u0442 \u043E\u0431\u0449\u0435\u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E.",
+  "commands.auto036": "\u{1F3AF} **\u041E\u0431\u044A\u0435\u043A\u0442 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430**",
+  "commands.auto037": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "commands.auto039": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "commands.auto041": "\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E: {value0}.",
+  "commands.auto042": "\u{1F447} \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u0443\u044E \u0446\u0435\u043B\u044C, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044F \u0442\u0435\u043A\u0443\u0449\u0443\u044E \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u0443\u044E \u043F\u0430\u043C\u044F\u0442\u044C.",
+  "commands.auto043": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043E\u0447\u0438\u0441\u0442\u043A\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
+  "commands.auto044": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430. \u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0445 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043D\u044B\u0445 \u0444\u0430\u0439\u043B\u043E\u0432 \u043D\u0435\u0442.",
+  "commands.auto045": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430. \u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B: {value0}; \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u043C\u043E\u0435 \u043F\u0440\u043E\u0441\u0442\u0440\u0430\u043D\u0441\u0442\u0432\u043E: {value1}.",
+  "commands.auto046": "\u26A0\uFE0F **\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430?**",
+  "commands.auto047": "\u042D\u0442\u043E \u043F\u0440\u0438\u0432\u0435\u0434\u0435\u0442 \u043A \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044E \u0444\u0430\u0439\u043B\u043E\u0432 **{value0}** \u0432 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u043C \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A \u0441 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435\u043C **{value1}**.",
+  "commands.auto048": "\u041F\u0440\u0438 \u044D\u0442\u043E\u043C \u0431\u0443\u0434\u0443\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u044B \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u0438\u0445 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0438\u043D\u0434\u0435\u043A\u0441\u044B; \u0438\u0441\u0442\u043E\u0440\u0438\u044F \u0437\u0430\u0434\u0430\u0447 \u0438 \u0441\u0442\u043E\u0440\u043E\u043D\u043D\u0438\u0435 \u043E\u0431\u043B\u0430\u0447\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435 \u0443\u0434\u0430\u043B\u044F\u044E\u0442\u0441\u044F.",
+  "commands.auto049": "\u0415\u0441\u043B\u0438 \u0432\u044B \u0443\u0432\u0435\u0440\u0435\u043D\u044B, \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u0440\u0430\u0441\u043D\u0443\u044E \u043A\u043D\u043E\u043F\u043A\u0443 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F \u043D\u0438\u0436\u0435.",
+  "commands.auto050": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043E\u0447\u0438\u0441\u0442\u043A\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E, \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D.",
+  "commands.auto051": "\u2705 **\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u043E\u0447\u0438\u0449\u0435\u043D\u044B**",
+  "commands.auto052": "\u0423\u0434\u0430\u043B\u0435\u043D\u044B: \u0444\u0430\u0439\u043B\u044B {value0}.",
+  "commands.auto053": "\u041E\u0441\u0432\u043E\u0431\u043E\u0436\u0434\u0435\u043D\u043E \u043C\u0435\u0441\u0442\u043E: {value0}",
+  "commands.auto054": "\u041E\u0441\u0442\u0430\u043B\u0438\u0441\u044C \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B: {value0}.",
+  "commands.auto055": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441\u0442\u0430\u0440\u043E\u0439 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u0447\u0438\u0441\u0442\u043A\u0438 \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C/\u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0435\u0449\u0435 \u0440\u0430\u0437.",
+  "commands.auto056": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C: {value0}.",
+  "commands.auto057": "\u042D\u0442\u0430 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u044F \u0443\u0434\u0430\u043B\u044F\u0435\u0442 \u0444\u0438\u0437\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u0444\u0430\u0439\u043B \u0438 \u0435\u0433\u043E \u0438\u043D\u0434\u0435\u043A\u0441.",
+  "commands.auto058": "\u26A0\uFE0F **\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u044D\u0442\u043E\u0442 \u0444\u0430\u0439\u043B?**",
+  "commands.auto059": "\u274C \u041D\u0438 \u043E\u0434\u0438\u043D \u0444\u0430\u0439\u043B \u043D\u0435 \u043D\u0430\u0447\u0438\u043D\u0430\u0435\u0442\u0441\u044F \u0441 \u043F\u0440\u0435\u0444\u0438\u043A\u0441\u0430 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \xAB{value0}\xBB.",
+  "commands.auto060": "\u274C \u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \xAB{value0}\xBB \u0441\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u0438\u043C \u0444\u0430\u0439\u043B\u0430\u043C. \u0421\u043A\u043E\u043F\u0438\u0440\u0443\u0439\u0442\u0435 \u0431\u043E\u043B\u0435\u0435 \u0434\u043B\u0438\u043D\u043D\u044B\u0439 \u043F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438 \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443.",
+  "commands.auto061": "\u26A0\uFE0F **\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u044D\u0442\u043E\u0442 \u0444\u0430\u0439\u043B?**",
+  "commands.auto062": "\u041F\u0440\u0438 \u044D\u0442\u043E\u043C \u0431\u0443\u0434\u0435\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u0430 \u0437\u0430\u043F\u0438\u0441\u044C \u0431\u0430\u0437\u044B \u0434\u0430\u043D\u043D\u044B\u0445 \u0438 \u043F\u0440\u0435\u0434\u043F\u0440\u0438\u043D\u044F\u0442\u0430 \u043F\u043E\u043F\u044B\u0442\u043A\u0430 \u0443\u0434\u0430\u043B\u0438\u0442\u044C \u0444\u0438\u0437\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u0444\u0430\u0439\u043B. \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0430\u0439\u0442\u0435, \u0442\u043E\u043B\u044C\u043A\u043E \u0435\u0441\u043B\u0438 \u044D\u0442\u043E \u043F\u0440\u0435\u0434\u0443\u0441\u043C\u043E\u0442\u0440\u0435\u043D\u043E.",
+  "commands.auto063": "\u0423\u0434\u0430\u043B\u0435\u043D\u0438\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u043E: {value0}",
+  "commands.auto064": "\u274C \u0424\u0430\u0439\u043B \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u0438\u043B\u0438 \u043D\u0430\u0445\u043E\u0434\u0438\u0442\u0441\u044F \u0437\u0430 \u043F\u0440\u0435\u0434\u0435\u043B\u0430\u043C\u0438 \u0442\u0435\u043A\u0443\u0449\u0435\u0439 \u043E\u0431\u043B\u0430\u0441\u0442\u0438 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F.",
+  "commands.auto065": "\u274C \u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 OpenList \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439.",
+  "commands.auto066": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0443\u0434\u0430\u043B\u0438\u0442\u044C: {value0}.",
+  "commands.auto067": "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0443\u044E \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0439 \u043F\u043E\u043F\u044B\u0442\u043A\u0438 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438 \u0434\u043B\u044F \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438 \u043A\u0430\u043D\u0430\u043B\u0430.",
+  "commands.auto068": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0443\u043D\u0438\u043A\u0430\u043B\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u0437\u0430\u0434\u0430\u0447.",
+  "commands.auto069": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0432 \u0434\u0430\u043D\u043D\u044B\u0439 \u043C\u043E\u043C\u0435\u043D\u0442 \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F.",
+  "commands.auto070": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u0438\u043B\u0438 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
+  "commands.auto071": "\u041D\u0435\u0442 \u043E\u0436\u0438\u0434\u0430\u044E\u0449\u0438\u0445 \u0444\u0430\u0439\u043B\u043E\u0432, \u043A\u043E\u0442\u043E\u0440\u044B\u043C \u043C\u043E\u0436\u043D\u043E \u043F\u0440\u0438\u043E\u0440\u0438\u0442\u0435\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C.",
+  "commands.auto072": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043D\u0430\u0445\u043E\u0434\u0438\u0442\u0441\u044F \u0432 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0438 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F.",
+  "commands.auto073": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u0438\u043B\u0438 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.",
+  "commands.auto074": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0443\u043D\u0438\u043A\u0430\u043B\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u0437\u0430\u0434\u0430\u0447.",
+  "commands.auto075": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u0438\u043B\u0438 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.",
+  "commands.auto076": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u0438\u043B\u0438 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.",
+  "commands.auto077": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0443\u043D\u0438\u043A\u0430\u043B\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u0437\u0430\u0434\u0430\u0447.",
+  "commands.auto078": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0443\u043D\u0438\u043A\u0430\u043B\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u0437\u0430\u0434\u0430\u0447.",
+  "commands.auto079": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0438\u043C\u0435\u0435\u0442 \u043D\u0435\u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043D\u0443\u044E \u0441\u0432\u0435\u0440\u043A\u0443 \u0438\u043B\u0438 \u0432 \u043D\u0430\u0441\u0442\u043E\u044F\u0449\u0435\u0435 \u0432\u0440\u0435\u043C\u044F \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043F\u043E\u0432\u0442\u043E\u0440\u0435\u043D\u0430.",
+  "commands.auto080": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u0435 \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0444\u0430\u0439\u043B\u0430, \u0437\u0430\u0442\u0435\u043C \u043F\u0430\u0443\u0437\u0430.",
+  "commands.auto081": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u043C.",
+  "commands.auto082": "\u26A0\uFE0F **\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0432\u0441\u0435 \u0437\u0430\u0434\u0430\u043D\u0438\u044F \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435?**",
+  "commands.auto083": "\u0420\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438: \u0437\u0430\u0434\u0430\u0447\u0438 {value0} (\u0444\u0430\u0439\u043B\u044B {value1} \u0430\u043A\u0442\u0438\u0432\u043D\u044B, {value2} \u043E\u0436\u0438\u0434\u0430\u0435\u0442)",
+  "commands.auto084": "\u0417\u0430\u0434\u0430\u0447\u0438 \u043A\u0430\u043D\u0430\u043B\u0430: {value0}",
+  "commands.auto085": "\u0412\u0441\u0435\u0433\u043E \u0437\u0430\u0434\u0430\u0447: {value0}",
+  "commands.auto086": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 \u0437\u0430\u0434\u0430\u0447 \u0438 \u043E\u0447\u0438\u0441\u0442\u0438\u0442 \u0438\u0445 \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B. \u0417\u0430\u0434\u0430\u0447\u0438 \u0432 \u0434\u0440\u0443\u0433\u0438\u0445 \u0447\u0430\u0442\u0430\u0445 \u0438 \u0434\u0440\u0443\u0433\u0438\u0445 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439 \u043D\u0435 \u0437\u0430\u0442\u0440\u0430\u0433\u0438\u0432\u0430\u044E\u0442\u0441\u044F.",
+  "commands.auto087": "\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u043B \u043E\u0442\u043C\u0435\u043D\u0443 \u0432\u0441\u0435\u0445 \u0437\u0430\u0434\u0430\u0447 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435",
+  "commands.auto088": "\u{1F6D1} **\u0417\u0430\u0434\u0430\u0447\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u044B**",
+  "commands.auto089": "\u0420\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438: \u0437\u0430\u0434\u0430\u0447\u0438 {value0} (\u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B {value1} / \u0444\u0430\u0439\u043B\u044B \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u044F {value2})",
+  "commands.auto090": "\u0417\u0430\u0434\u0430\u0447\u0438 \u043A\u0430\u043D\u0430\u043B\u0430: {value0}",
+  "commands.auto091": "\u0412\u0441\u0435\u0433\u043E \u0437\u0430\u0434\u0430\u0447: {value0}",
+  "commands.auto092": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u043C.",
+  "commands.auto093": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u0435 \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0444\u0430\u0439\u043B\u0430, \u0437\u0430\u0442\u0435\u043C \u043F\u0430\u0443\u0437\u0430.",
+  "commands.auto094": "\u23F8\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
+  "commands.auto095": "\u23F8\uFE0F \u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0443 \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438 \u043F\u043E\u0441\u043B\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u044F \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0444\u0430\u0439\u043B\u0430.",
+  "commands.auto096": "\u23F8\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 {value0} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {value1}",
+  "commands.auto097": "\u{1F4EE} \u0417\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430: {value0}. \u0422\u0435\u043A\u0443\u0449\u0430\u044F \u043E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0447\u0430\u0442\u0430 \u043D\u0435 \u0431\u044B\u043B\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
+  "commands.auto098": "\u{1F4EE} \u0417\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430: {value0}. \u041D\u0438 \u043E\u0434\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u0431\u044B\u043B\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
+  "commands.auto099": "\u23F8\uFE0F \u0420\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u044B\n\n\u0410\u043A\u0442\u0438\u0432\u0435\u043D: {value0}\n\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435: {value1}\n\n\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u0444\u0430\u0439\u043B \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u0441\u044F; \u043D\u043E\u0432\u044B\u0435 \u043E\u0436\u0438\u0434\u0430\u044E\u0449\u0438\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0437\u0430\u043F\u0443\u0441\u0442\u044F\u0442\u0441\u044F.",
+  "commands.auto100": "\u25B6\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
+  "commands.auto101": "\u25B6\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 {value0} \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {value1}",
+  "commands.auto102": "\u{1F4EE} \u0417\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430: {value0}. \u0422\u0435\u043A\u0443\u0449\u0430\u044F \u043E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0447\u0430\u0442\u0430 \u043D\u0435 \u0431\u044B\u043B\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
+  "commands.auto103": "\u{1F4EE} \u0417\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430: {value0}. \u041D\u0438 \u043E\u0434\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u0431\u044B\u043B\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
+  "commands.auto104": "\u25B6\uFE0F \u0412\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u044B \u0440\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435\n\n\u0410\u043A\u0442\u0438\u0432\u0435\u043D: {value0}\n\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435: {value1}",
+  "commands.auto105": "\u{1F6D1} \u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
+  "commands.auto106": "\u{1F6D1} \u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 {value0} \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.\n\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {value1}",
+  "commands.auto107": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043F\u043E\u0434\u0445\u043E\u0434\u044F\u0449\u0435\u0439 \u0437\u0430\u0434\u0430\u0447\u0438: {value0}",
+  "commands.auto108": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441\u0442\u0430\u0440\u043E\u0439 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u0442\u043C\u0435\u043D\u044B \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 /tasks \u0435\u0449\u0435 \u0440\u0430\u0437 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435, \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0432 \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0437\u0430\u0434\u0430\u0447\u0435.",
+  "commands.auto109": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043F\u043E\u0434\u0445\u043E\u0434\u044F\u0449\u0435\u0439 \u0437\u0430\u0434\u0430\u0447\u0438: {value0}",
+  "commands.auto110": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441\u0442\u0430\u0440\u043E\u0439 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u0442\u043C\u0435\u043D\u044B \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 /tasks \u0435\u0449\u0435 \u0440\u0430\u0437 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435, \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0432 \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0437\u0430\u0434\u0430\u0447\u0435.",
+  "commands.auto111": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0443\u043D\u0438\u043A\u0430\u043B\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C/\u0437\u0430\u0434\u0430\u0447\u0438.",
+  "commands.auto112": "\u{1F4EE} \u041D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u0443\u043D\u0438\u043A\u0430\u043B\u044C\u043D\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438 \u043A\u0430\u043D\u0430\u043B\u0430; \u043D\u0438\u043A\u0430\u043A\u0430\u044F \u0434\u0440\u0443\u0433\u0430\u044F \u0437\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043F\u043E\u0432\u0442\u043E\u0440\u044F\u043B\u0430\u0441\u044C.",
+  "commands.auto113": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0435 \u043A\u0430\u043D\u0430\u043B\u0430 \u043D\u0435\u0442 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u044B\u0445 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u043E\u0432, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u043C\u043E\u0436\u043D\u043E \u0431\u044B\u043B\u043E \u0431\u044B \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C.",
+  "commands.auto114": "\u{1F504} \u0417\u0430\u043F\u0440\u043E\u0448\u0435\u043D\u044B \u043D\u0435\u0443\u0434\u0430\u0432\u0448\u0438\u0435\u0441\u044F \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B {value0} \u0432 \u0437\u0430\u0434\u0430\u0447\u0435 \u043A\u0430\u043D\u0430\u043B\u0430.\n\u0417\u0430\u0434\u0430\u0447\u0430: {value1}",
+  "commands.auto115": "\u{1F4EE} \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0438\u0442\u044C \u0442\u0435\u043A\u0443\u0449\u0438\u0439 \u0447\u0430\u0442; \u043D\u0435\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u043F\u043E\u0432\u0442\u043E\u0440\u044F\u043B\u0438\u0441\u044C.",
+  "commands.auto116": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043D\u0435\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0445 \u0437\u0430\u0434\u0430\u0447: {value0}",
+  "commands.auto117": "\u{1F4EE} \u041D\u0435\u043B\u044C\u0437\u044F \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C \u043D\u0435\u0434\u0430\u0432\u043D\u043E \u043D\u0435\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0435 \u0437\u0430\u0434\u0430\u0447\u0438.",
+  "commands.auto119": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u043E\u0434\u043D\u043E\u0444\u0430\u0439\u043B\u043E\u0432\u044B\u0439 \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u043F\u043E\u0437\u0436\u0435.",
+  "commands.auto120": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u044C\u043D\u043E\u0433\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u0444\u0430\u0439\u043B\u0430\u043C. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u043F\u043E\u0437\u0436\u0435.",
+  "commands.auto121": "\u{1F4CC} \u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D \u043D\u0430 `{value0}`.\n{value1}\n\n\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u0430 \u0438\u0441\u0442\u0435\u043A\u0430\u0435\u0442 \u043F\u043E\u0441\u043B\u0435 \u0443\u0441\u043F\u0435\u0448\u043D\u043E\u0433\u043E \u0437\u0430\u043F\u0443\u0441\u043A\u0430 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0433\u043E \u043F\u043E\u0442\u043E\u043A\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
+  "commands.auto122": "\u{1F4CD} \u0414\u043B\u044F \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 `{value0}`.\n{value1}\n\n\u0411\u0443\u0434\u0443\u0449\u0438\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u0431\u0443\u0434\u0443\u0442 \u043E\u0442\u0434\u0430\u0432\u0430\u0442\u044C \u043F\u0440\u0435\u0434\u043F\u043E\u0447\u0442\u0435\u043D\u0438\u0435 \u044D\u0442\u043E\u043C\u0443 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0443. \u0423\u0434\u0430\u043B\u0438\u0442\u0435 \u0435\u0433\u043E \u0438\u0437 \xAB\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB.",
+  "commands.auto123": "\u0427\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u043A\u0430\u0442\u0430\u043B\u043E\u0433, \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u044B\u0439 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0438\u043B\u0438 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0447\u0430\u0442\u0430 \u0432 \xAB\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB, \u0437\u0430\u0442\u0435\u043C \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430.",
+  "commands.auto124": "\u{1F558} **\u041D\u0435\u0434\u0430\u0432\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0438**",
+  "commands.auto125": "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 {value0}.",
+  "commands.auto126": "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0447\u0438\u0441\u0442\u043A\u0430 \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u0430",
+  "commands.auto127": "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0447\u0438\u0441\u0442\u043A\u0430 \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u0430",
+  "commands.auto128": "\u26A0\uFE0F **\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0447\u0430\u043D\u043A\u0438 {value0}?**",
+  "commands.auto129": "\u042D\u0442\u043E \u0430\u0433\u0440\u0435\u0441\u0441\u0438\u0432\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C \u043F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u0438\u0437\u043C\u0430 \u0431\u043B\u043E\u043A\u043E\u0432, \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u043C\u043E\u0436\u0435\u0442 \u043F\u0440\u0438\u0432\u0435\u0441\u0442\u0438 \u043A:",
+  "commands.auto130": "- \u041E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 Telegram \u0438\u043B\u0438 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u043F\u043E \u0431\u043E\u0440\u044C\u0431\u0435 \u0441\u043E \u0437\u043B\u043E\u0443\u043F\u043E\u0442\u0440\u0435\u0431\u043B\u0435\u043D\u0438\u044F\u043C\u0438",
+  "commands.auto131": "- \u041F\u0440\u0435\u0440\u0432\u0430\u043D\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0438 \u0431\u043E\u043B\u044C\u0448\u0435\u0435 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u044B\u0445 \u043F\u043E\u043F\u044B\u0442\u043E\u043A.",
+  "commands.auto132": "- \u041E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 \u0434\u043B\u044F \u0443\u0447\u0435\u0442\u043D\u044B\u0445 \u0437\u0430\u043F\u0438\u0441\u0435\u0439 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439 Telegram; \u0432 \u043A\u0440\u0430\u0439\u043D\u0438\u0445 \u0441\u043B\u0443\u0447\u0430\u044F\u0445 \u0432\u043B\u0438\u044F\u043D\u0438\u0435 \u043D\u0430 \u0430\u043A\u043A\u0430\u0443\u043D\u0442",
+  "commands.auto133": "\u0414\u043B\u044F \u0440\u0443\u0442\u0438\u043D\u043D\u044B\u0445 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A \u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F 4 \u0438\u043B\u0438 8.",
+  "commands.auto134": "{value0}\n\n\u2705 \u041F\u0435\u0440\u0435\u0448\u0451\u043B \u043D\u0430 \u0447\u0430\u043D\u043A\u0438 {value1}; \u043D\u043E\u0432\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044E\u0442 \u044D\u0442\u043E \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E.",
+  "commands.auto135": "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 {value0}.",
+  "commands.auto136": "{value0}\n\n\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043E \u0438 \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u043D\u0430 \u0447\u0430\u043D\u043A\u0438 {value1}. \u0415\u0441\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043F\u0440\u0435\u0440\u044B\u0432\u0430\u0435\u0442\u0441\u044F, \u0437\u0430\u043C\u0435\u0434\u043B\u044F\u0435\u0442\u0441\u044F \u0438\u043B\u0438 \u0432\u044B\u0437\u044B\u0432\u0430\u0435\u0442 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F, \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E \u0432\u0435\u0440\u043D\u0438\u0442\u0435\u0441\u044C \u043A 4 \u0438\u043B\u0438 8.",
+  "commands.auto137": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043D\u044B\u0435 \u0440\u0430\u0431\u043E\u0447\u0438\u0435 {value0}",
+  "commands.auto138": "\u26A0\uFE0F **\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C 4 \u0444\u0430\u0439\u043B\u0430 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E?**",
+  "commands.auto139": "\u042D\u0442\u043E \u0430\u0433\u0440\u0435\u0441\u0441\u0438\u0432\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E\u0433\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u0444\u0430\u0439\u043B\u0430\u043C, \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u043C\u043E\u0436\u0435\u0442 \u043F\u0440\u0438\u0432\u0435\u0441\u0442\u0438 \u043A:",
+  "commands.auto140": "- \u041E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 Telegram \u0438\u043B\u0438 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u043F\u043E \u0431\u043E\u0440\u044C\u0431\u0435 \u0441\u043E \u0437\u043B\u043E\u0443\u043F\u043E\u0442\u0440\u0435\u0431\u043B\u0435\u043D\u0438\u044F\u043C\u0438",
+  "commands.auto141": "- \u0420\u0435\u0433\u0443\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432 \u043E\u0431\u043B\u0430\u043A\u043E \u0438 \u0443\u0432\u0435\u043B\u0438\u0447\u0435\u043D\u0438\u0435 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u0430 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u044B\u0445 \u043F\u043E\u043F\u044B\u0442\u043E\u043A.",
+  "commands.auto142": "- \u0417\u043D\u0430\u0447\u0438\u0442\u0435\u043B\u044C\u043D\u0430\u044F \u043D\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u043D\u044B\u0439 \u0434\u0438\u0441\u043A \u0438 \u0441\u0435\u0442\u044C.",
+  "commands.auto143": "\u0414\u043B\u044F \u0440\u0443\u0442\u0438\u043D\u043D\u044B\u0445 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A \u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F 2 \u0438\u043B\u0438 3.",
+  "commands.auto144": "{value0}\n\n\u2705 \u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u043B\u0441\u044F \u043D\u0430 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u0443\u044E \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0443 \u0444\u0430\u0439\u043B\u043E\u0432 {value1}.",
+  "commands.auto145": "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 {value0}.",
+  "commands.auto146": "{value0}\n\n\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u043B \u0438 \u043F\u0435\u0440\u0435\u0448\u0451\u043B \u043D\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0443 4-\u0445 \u0444\u0430\u0439\u043B\u043E\u0432 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E. \u0415\u0441\u043B\u0438 \u0432\u043E\u0437\u043D\u0438\u043A\u0430\u044E\u0442 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438, \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F \u0438\u043B\u0438 \u0441\u0431\u043E\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438, \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E \u0432\u0435\u0440\u043D\u0438\u0442\u0435\u0441\u044C \u043A 2 \u0438\u043B\u0438 3.",
+  "commands.auto147": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043D\u044B\u0439 \u043F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u044C\u043D\u044B\u0439 \u0434\u043E\u0441\u0442\u0443\u043F \u043A 4 \u0444\u0430\u0439\u043B\u0430\u043C",
+  "commands.authRequired": "\u{1F510} \u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /start \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 PIN-\u043A\u043E\u0434.",
+  "commands.helpUnavailable": "\u274C\u041F\u043E\u043C\u043E\u0449\u044C \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430.",
+  "commands.settingsSaved": "\u2705\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u044B.",
+  "commands.settingsFailed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438: {error}.",
+  "commands.notificationsHint": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /\u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F, \u0447\u0442\u043E\u0431\u044B \u0441\u043D\u043E\u0432\u0430 \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u0440\u0443\u043A\u043E\u0432\u043E\u0434\u0441\u0442\u0432\u043E \u0438 \u043A\u043D\u043E\u043F\u043A\u0438 \u0431\u044B\u0441\u0442\u0440\u043E\u0433\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u0430.",
+  "commands.alreadyCurrent": "\u0423\u0436\u0435 \u0432\u044B\u0431\u0440\u0430\u043D\u043E",
+  "commands.notificationsUpdated": "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u044B.",
+  "commands.settingFailedRetry": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0443. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u043F\u043E\u0437\u0436\u0435.",
+  "commands.statusFailed": "\u274C\u041D\u0435 \u0441\u043C\u043E\u0433 \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u0434\u0438\u0430\u0433\u043D\u043E\u0441\u0442\u0438\u043A\u0443. \u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u0437\u0430\u043F\u0440\u043E\u0441\u0430: {requestId}",
+  "commands.localAccount": "\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0441\u0435\u0440\u0432\u0435\u0440\u0430",
+  "commands.defaultAccount": "\u0423\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "commands.unnamedAccount": "\u0411\u0435\u0437\u044B\u043C\u044F\u043D\u043D\u044B\u0439 \u0430\u043A\u043A\u0430\u0443\u043D\u0442",
+  "commands.localStorage": "\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435",
+  "commands.refreshList": "\u{1F504} \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A",
+  "commands.storageSwitchTitle": "\u{1F5C4}\uFE0F **\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F**",
+  "commands.storageSwitchCurrent": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439: {value}",
+  "commands.storageSwitchHint": "\u041A\u043E\u0441\u043D\u0438\u0442\u0435\u0441\u044C \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438, \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u043E\u0439 \u0432 \u0432\u0435\u0431-\u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0438, \u0447\u0442\u043E\u0431\u044B \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u044C\u0441\u044F \u043D\u0430 \u043D\u0435\u0435 \u0437\u0434\u0435\u0441\u044C.",
+  "commands.storageSwitchOptions": "**\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435:**",
+  "commands.storageSwitchNote": "\u0417\u0434\u0435\u0441\u044C \u043C\u043E\u0436\u043D\u043E \u0432\u044B\u0431\u0440\u0430\u0442\u044C \u0442\u043E\u043B\u044C\u043A\u043E \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0435 \u0443\u0447\u0435\u0442\u043D\u044B\u0435 \u0437\u0430\u043F\u0438\u0441\u0438. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u0443\u0447\u0435\u0442\u043D\u044B\u0435 \u0437\u0430\u043F\u0438\u0441\u0438 OAuth \u0438\u043B\u0438 \u0443\u0447\u0435\u0442\u043D\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u043D\u0430 \u043E\u0441\u043D\u043E\u0432\u0435 \u0443\u0447\u0435\u0442\u043D\u044B\u0445 \u0434\u0430\u043D\u043D\u044B\u0445 \u0432 \u0432\u0435\u0431-\u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435.",
+  "commands.accountUnnamed": "\u0411\u0435\u0437\u044B\u043C\u044F\u043D\u043D\u044B\u0439 \u0430\u043A\u043A\u0430\u0443\u043D\u0442",
+  "commands.storageSwitchFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u0438 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430: {error}.",
+  "commands.storageRefreshed": "\u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044B\u0439",
+  "commands.storageInvalid": "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u0432\u044B\u0431\u043E\u0440 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430",
+  "commands.storageAlreadyLocal": "\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u0443\u0436\u0435 \u0430\u043A\u0442\u0438\u0432\u043D\u043E",
+  "commands.storageSwitchedLocal": "\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u043D\u0430 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435",
+  "commands.storageMissing": "\u042D\u0442\u0430 \u0443\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442.",
+  "commands.storageAlreadyAccount": "\u042D\u0442\u043E\u0442 \u0430\u043A\u043A\u0430\u0443\u043D\u0442 \u0443\u0436\u0435 \u0430\u043A\u0442\u0438\u0432\u0435\u043D",
+  "commands.storageSwitched": "\u041F\u0435\u0440\u0435\u0448\u0435\u043B \u043D\u0430 {name}",
+  "commands.storageSwitchError": "\u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F: {error}",
+  "commands.deleteConfirm": "\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435",
+  "commands.bulkConfirm": "\u26A0\uFE0F \u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0432\u0441\u0435",
+  "commands.confirmCancelAll": "\u26A0\uFE0F \u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0432\u0441\u0435 \u0437\u0430\u0434\u0430\u0447\u0438",
+  "commands.confirmUse": "\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 {count}.",
+  "commands.confirmFiles": "\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0444\u0430\u0439\u043B\u044B {count}.",
+  "commands.clearLocalConfirm": "\u26A0\uFE0F \u0423\u0434\u0430\u043B\u0438\u0442\u0435 \u0432\u0441\u0435 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B.",
+  "commands.clearLocalButton": "\u{1F9F9} \u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B ({count})",
+  "commands.secondConfirm": "\u0422\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435",
+  "commands.cancelled": "\u041E\u0442\u043C\u0435\u043D\u0435\u043D\u043E",
+  "commands.returned": "\u041D\u0430\u0437\u0430\u0434",
+  "commands.deleted": "\u0423\u0434\u0430\u043B\u0435\u043D\u043E",
+  "commands.deletedCount": "\u0423\u0434\u0430\u043B\u0435\u043D\u044B \u0444\u0430\u0439\u043B\u044B {count}.",
+  "commands.targetNextButton": "\u{1F4CC} \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0442\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u043E\u0434\u0438\u043D \u0440\u0430\u0437",
+  "commands.targetSessionButton": "\u{1F4CD} \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0442\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430",
+  "commands.targetClearButton": "\u{1F9F9} \u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0438\u0441\u0442\u0435\u043C\u044B \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "commands.targetTitle": "\u{1F3AF} **\u041E\u0431\u044A\u0435\u043A\u0442 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430**",
+  "commands.targetNext": "\u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0430\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430: {value}",
+  "commands.targetSession": "\u042D\u0442\u043E\u0442 \u0447\u0430\u0442: {value}",
+  "commands.targetSystem": "\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E: {value}.",
+  "commands.targetSet": "{value} (\u043D\u0430\u0431\u043E\u0440)",
+  "commands.targetDefault": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
+  "commands.targetHint": "\u{1F447} \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0438, \u0447\u0442\u043E\u0431\u044B \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u0432\u044B\u0431\u0440\u0430\u0442\u044C \u0442\u0435\u043A\u0443\u0449\u0443\u044E \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u0443\u044E \u043F\u0430\u043C\u044F\u0442\u044C.",
+  "commands.targetCleared": "\u2705 \u0423\u0431\u0440\u0430\u043D\u043E \u043F\u0435\u0440\u0435\u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0435\u043D\u0438\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430 \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430. \u0411\u0443\u0434\u0443\u0449\u0438\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044E\u0442 \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E.",
+  "commands.targetRestored": "\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u044B",
+  "commands.targetInvalid": "\u274C \u042D\u0442\u043E\u0442 \u0446\u0435\u043B\u0435\u0432\u043E\u0439 \u043E\u0431\u044A\u0435\u043A\u0442 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043D\u0435 \u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u043D. \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443 \u043D\u0438\u0436\u0435.",
+  "commands.targetAccountMissing": "\u274C \u0423\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430. \u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u0432\u0441\u0435 \u0443\u0447\u0435\u0442\u043D\u044B\u0435 \u0437\u0430\u043F\u0438\u0441\u0438 \u0441 /storage_switch.",
+  "commands.targetSaved": "\u2705 \u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 \u0446\u0435\u043B\u044C {scope} \u043D\u0430 {provider} / {account}.\n\u041E\u0431\u0449\u0435\u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u043D\u0435 \u0431\u044B\u043B\u0438 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u044B.",
+  "commands.targetScopeNext": "\u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0430\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430",
+  "commands.targetScopeSession": "\u0447\u0430\u0442-\u0441\u0435\u0441\u0441\u0438\u044F",
+  "commands.targetNextSet": "\u041D\u0430\u0431\u043E\u0440 \u043F\u0430\u043C\u044F\u0442\u0438 \u0434\u043B\u044F \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438",
+  "commands.targetSessionSet": "\u041D\u0430\u0431\u043E\u0440 \u0434\u043B\u044F \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430",
+  "commands.fileSearchFailed": "\u274C \u041F\u043E\u0438\u0441\u043A \u043D\u0435 \u0443\u0434\u0430\u043B\u0441\u044F: {error}.",
+  "commands.fileUnavailable": "\u0424\u0430\u0439\u043B \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u0438\u043B\u0438 \u043D\u0430\u0445\u043E\u0434\u0438\u0442\u0441\u044F \u0437\u0430 \u043F\u0440\u0435\u0434\u0435\u043B\u0430\u043C\u0438 \u0442\u0435\u043A\u0443\u0449\u0435\u0439 \u043E\u0431\u043B\u0430\u0441\u0442\u0438 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F.",
+  "commands.fileDetail": "\u0414\u0435\u0442\u0430\u043B\u0438 \u0444\u0430\u0439\u043B\u0430",
+  "commands.confirmRequired": "\u0422\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u0432\u0442\u043E\u0440\u043E\u0435 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435",
+  "commands.fileFavorited": "\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435",
+  "commands.fileUnfavorited": "\u0423\u0434\u0430\u043B\u0435\u043D\u043E \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E",
+  "commands.fileShareUnsupported": "\u042D\u0442\u043E\u0442 \u043F\u0440\u043E\u0432\u0430\u0439\u0434\u0435\u0440 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0441\u043E\u0437\u0434\u0430\u0432\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0438 \u0434\u043B\u044F \u043E\u0431\u0449\u0435\u0433\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u0430. \u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 \u0435\u0433\u043E \u0432 \u0432\u0435\u0431-\u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435.",
+  "commands.fileSignedLink": "\u{1F517} \u041F\u043E\u0434\u043F\u0438\u0441\u0430\u043D\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430 (\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u0430 1 \u0447\u0430\u0441):\n{link}",
+  "commands.fileLinkCreated": "\u041F\u043E\u0434\u043F\u0438\u0441\u0430\u043D\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430 \u0441\u043E\u0437\u0434\u0430\u043D\u0430",
+  "commands.fileMovePrompt": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F \u0438\u043B\u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438.",
+  "commands.fileRenamePrompt": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043D\u043E\u0432\u043E\u0435 \u0438\u043C\u044F \u0444\u0430\u0439\u043B\u0430 (\u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u0435 \u0438\u0441\u0445\u043E\u0434\u043D\u043E\u0435 \u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u0438\u0435) \u0438\u043B\u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438.",
+  "commands.fileAwaitFolder": "\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 \u043F\u0430\u043F\u043A\u0438 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F",
+  "commands.fileAwaitName": "\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 \u043D\u043E\u0432\u043E\u0433\u043E \u0438\u043C\u0435\u043D\u0438 \u0444\u0430\u0439\u043B\u0430",
+  "commands.fileDeleteTitle": "\u26A0\uFE0F **\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u044D\u0442\u043E\u0442 \u0444\u0430\u0439\u043B?**",
+  "commands.fileDeleteImpact": "\u041F\u0440\u0438 \u044D\u0442\u043E\u043C \u0431\u0443\u0434\u0435\u0442 \u0443\u0434\u0430\u043B\u0435\u043D \u0444\u0438\u0437\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u0444\u0430\u0439\u043B \u0438 \u0435\u0433\u043E \u0438\u043D\u0434\u0435\u043A\u0441.",
+  "commands.fileMutationExpired": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0439 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438 \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0444\u0430\u0439\u043B\u0435 \u0435\u0449\u0435 \u0440\u0430\u0437.",
+  "commands.fileMutationCancelled": "\u041E\u043F\u0435\u0440\u0430\u0446\u0438\u044F \u0441 \u0444\u0430\u0439\u043B\u043E\u043C \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.",
+  "commands.fileMoved": "\u2705 \u041F\u0435\u0440\u0435\u043C\u0435\u0449\u0435\u043D\u043E: {folder}",
+  "commands.fileRenamed": "\u2705 \u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u043D\u043E \u0432: {name}.",
+  "commands.fileDeleteChoose": "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0430\u0439\u043B \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u041F\u043E\u0438\u0441\u043A \u0444\u0430\u0439\u043B\u043E\u0432 \u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0438\u043C\u0438\xBB, \u0437\u0430\u0442\u0435\u043C \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u0423\u0434\u0430\u043B\u0438\u0442\u044C\xBB.",
+  "commands.fileDeleteNoIndex": "\u274C \u0412\u043E \u0438\u0437\u0431\u0435\u0436\u0430\u043D\u0438\u0435 \u043E\u0448\u0438\u0431\u043E\u043A Telegram-\u0431\u043E\u0442 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0443\u0434\u0430\u043B\u044F\u0442\u044C \u043F\u043E \u043D\u043E\u043C\u0435\u0440\u0443 \u0441\u043F\u0438\u0441\u043A\u0430. \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /list \u0438 \u0441\u043A\u043E\u043F\u0438\u0440\u0443\u0439\u0442\u0435 \u0445\u043E\u0442\u044F \u0431\u044B \u043F\u0435\u0440\u0432\u044B\u0435 8 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0444\u0430\u0439\u043B\u0430.",
+  "commands.fileIdTooShort": "\u274C \u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0434\u043E\u043B\u0436\u0435\u043D \u0431\u044B\u0442\u044C \u043D\u0435 \u043C\u0435\u043D\u0435\u0435 8 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432. \u0421\u043A\u043E\u043F\u0438\u0440\u0443\u0439\u0442\u0435 \u0431\u043E\u043B\u0435\u0435 \u0434\u043B\u0438\u043D\u043D\u044B\u0439 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u0444\u0430\u0439\u043B\u0430 \u0438\u0437 \u0432\u0435\u0431-\u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F.",
+  "commands.fileNotFound": "\u274C \u041D\u0438 \u043E\u0434\u0438\u043D \u0444\u0430\u0439\u043B \u043D\u0435 \u0438\u043C\u0435\u0435\u0442 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430, \u043D\u0430\u0447\u0438\u043D\u0430\u044E\u0449\u0435\u0433\u043E\u0441\u044F \u0441 \xAB{selector}\xBB.",
+  "commands.fileAmbiguous": "\u274C \u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \xAB{selector}\xBB \u0441\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u0438\u043C \u0444\u0430\u0439\u043B\u0430\u043C. \u0421\u043A\u043E\u043F\u0438\u0440\u0443\u0439\u0442\u0435 \u0431\u043E\u043B\u0435\u0435 \u0434\u043B\u0438\u043D\u043D\u044B\u0439 \u043F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438 \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443.",
+  "commands.fileOpenListDeleteUnsupported": "\u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 OpenList \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439.",
+  "commands.fileDeleteHint": "\u041F\u0440\u0438 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0438 \u0443\u0434\u0430\u043B\u044F\u0435\u0442\u0441\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u0431\u0430\u0437\u044B \u0434\u0430\u043D\u043D\u044B\u0445 \u0438 \u043F\u0440\u0435\u0434\u043F\u0440\u0438\u043D\u0438\u043C\u0430\u0435\u0442\u0441\u044F \u043F\u043E\u043F\u044B\u0442\u043A\u0430 \u0443\u0434\u0430\u043B\u0438\u0442\u044C \u0444\u0438\u0437\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u0444\u0430\u0439\u043B. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0434\u0435\u0442\u0430\u043B\u0438, \u0437\u0430\u0442\u0435\u043C \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435.",
+  "commands.deleteExpired": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044F \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
+  "commands.deleteNotOwner": "\u042D\u0442\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044F \u043D\u0435 \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0438\u0442 \u0432\u0430\u043C \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
+  "commands.deleteInvalid": "\u042D\u0442\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044F \u043D\u0435 \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0438\u0442 \u0432\u0430\u043C, \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D.",
+  "commands.deleteCancelled": "\u0423\u0434\u0430\u043B\u0435\u043D\u0438\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u043E: {name}",
+  "commands.fileMissingShort": "\u0424\u0430\u0439\u043B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D",
+  "commands.fileDeleteUnsupportedShort": "\u042D\u0442\u043E \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439.",
+  "commands.deleteFailed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0443\u0434\u0430\u043B\u0438\u0442\u044C: {error}.",
+  "commands.pathOncePrompt": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0435\u0435 \u0434\u043B\u044F \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
+  "commands.pathSessionPrompt": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \u0434\u043B\u044F \u0441\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u044F \u0432 \u044D\u0442\u043E\u0442 \u0447\u0430\u0442.",
+  "commands.pathOnceSaved": "\u{1F4CC} \u0414\u043B\u044F \u043F\u0430\u043F\u043A\u0438 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \xAB{folder}\xBB.\n{preview}\n\n\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u0430 \u0438\u0441\u0442\u0435\u043A\u0430\u0435\u0442 \u043F\u043E\u0441\u043B\u0435 \u0442\u043E\u0433\u043E, \u043A\u0430\u043A \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0444\u0430\u0439\u043B \u0443\u0441\u043F\u0435\u0448\u043D\u043E \u0432\u043E\u0439\u0434\u0435\u0442 \u0432 \u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u043F\u0440\u043E\u0446\u0435\u0441\u0441 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
+  "commands.pathSessionSaved": "\u{1F4CD} \u0414\u043B\u044F \u043F\u0430\u043F\u043A\u0438 \u0441\u0435\u0430\u043D\u0441\u0430 \u0447\u0430\u0442\u0430 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \xAB{folder}\xBB.\n{preview}\n\n\u0411\u0443\u0434\u0443\u0449\u0438\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u0431\u0443\u0434\u0443\u0442 \u043F\u0440\u0435\u0434\u043F\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u044D\u0442\u0443 \u043F\u0430\u043F\u043A\u0443. \u0423\u0434\u0430\u043B\u0438\u0442\u0435 \u0435\u0433\u043E \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB.",
+  "commands.pathInvalid": "\u274C \u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043F\u0443\u0442\u044C: {error}.",
+  "commands.pathCleared": "\u{1F9F9} \u041E\u0447\u0438\u0449\u0435\u043D\u044B \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u0438\u0435 \u043F\u0430\u043F\u043A\u0438 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0438 \u0441\u0435\u0430\u043D\u0441\u0430 \u0447\u0430\u0442\u0430. \u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044F \u0441\u043D\u043E\u0432\u0430 \u0430\u043A\u0442\u0438\u0432\u043D\u0430.",
+  "commands.pathRecentTitle": "\u{1F558} **\u041D\u0435\u0434\u0430\u0432\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u043F\u0430\u043F\u043A\u0438**",
+  "commands.pathRecentHint": "\u0427\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0435\u0433\u043E \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E, \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \xAB\u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0430\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430\xBB \u0438\u043B\u0438 \xAB\u042D\u0442\u043E\u0442 \u0447\u0430\u0442\xBB \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB, \u0430 \u0437\u0430\u0442\u0435\u043C \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u0430\u043F\u043A\u0438.",
+  "commands.pathRecentEmpty": "\u{1F558} \u041D\u0435\u0442 \u043D\u0435\u0434\u0430\u0432\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0445 \u043F\u0430\u043F\u043E\u043A. \u041F\u0430\u043F\u043A\u0438 \u0437\u0430\u043F\u0438\u0441\u044B\u0432\u0430\u044E\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0442\u043E\u0433\u043E, \u043A\u0430\u043A \u0432\u044B \u0438\u0445 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435.",
+  "commands.pathRecentSent": "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043D\u044B\u0435 \u043F\u0430\u043F\u043A\u0438",
+  "commands.pathInputToast": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \u0438\u043B\u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438.",
+  "commands.pathUpdated": "\u041C\u0435\u0441\u0442\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u043E.",
+  "commands.taskInvalidButton": "\u042D\u0442\u0430 \u043A\u043D\u043E\u043F\u043A\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u0430 \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
+  "commands.taskOldCard": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0439 \u043A\u0430\u0440\u0442\u044B \u0437\u0430\u0434\u0430\u0447 \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /tasks \u0435\u0449\u0435 \u0440\u0430\u0437.",
+  "commands.taskWrongOwner": "\u042D\u0442\u0430 \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0432\u0430\u0448\u0430 \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A",
+  "commands.taskRefreshed": "\u0421\u043F\u0438\u0441\u043E\u043A \u0437\u0430\u0434\u0430\u0447 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D.",
+  "commands.taskEnded": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u0438\u043B\u0438 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430",
+  "commands.taskConfirmCancel": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044C \u043E\u0442\u043C\u0435\u043D\u0443",
+  "commands.taskCancelExpired": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F \u043E\u0442\u043C\u0435\u043D\u044B \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0437\u0430\u0434\u0430\u0447\u0435 \u0435\u0449\u0435 \u0440\u0430\u0437.",
+  "commands.taskRetryUnsupported": "\u042D\u0442\u043E\u0442 \u0442\u0438\u043F \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442 \u044D\u0442\u0443 \u043A\u043D\u043E\u043F\u043A\u0443 \u043F\u043E\u0432\u0442\u043E\u0440\u0430.",
+  "commands.taskPrioritized": "\u041F\u0435\u0440\u0435\u043C\u0435\u0449\u0435\u043D \u0432 \u043D\u0430\u0447\u0430\u043B\u043E \u043E\u0447\u0435\u0440\u0435\u0434\u0438 \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u044F",
+  "commands.taskPausing": "\u041F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u044F \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0444\u0430\u0439\u043B\u0430",
+  "commands.taskPaused": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
+  "commands.taskResumed": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
+  "commands.taskCancelled": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
+  "commands.taskProtected": "\u0417\u0430\u0449\u0438\u0442\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u044B \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438; \u043F\u043E\u0434\u043E\u0436\u0434\u0438\u0442\u0435, \u043F\u043E\u043A\u0430 \u0443\u0441\u043B\u043E\u0432\u0438\u044F \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u044F\u0442\u0441\u044F",
+  "commands.taskForbidden": "\u042D\u0442\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0438\u0442 \u0442\u0435\u043A\u0443\u0449\u0435\u043C\u0443 \u0447\u0430\u0442\u0443",
+  "commands.taskOperationFailed": "\u041E\u043F\u0435\u0440\u0430\u0446\u0438\u044F \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C: {error}",
+  "commands.taskPrefixAmbiguous": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435\u043E\u0434\u043D\u043E\u0437\u043D\u0430\u0447\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u0437\u0430\u0434\u0430\u0447.",
+  "commands.bulkInvalidChat": "\u{1F4EE} \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u044D\u0442\u043E\u0442 \u0447\u0430\u0442. \u041D\u0438 \u043E\u0434\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u0431\u044B\u043B\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.",
+  "commands.bulkEmpty": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435\u0442 \u043E\u0442\u043C\u0435\u043D\u044F\u0435\u043C\u044B\u0445 \u0437\u0430\u0434\u0430\u0447.",
+  "commands.bulkTitle": "\u26A0\uFE0F **\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0432\u0441\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435?**",
+  "commands.bulkOrdinary": "\u0420\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438: \u0437\u0430\u0434\u0430\u0447\u0438 {tasks} (\u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B {active}, \u0444\u0430\u0439\u043B\u044B \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u044F {pending})",
+  "commands.bulkChannels": "\u0417\u0430\u0434\u0430\u0447\u0438 \u043A\u0430\u043D\u0430\u043B\u0430: {count}",
+  "commands.bulkWarning": "\u0412\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 \u0437\u0430\u0434\u0430\u0447 \u0431\u0443\u0434\u0435\u0442 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E, \u0430 \u0438\u0445 \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u0431\u0443\u0434\u0443\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u044B. \u0417\u0430\u0434\u0430\u0447\u0438 \u0432 \u0434\u0440\u0443\u0433\u0438\u0445 \u0447\u0430\u0442\u0430\u0445 \u0438 \u0437\u0430\u0434\u0430\u0447\u0438, \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0430\u0449\u0438\u0435 \u0434\u0440\u0443\u0433\u0438\u043C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F\u043C, \u043D\u0435 \u0437\u0430\u0442\u0440\u0430\u0433\u0438\u0432\u0430\u044E\u0442\u0441\u044F.",
+  "commands.bulkInvalid": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043C\u0430\u0441\u0441\u043E\u0432\u043E\u0439 \u043E\u0442\u043C\u0435\u043D\u044B \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
+  "commands.confirmWrongOwner": "\u042D\u0442\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043D\u0435 \u0432\u0430\u0448\u0435 \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A",
+  "commands.confirmInvalid": "\u042D\u0442\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043D\u0435 \u0432\u0430\u0448\u0435, \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D.",
+  "commands.bulkReturned": "\u0412\u0435\u0440\u043D\u0443\u043B\u0441\u044F \u0431\u0435\u0437 \u043E\u0442\u043C\u0435\u043D\u044B \u0437\u0430\u0434\u0430\u0447 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435.",
+  "commands.bulkDoneTitle": "\u{1F6D1} **\u0417\u0430\u0434\u0430\u0447\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u044B**",
+  "commands.bulkDone": "\u0417\u0430\u0434\u0430\u0447\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u044B",
+  "commands.bulkFailed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C: {error}.",
+  "commands.stopFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u0438\u043D\u0443\u0434\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0437\u0430\u0434\u0430\u0447\u0438: {error}.",
+  "commands.cleanupCancelledSummary": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430. \u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B: {count}, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044F {size}.",
+  "commands.cleanupCancelledEmpty": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430. \u041D\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0445 \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
+  "commands.cleanupConfirmTitle": "\u26A0\uFE0F **\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u0444\u0430\u0439\u043B\u044B \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430?**",
+  "commands.cleanupConfirmSummary": "\u041F\u0440\u0438 \u044D\u0442\u043E\u043C \u0444\u0430\u0439\u043B\u044B **{count}** \u0431\u0443\u0434\u0443\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u044B \u0438\u0437 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A \u0441 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435\u043C **{size}**.",
+  "commands.cleanupConfirmImpact": "\u041F\u0440\u0438 \u044D\u0442\u043E\u043C \u0431\u0443\u0434\u0443\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u044B \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u0438\u0445 \u0438\u043D\u0434\u0435\u043A\u0441\u044B, \u043D\u043E \u043D\u0435 \u0438\u0441\u0442\u043E\u0440\u0438\u044F \u0437\u0430\u0434\u0430\u0447 \u0438\u043B\u0438 \u043E\u0431\u043B\u0430\u0447\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B.",
+  "commands.cleanupConfirmHint": "\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u0440\u0430\u0441\u043D\u0443\u044E \u043A\u043D\u043E\u043F\u043A\u0443 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F \u043D\u0438\u0436\u0435, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C.",
+  "commands.cleanupConfirmRequired": "\u0422\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435",
+  "commands.cleanupConfirmInvalid": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043E\u0447\u0438\u0441\u0442\u043A\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E, \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D.",
+  "commands.cleanupDoneTitle": "\u2705 **\u0424\u0430\u0439\u043B\u044B \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0443\u0434\u0430\u043B\u0435\u043D\u044B**",
+  "commands.cleanupDoneSummary": "\u0423\u0434\u0430\u043B\u0435\u043D\u044B: \u0444\u0430\u0439\u043B\u044B {count}.\n\u041E\u0441\u0432\u043E\u0431\u043E\u0436\u0434\u0435\u043D\u043E \u043C\u0435\u0441\u0442\u043E: {size}\n\u041E\u0441\u0442\u0430\u043B\u044C\u043D\u044B\u0435 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B: {remaining}.",
+  "commands.cleanupDeleted": "\u0423\u0434\u0430\u043B\u0435\u043D\u044B \u0444\u0430\u0439\u043B\u044B {count}.",
+  "commands.cleanupOldButton": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441\u0442\u0430\u0440\u043E\u0439 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u0447\u0438\u0441\u0442\u043A\u0438 \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C/\u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0435\u0449\u0435 \u0440\u0430\u0437.",
+  "commands.cleanupFailed": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C: {error}.",
+  "commands.bulkInvalidConfirm": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043C\u0430\u0441\u0441\u043E\u0432\u043E\u0439 \u043E\u0442\u043C\u0435\u043D\u044B \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
+  "commands.bulkNotOwner": "\u042D\u0442\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043D\u0435 \u0432\u0430\u0448\u0435 \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A",
+  "commands.bulkReturnedToast": "\u0412\u0435\u0440\u043D\u0443\u043B\u0441\u044F",
+  "commands.bulkInvalidUsed": "\u042D\u0442\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043D\u0435 \u0432\u0430\u0448\u0435, \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D.",
+  "commands.bulkDoneMessage": "\u0412\u0435\u0440\u043D\u0443\u043B\u0441\u044F \u0431\u0435\u0437 \u043E\u0442\u043C\u0435\u043D\u044B \u0437\u0430\u0434\u0430\u0447 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435.",
+  "commands.bulkCancelledToast": "\u0417\u0430\u0434\u0430\u0447\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u044B",
+  "commands.bulkCancelFailed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C: {error}.",
+  "commands.taskStopFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u0438\u043D\u0443\u0434\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0437\u0430\u0434\u0430\u0447\u0438: {error}.",
+  "commands.taskPausedChannel": "\u23F8\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 {task} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {source}",
+  "commands.taskNotFoundPause": "\u{1F4EE} \u0417\u0430\u0434\u0430\u0447\u0430 {task} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430. \u042D\u0442\u0430 \u043E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0447\u0430\u0442\u0430 \u043D\u0435 \u0431\u044B\u043B\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
+  "commands.taskResumedSingle": "\u25B6\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
+  "commands.taskResumedChannel": "\u25B6\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 {task} \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {source}",
+  "commands.taskNotFoundResume": "\u{1F4EE} \u0417\u0430\u0434\u0430\u0447\u0430 {task} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430. \u042D\u0442\u0430 \u043E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0447\u0430\u0442\u0430 \u043D\u0435 \u0431\u044B\u043B\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
+  "commands.taskCancelledSingle": "\u{1F6D1} \u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
+  "commands.taskCancelledChannel": "\u{1F6D1} \u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 {task} \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.\n\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {source}",
+  "commands.taskNotFound": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043F\u043E\u0434\u0445\u043E\u0434\u044F\u0449\u0435\u0439 \u0437\u0430\u0434\u0430\u0447\u0438: {task}.",
+  "commands.taskLegacyCancel": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441\u0442\u0430\u0440\u043E\u0439 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u0442\u043C\u0435\u043D\u044B \u0438\u0441\u0442\u0435\u043A. \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 /tasks, \u0447\u0442\u043E\u0431\u044B \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0437\u0430\u0434\u0430\u0447\u0435 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044C \u0435\u0435.",
+  "commands.taskLegacyAmbiguous": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0443\u043D\u0438\u043A\u0430\u043B\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C/\u0437\u0430\u0434\u0430\u0447\u0438.",
+  "commands.taskLegacyEnded": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u0438\u043B\u0438 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430",
+  "commands.retryNoUniqueChannel": "\u{1F4EE} \u041D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u0443\u043D\u0438\u043A\u0430\u043B\u044C\u043D\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438 \u043A\u0430\u043D\u0430\u043B\u0430; \u043D\u0438\u043A\u0430\u043A\u0430\u044F \u0434\u0440\u0443\u0433\u0430\u044F \u0437\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043F\u043E\u0432\u0442\u043E\u0440\u044F\u043B\u0430\u0441\u044C.",
+  "commands.retryChannelDone": "\u{1F504} \u0412\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0443\u0447\u0430\u0441\u0442\u0438\u0435 \u0432 {count} \u043D\u0435\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0445 \u0437\u0430\u0434\u0430\u0447 \u043A\u0430\u043D\u0430\u043B\u0430.\n\u0417\u0430\u0434\u0430\u0447\u0430: {task}",
+  "commands.retryChannelEmpty": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0435 \u043A\u0430\u043D\u0430\u043B\u0430 \u043D\u0435\u0442 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u044B\u0445 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u043E\u0432, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u043C\u043E\u0436\u043D\u043E \u0431\u044B\u043B\u043E \u0431\u044B \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C.",
+  "commands.retryInvalidChat": "\u{1F4EE} \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u044D\u0442\u043E\u0442 \u0447\u0430\u0442; \u043D\u0438 \u043E\u0434\u043D\u0430 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u0430\u044F \u0437\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u0431\u044B\u043B\u0430 \u043F\u043E\u0432\u0442\u043E\u0440\u0435\u043D\u0430.",
+  "commands.retryTaskMissing": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043D\u0435\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0445 \u0437\u0430\u0434\u0430\u0447: {task}",
+  "commands.workerReadFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u043E\u0434\u043D\u043E\u0444\u0430\u0439\u043B\u043E\u0432\u044B\u0439 \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u043F\u043E\u0437\u0436\u0435.",
+  "commands.concurrencyReadFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u044C\u043D\u043E\u0433\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u0444\u0430\u0439\u043B\u0430\u043C. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u043F\u043E\u0437\u0436\u0435.",
+  "commands.pathOncePromptDirect": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u0430\u043F\u043A\u0438 \u0434\u043B\u044F \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
+  "commands.pathOnceSavedDirect": "\u{1F4CC} \u0414\u043B\u044F \u043F\u0430\u043F\u043A\u0438 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \xAB{folder}\xBB.\n{preview}\n\n\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u0430 \u0438\u0441\u0442\u0435\u043A\u0430\u0435\u0442 \u043F\u043E\u0441\u043B\u0435 \u0442\u043E\u0433\u043E, \u043A\u0430\u043A \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0444\u0430\u0439\u043B \u0432\u043E\u0439\u0434\u0435\u0442 \u0432 \u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u043F\u0440\u043E\u0446\u0435\u0441\u0441 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
+  "commands.pathSessionPromptDirect": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u0430\u043F\u043A\u0438, \u043A\u043E\u0442\u043E\u0440\u0430\u044F \u0431\u0443\u0434\u0435\u0442 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C\u0441\u044F \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430.",
+  "commands.pathSessionSavedDirect": "\u{1F4CD} \u0414\u043B\u044F \u043F\u0430\u043F\u043A\u0438 \u0441\u0435\u0430\u043D\u0441\u0430 \u0447\u0430\u0442\u0430 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \xAB{folder}\xBB.\n{preview}\n\n\u0411\u0443\u0434\u0443\u0449\u0438\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u0431\u0443\u0434\u0443\u0442 \u043F\u0440\u0435\u0434\u043F\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u044D\u0442\u0443 \u043F\u0430\u043F\u043A\u0443. \u0423\u0434\u0430\u043B\u0438\u0442\u0435 \u0435\u0433\u043E \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB.",
+  "commands.pathInvalidDirect": "\u274C \u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043F\u0443\u0442\u044C: {error}.",
+  "commands.pathClearedDirect": "\u{1F9F9} \u041E\u0447\u0438\u0449\u0435\u043D\u044B \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u0438\u0435 \u043F\u0430\u043F\u043A\u0438 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0438 \u0441\u0435\u0430\u043D\u0441\u0430 \u0447\u0430\u0442\u0430. \u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044F \u0441\u043D\u043E\u0432\u0430 \u0430\u043A\u0442\u0438\u0432\u043D\u0430."
+};
+
+// src/i18n/telegram.ts
+var DEFAULT_LOCALE = "zh-CN";
+var FALLBACK_LOCALE = "zh-CN";
+var TELEGRAM_LOCALES = {
+  "zh-CN": { code: "zh-CN", nativeName: "\u7B80\u4F53\u4E2D\u6587", aliases: ["zh", "zh-cn", "zh-hans", "cn"], direction: "ltr", intlLocale: "zh-CN", telegramLanguageCode: "zh" },
+  en: { code: "en", nativeName: "English", aliases: ["en", "en-us", "en-gb"], direction: "ltr", intlLocale: "en", telegramLanguageCode: "en" },
+  ru: { code: "ru", nativeName: "\u0420\u0443\u0441\u0441\u043A\u0438\u0439", aliases: ["ru", "ru-ru"], direction: "ltr", intlLocale: "ru-RU", telegramLanguageCode: "ru" }
+};
+var resources = {
+  "zh-CN": {
+    "language.choose": "\u8BF7\u9009\u62E9\u8BED\u8A00 / Please choose your language",
+    "language.title": "\u{1F310} **\u8BED\u8A00\u8BBE\u7F6E**",
+    "language.current": "\u5F53\u524D\u8BED\u8A00\uFF1A{language}",
+    "language.changed": "\u2705 \u8BED\u8A00\u5DF2\u5207\u6362\u4E3A\u7B80\u4F53\u4E2D\u6587",
+    "language.chinese": "\u7B80\u4F53\u4E2D\u6587",
+    "language.english": "English",
+    "language.russian": "\u0420\u0443\u0441\u0441\u043A\u0438\u0439",
+    "language.hint": "\u8BF7\u9009\u62E9 Bot \u754C\u9762\u8BED\u8A00\u3002\u6B64\u64CD\u4F5C\u53EA\u66F4\u6539\u663E\u793A\u8BED\u8A00\u3002",
+    "auth.required": "\u{1F510} \u8BF7\u5148\u53D1\u9001 /start \u9A8C\u8BC1\u5BC6\u7801",
+    "auth.requiredUpload": "\u{1F510} \u8BF7\u5148\u53D1\u9001 /start \u9A8C\u8BC1\u5BC6\u7801\u540E\u518D\u4E0A\u4F20\u6587\u4EF6",
+    "auth.inputPrompt": "\u{1F510} \u8BF7\u4F7F\u7528\u4E0B\u65B9\u952E\u76D8\u8F93\u5165\u5BC6\u7801\uFF1A",
+    "auth.cancelled": "\u{1F6AB} \u5DF2\u53D6\u6D88\u5BC6\u7801\u8F93\u5165\n\n\u53D1\u9001 /start \u91CD\u65B0\u5F00\u59CB",
+    "auth.wrong": "\u274C \u5BC6\u7801\u9519\u8BEF\uFF0C\u8BF7\u91CD\u65B0\u8F93\u5165\uFF1A",
+    "auth.success": "\u2705 \u5BC6\u7801\u9A8C\u8BC1\u6210\u529F!",
+    "auth.startPrompt": "\u{1F44B} **\u6B22\u8FCE\u4F7F\u7528 TG Vault Bot\uFF01**\n\n\u{1F510} \u8BF7\u4F7F\u7528\u4E0B\u65B9\u952E\u76D8\u8F93\u5165\u5BC6\u7801\uFF1A",
+    "auth.welcomeBack": "\u{1F44B} **\u6B22\u8FCE\u56DE\u6765\uFF01**\n\n\u53D1\u9001\u6216\u8F6C\u53D1\u6587\u4EF6\u5373\u53EF\u4E0A\u4F20\u3002\n\n\u8BF7\u4ECE\u4E0B\u65B9\u56DB\u4E2A\u4E3B\u5165\u53E3\u5F00\u59CB\uFF1B\u5B8C\u6574\u80FD\u529B\u53EF\u4F7F\u7528 /help \u67E5\u770B\u3002",
+    "auth.successBody": "\u2705 **\u5BC6\u7801\u9A8C\u8BC1\u6210\u529F\uFF01**\n\n\u73B0\u5728\u60A8\u53EF\u4EE5\uFF1A\n\u{1F4E4}  \u53D1\u9001/\u8F6C\u53D1\u4EFB\u610F\u6587\u4EF6\u4E0A\u4F20 (\u6700\u5927 2GB\uFF0C\u8D26\u53F7\u7EA7\u4E0B\u8F7D\u5668\u4E0D\u53D7\u6B64\u9650\u5236)\n\u{1F4CA}  /storage \u2014 \u67E5\u770B\u5B58\u50A8\u7A7A\u95F4",
+    "auth.twoFactorPrompt": "\u{1F510} \u5BC6\u7801\u9A8C\u8BC1\u901A\u8FC7\uFF01\n\n\u8BF7\u8F93\u5165\u60A8\u7684 **2FA 6 \u4F4D\u9A8C\u8BC1\u7801** \u4EE5\u5B8C\u6210\u767B\u5F55\uFF1A",
+    "auth.twoFactorToast": "\u8BF7\u8F93\u5165 2FA \u9A8C\u8BC1\u7801",
+    "auth.twoFactorWrong": "\u274C \u9A8C\u8BC1\u7801\u9519\u8BEF\uFF0C\u8BF7\u91CD\u65B0\u8F93\u5165 6 \u4F4D\u6570\u5B57\uFF1A",
+    "auth.twoFactorActivated": "\u2705 **2FA \u5DF2\u6210\u529F\u6FC0\u6D3B\uFF01**\n\n\u{1F6E1}\uFE0F \u60A8\u7684\u8D26\u6237\u73B0\u5728\u53D7\u5230\u53CC\u91CD\u4FDD\u62A4\u3002",
+    "auth.twoFactorLoginOk": "\u2705 **2FA \u9A8C\u8BC1\u6210\u529F**\n\n\u6B22\u8FCE\u56DE\u6765\uFF01",
+    "auth.twoFactorQrFail": "\u274C \u751F\u6210\u4E8C\u7EF4\u7801\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u63A7\u5236\u53F0\u65E5\u5FD7\u3002",
+    "common.unknownText": "\u2753 \u672A\u8BC6\u522B\u7684\u6307\u4EE4\n\n\u53D1\u9001 /start \u5F00\u59CB\u4F7F\u7528\uFF0C\u6216 /help \u67E5\u770B\u5E2E\u52A9",
+    "common.unsupportedMedia": "\u26A0\uFE0F \u6682\u4E0D\u652F\u6301\u6B64\u7C7B\u5A92\u4F53\u683C\u5F0F",
+    "common.emptyFiles": "\u{1F4EE} \u6682\u65E0\u4E0A\u4F20\u8BB0\u5F55",
+    "common.emptyTasks": "\u{1F4EE} \u5F53\u524D\u6CA1\u6709\u8FDB\u884C\u4E2D\u7684\u4EFB\u52A1",
+    "common.fileCount": "{count} \u4E2A\u6587\u4EF6",
+    "common.cancel": "\u53D6\u6D88",
+    "common.back": "\u8FD4\u56DE",
+    "common.refresh": "\u5237\u65B0",
+    "common.confirm": "\u786E\u8BA4",
+    "common.failed": "\u5931\u8D25",
+    "common.success": "\u6210\u529F",
+    "messages.storage.title": "\u{1F4CA} **\u5B58\u50A8\u7A7A\u95F4\u7EDF\u8BA1**",
+    "messages.storage.disk": "**\u{1F4BF} \u670D\u52A1\u5668\u78C1\u76D8**",
+    "messages.storage.total": "  \u603B\u5BB9\u91CF\u3000{value}",
+    "messages.storage.used": "  \u5DF2\u4F7F\u7528\u3000{value} ({percent}%)",
+    "messages.storage.free": "  \u53EF\u3000\u7528\u3000{value}",
+    "messages.storage.indexed": "**\u{1F4C1} \u5B58\u50A8\u6E90\u6587\u4EF6**",
+    "messages.storage.fileCount": "  \u6587\u4EF6\u6570\u3000{count} \u4E2A",
+    "messages.storage.size": "  \u5360\u3000\u7528\u3000{value}",
+    "messages.storage.local": "**\u{1F5A5}\uFE0F \u672C\u5730\u670D\u52A1\u5668\u4E0B\u8F7D\u6587\u4EF6**",
+    "messages.storage.location": "  \u4F4D\u7F6E\u3000uploads \u672C\u5730\u7F13\u5B58/\u4E0B\u8F7D\u76EE\u5F55",
+    "messages.storage.queue": "**\u{1F4E1} \u4E0B\u8F7D\u961F\u5217**",
+    "messages.storage.queueCounts": "  \u{1F504} \u5904\u7406\u4E2D {active}\u3000\u23F3 \u7B49\u5F85\u4E2D {pending}",
+    "messages.files.title": "\u{1F4CB} **\u6700\u8FD1\u4E0A\u4F20\u7684\u6587\u4EF6**\uFF08\u672C\u9875 {count} \u6761\uFF09",
+    "messages.files.unnamed": "\u672A\u547D\u540D\u6587\u4EF6",
+    "messages.files.hint": "\u{1F4A1} \u9700\u8981\u641C\u7D22\u6216\u64CD\u4F5C\u6587\u4EF6\uFF0C\u8BF7\u6253\u5F00\u201C\u641C\u7D22\u548C\u64CD\u4F5C\u6587\u4EF6\u201D\u3002",
+    "fileBrowser.detail": "\u8BE6\u60C5",
+    "fileBrowser.copyId": "\u590D\u5236 ID",
+    "fileBrowser.favorite": "\u6536\u85CF",
+    "fileBrowser.unfavorite": "\u53D6\u6D88\u6536\u85CF",
+    "fileBrowser.signedLink": "\u7B7E\u540D\u94FE\u63A5",
+    "fileBrowser.move": "\u79FB\u52A8",
+    "fileBrowser.rename": "\u91CD\u547D\u540D",
+    "fileBrowser.delete": "\u5220\u9664\u2026",
+    "fileBrowser.unnamed": "\u672A\u547D\u540D\u6587\u4EF6",
+    "fileBrowser.other": "\u5176\u4ED6",
+    "fileBrowser.localStorage": "\u672C\u5730\u5B58\u50A8",
+    "fileBrowser.rootFolder": "\u6839\u76EE\u5F55",
+    "fileBrowser.unknown": "\u672A\u77E5",
+    "fileBrowser.search": "\u6587\u4EF6\u641C\u7D22",
+    "fileBrowser.recentFiles": "\u6700\u8FD1\u6587\u4EF6",
+    "fileBrowser.noMatches": "\u6CA1\u6709\u5339\u914D\u6587\u4EF6\u3002",
+    "fileBrowser.hint": "\u70B9\u51FB\u6587\u4EF6\u53EF\u67E5\u770B\u8BE6\u60C5\u3001\u590D\u5236 ID\u3001\u6536\u85CF\u3001\u751F\u6210\u94FE\u63A5\u3001\u79FB\u52A8/\u91CD\u547D\u540D\u6216\u8FDB\u5165\u5220\u9664\u786E\u8BA4\u3002",
+    "messages.delete.success": "\u2705 **\u6587\u4EF6\u5DF2\u5220\u9664**",
+    "keyboard.upload": "\u{1F4E4} \u4E0A\u4F20\u8BF4\u660E",
+    "keyboard.tasks": "\u{1F527} \u4EFB\u52A1",
+    "keyboard.storage": "\u{1F4CA} \u5B58\u50A8",
+    "keyboard.more": "\u2630 \u66F4\u591A",
+    "keyboard.cancel": "\u53D6\u6D88",
+    "help.body": "\u{1F4D6} **\u4F7F\u7528\u5E2E\u52A9**\n\n\u{1F4E4} \u53D1\u9001\u6216\u8F6C\u53D1\u6587\u4EF6\uFF1A\u76F4\u63A5\u4E0A\u4F20\n\u{1F517} \u53D1\u9001 Telegram \u6D88\u606F\u94FE\u63A5 [\u6587\u4EF6\u5939\u540D]\uFF1A\u76F4\u63A5\u4E0B\u8F7D\uFF0C\u7701\u7565\u540D\u79F0\u6309\u5F53\u5929\u65E5\u671F\u5206\u7C7B\n\u{1F4E5} \u4EFB\u52A1\uFF1A\u67E5\u770B\u8FDB\u5EA6\u3001\u6682\u505C\u6216\u53D6\u6D88\n\u{1F4C1} \u4FDD\u5B58\u4F4D\u7F6E\uFF1A\u8BBE\u7F6E\u76EE\u5F55\u548C\u5B58\u50A8\u76EE\u6807\n\u{1F4E1} \u9891\u9053\uFF1A\u6309\u65E5\u671F/\u6807\u7B7E\u4E0B\u8F7D\u6216\u7BA1\u7406\u8BA2\u9605\n\u{1F310} /language\uFF1A\u66F4\u6539\u754C\u9762\u8BED\u8A00\n\n\u{1F447} \u70B9\u51FB\u4E0B\u65B9\u6309\u94AE\u9009\u62E9\u529F\u80FD\u3002",
+    "notification.digestTitle": "\u{1F4EC} **\u901A\u77E5\u6458\u8981**",
+    "notification.settingsTitle": "\u{1F514} **\u901A\u77E5\u8BBE\u7F6E**",
+    "notification.securityImmediate": "\u5B89\u5168\u544A\u8B66\u59CB\u7EC8\u7ACB\u5373\u901A\u77E5\u3002",
+    "notification.clickToChange": "\u{1F447} \u70B9\u51FB\u6309\u94AE\u4FEE\u6539",
+    "notifications.digestTitle": "\u{1F4EC} **\u901A\u77E5\u6458\u8981**",
+    "notifications.title": "\u{1F514} **\u901A\u77E5\u8BBE\u7F6E**",
+    "notifications.securityAlways": "\u5B89\u5168\u544A\u8B66\u59CB\u7EC8\u7ACB\u5373\u901A\u77E5\u3002",
+    "notifications.clickToChange": "\u{1F447} \u70B9\u51FB\u6309\u94AE\u4FEE\u6539",
+    "notifications.successImmediate": "\u6210\u529F\xB7\u7ACB\u5373",
+    "notifications.successDigest": "\u6210\u529F\xB7\u6458\u8981",
+    "notifications.successOff": "\u6210\u529F\xB7\u5173\u95ED",
+    "notifications.invalidTimezone": "\u65E0\u6548\u65F6\u533A",
+    "notifications.failureImmediate": "\u5931\u8D25\xB7\u7ACB\u5373",
+    "notifications.failureDigest": "\u5931\u8D25\xB7\u6458\u8981",
+    "notifications.subscriptionImmediate": "\u8BA2\u9605\xB7\u7ACB\u5373",
+    "notifications.subscriptionDigest": "\u8BA2\u9605\xB7\u6458\u8981",
+    "notifications.quietPreset": "\u5B89\u9759 22:00\u201307:00",
+    "notifications.quietOff": "\u5173\u95ED\u5B89\u9759\u65F6\u6BB5",
+    "notifications.timezoneShanghai": "\u65F6\u533A\xB7\u4E0A\u6D77",
+    "notifications.timezoneUtc": "\u65F6\u533A\xB7UTC",
+    "notifications.modeImmediate": "\u7ACB\u5373",
+    "notifications.modeDigest": "\u6458\u8981",
+    "notifications.modeDigestCombined": "\u5408\u5E76\u6458\u8981",
+    "notifications.modeOff": "\u4E0D\u901A\u77E5",
+    "notifications.quietDisabled": "\u672A\u5F00\u542F",
+    "notifications.settingsModes": "\u5931\u8D25\uFF1A{failure} \uFF5C \u6210\u529F\uFF1A{success}",
+    "notifications.settingsSchedule": "\u8BA2\u9605\uFF1A{subscription} \uFF5C \u5B89\u9759\uFF1A{quiet}",
+    "notifications.settingsTimezone": "\u65F6\u533A\uFF1A{timezone}",
+    "notifications.error.timezoneRequired": "\u8BF7\u63D0\u4F9B\u65F6\u533A\uFF0C\u4F8B\u5982 Asia/Shanghai",
+    "notifications.error.quietFormat": "\u5B89\u9759\u65F6\u6BB5\u683C\u5F0F\u5E94\u4E3A HH:MM-HH:MM\uFF0C\u4F8B\u5982 22:00-07:00\uFF1B\u5173\u95ED\u8BF7\u4F7F\u7528 quiet off",
+    "notifications.error.successMode": "\u6210\u529F\u901A\u77E5\u53EF\u9009\u503C\uFF1Aimmediate\uFF08\u7ACB\u5373\uFF09\u3001digest\uFF08\u6458\u8981\uFF09\u3001off\uFF08\u5173\u95ED\uFF09",
+    "notifications.error.deliveryMode": "\u901A\u77E5\u53EF\u9009\u503C\uFF1Aimmediate\uFF08\u7ACB\u5373\uFF09\u6216 digest\uFF08\u6458\u8981\uFF09",
+    "notifications.error.unknownSetting": "\u672A\u77E5\u8BBE\u7F6E\u3002\u8BF7\u76F4\u63A5\u53D1\u9001 /notifications \u67E5\u770B\u53EF\u7528\u9009\u9879",
+    "channels.errors.sourceAllowlistRequired": "\u672A\u914D\u7F6E Telegram \u6765\u6E90\u767D\u540D\u5355\uFF0C\u7981\u6B62\u4F7F\u7528\u6570\u5B57 ID/\u79C1\u804A/\u79C1\u5BC6\u7FA4\u7EC4\u6765\u6E90\u3002\u8BF7\u914D\u7F6E TELEGRAM_ALLOWED_SOURCES\u3002",
+    "channels.errors.sourceNotAllowed": "\u6765\u6E90 {source} \u4E0D\u5728 Telegram \u4E0B\u8F7D\u767D\u540D\u5355\u4E2D",
+    "channels.errors.downloaderNotReady": "Telegram \u7528\u6237\u8D26\u53F7\u4E0B\u8F7D\u5668\u672A\u5C31\u7EEA",
+    "channels.errors.sourceRequired": "\u9891\u9053\u4E0D\u80FD\u4E3A\u7A7A",
+    "channels.errors.inviteExpired": "\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u5DF2\u8FC7\u671F\uFF0C\u65E0\u6CD5\u89E3\u6790\u3002\u8BF7\u83B7\u53D6\u65B0\u7684\u9080\u8BF7\u94FE\u63A5\uFF0C\u6216\u5148\u7528\u751F\u6210\u7528\u6237 Session \u7684\u540C\u4E00\u4E2A Telegram \u8D26\u53F7\u52A0\u5165\u540E\u518D\u91CD\u8BD5\u3002",
+    "channels.errors.inviteInvalid": "\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u65E0\u6548\uFF0C\u65E0\u6CD5\u89E3\u6790\u3002\u8BF7\u68C0\u67E5\u94FE\u63A5\u662F\u5426\u5B8C\u6574\uFF0C\u6216\u91CD\u65B0\u751F\u6210\u9080\u8BF7\u94FE\u63A5\u3002",
+    "channels.errors.inviteAlreadyJoined": "\u5F53\u524D\u8D26\u53F7\u5DF2\u52A0\u5165\uFF0C\u4F46 Telegram \u8FD4\u56DE\u4E86\u5F02\u5E38\u72B6\u6001\uFF0C\u8BF7\u91CD\u65B0\u5C1D\u8BD5\u89E3\u6790\u3002",
+    "channels.errors.inviteResolutionFailed": "\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u89E3\u6790\u5931\u8D25\uFF1A{error}",
+    "channels.errors.inviteNotJoined": "\u5F53\u524D Telegram \u7528\u6237\u8D26\u53F7\u5C1A\u672A\u52A0\u5165\u8FD9\u4E2A\u79C1\u5BC6\u9891\u9053/\u7FA4\uFF0C\u65E0\u6CD5\u8BFB\u53D6\u6D88\u606F\u3002\u8BF7\u5148\u4F7F\u7528\u751F\u6210\u7528\u6237 Session \u7684\u540C\u4E00\u4E2A Telegram \u8D26\u53F7\u6253\u5F00\u9080\u8BF7\u94FE\u63A5\u5E76\u52A0\u5165\uFF0C\u7136\u540E\u91CD\u65B0\u6267\u884C\u8BA2\u9605\u6216\u4E0B\u8F7D\u547D\u4EE4\u3002",
+    "channels.errors.inviteMissingEntity": "\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u89E3\u6790\u5931\u8D25\uFF1ATelegram \u672A\u8FD4\u56DE\u53EF\u8BFB\u53D6\u7684\u9891\u9053\u5B9E\u4F53\u3002\u8BF7\u68C0\u67E5\u8D26\u53F7\u662F\u5426\u4ECD\u5728\u8BE5\u9891\u9053/\u7FA4\u5185\u3002",
+    "channels.errors.hashtagRequired": "\u6807\u7B7E\u4E0D\u80FD\u4E3A\u7A7A",
+    "channels.errors.hashtagInvalid": "\u6807\u7B7E\u683C\u5F0F\u5E94\u4E3A #xxx\uFF0C\u4E0D\u80FD\u5305\u542B\u7A7A\u683C",
+    "channels.errors.subscriptionNotFound": "\u8BA2\u9605\u4E0D\u5B58\u5728",
+    "channels.errors.subscriptionDisabled": "\u8BA2\u9605\u5DF2\u505C\u7528",
+    "channels.errors.noDownloadableMessages": "\u6CA1\u6709\u53EF\u4E0B\u8F7D\u7684\u6D88\u606F",
+    "channels.errors.sourceMessageUnavailable": "\u539F\u6D88\u606F\u4E0D\u5B58\u5728\u6216\u6CA1\u6709\u53EF\u4E0B\u8F7D\u5A92\u4F53",
+    "channels.errors.fixedTargetProviderRequired": "\u56FA\u5B9A\u8BA2\u9605\u76EE\u6807\u7F3A\u5C11 provider",
+    "channels.storageCooldown": "\u23F8\uFE0F Google Drive \u4ECA\u65E5\u4E0A\u4F20\u989D\u5EA6\u5DF2\u8FBE\u4E0A\u9650\n\n\u5F53\u524D\u4EFB\u52A1\u5DF2\u81EA\u52A8\u6682\u505C\uFF0C\u5269\u4F59\u6587\u4EF6\u4E0D\u4F1A\u4E22\u5931\uFF1B\u65E0\u9700\u70B9\u51FB\u201C\u7EE7\u7EED\u201D\u3002\u7CFB\u7EDF\u5C06\u5728\u989D\u5EA6\u6062\u590D\u540E\u81EA\u52A8\u7EE7\u7EED\u3002\n\n\u6062\u590D\u65F6\u95F4\uFF1A{retryAt}\n\u4EFB\u52A1\uFF1A{jobId}",
+    "channels.recoveryComplete": "\u267B\uFE0F \u5DF2\u6062\u590D\u5E76\u5B8C\u6210\u4EFB\u52A1 {jobId}\uFF1A\u6210\u529F {successful}\uFF0C\u8DF3\u8FC7 {skipped}\uFF0C\u5931\u8D25 {failed}",
+    "subscriptions.syncComplete": "\u2705 \u8BA2\u9605 {source} \u5DF2\u540C\u6B65 {found} \u4E2A\u65B0\u6587\u4EF6\uFF0C\u8DF3\u8FC7 {skipped} \u6761\uFF0C\u5931\u8D25 {failed} \u6761\u3002",
+    "subscriptions.syncCompleteContinues": "\u2705 \u8BA2\u9605 {source} \u5DF2\u540C\u6B65 {found} \u4E2A\u65B0\u6587\u4EF6\uFF0C\u8DF3\u8FC7 {skipped} \u6761\uFF0C\u5931\u8D25 {failed} \u6761\u3002\u672C\u8F6E\u8FBE\u5230\u626B\u63CF\u4E0A\u9650\u6216\u5B58\u5728\u5931\u8D25\u9879\uFF0C\u5269\u4F59\u5C06\u5728\u540E\u7EED\u7EE7\u7EED\u5904\u7406\u3002",
+    "subscriptions.disabled.inviteExpired": "\u8BA2\u9605\u5DF2\u6682\u505C\uFF1A\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u5DF2\u8FC7\u671F\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u89E3\u6790\u6216\u4E0B\u8F7D\u3002\u8BF7\u91CD\u65B0\u52A0\u5165/\u66F4\u65B0\u94FE\u63A5\u540E\u518D\u8BA2\u9605\u3002",
+    "subscriptions.disabled.inviteInvalid": "\u8BA2\u9605\u5DF2\u6682\u505C\uFF1A\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u65E0\u6548\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u89E3\u6790\u6216\u4E0B\u8F7D\u3002\u8BF7\u68C0\u67E5\u94FE\u63A5\u540E\u91CD\u65B0\u8BA2\u9605\u3002",
+    "subscriptions.disabled.notParticipant": "\u8BA2\u9605\u5DF2\u6682\u505C\uFF1A\u5F53\u524D Telegram \u7528\u6237\u8D26\u53F7\u5DF2\u4E0D\u5728\u8BE5\u79C1\u5BC6\u9891\u9053/\u7FA4\u5185\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u4E0B\u8F7D\u3002\u8BF7\u5148\u91CD\u65B0\u52A0\u5165\u540E\u518D\u8BA2\u9605\u3002",
+    "subscriptions.disabled.inaccessible": "\u8BA2\u9605\u5DF2\u6682\u505C\uFF1A\u5F53\u524D Telegram \u7528\u6237\u8D26\u53F7\u65E0\u6CD5\u8BBF\u95EE\u8BE5\u9891\u9053/\u7FA4\uFF0C\u53EF\u80FD\u5DF2\u9000\u51FA\u3001\u88AB\u79FB\u9664\u6216\u9891\u9053\u53D8\u4E3A\u79C1\u5BC6\u3002\u8BF7\u68C0\u67E5\u8D26\u53F7\u6743\u9650\u540E\u91CD\u65B0\u8BA2\u9605\u3002",
+    "subscriptions.disabled.unknown": "\u8BA2\u9605\u5DF2\u6682\u505C\uFF1A\u65E0\u6CD5\u8BBF\u95EE\u6216\u4E0B\u8F7D\u8BE5\u9891\u9053/\u7FA4\u5185\u5BB9\uFF08{error}\uFF09\u3002\u8BF7\u68C0\u67E5\u8D26\u53F7\u662F\u5426\u4ECD\u53EF\u8BBF\u95EE\u540E\u91CD\u65B0\u8BA2\u9605\u3002",
+    "subscriptions.paused.inviteExpired": "\u26A0\uFE0F \u5DF2\u6682\u505C\u8BA2\u9605 {source}\n\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u5DF2\u8FC7\u671F\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u89E3\u6790\u6216\u4E0B\u8F7D\u3002\n\n\u4F60\u53EF\u4EE5\u5728 /tg_subs \u6216 /tg_sub \u8BA2\u9605\u5217\u8868\u4E2D\u67E5\u770B\u63D0\u9192\uFF1B\u66F4\u65B0\u94FE\u63A5\u5E76\u786E\u8BA4\u8D26\u53F7\u53EF\u8BBF\u95EE\u540E\u91CD\u65B0\u6DFB\u52A0\u8BA2\u9605\u5373\u53EF\u3002",
+    "subscriptions.paused.inviteInvalid": "\u26A0\uFE0F \u5DF2\u6682\u505C\u8BA2\u9605 {source}\n\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u65E0\u6548\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u89E3\u6790\u6216\u4E0B\u8F7D\u3002\n\n\u4F60\u53EF\u4EE5\u5728 /tg_subs \u6216 /tg_sub \u8BA2\u9605\u5217\u8868\u4E2D\u67E5\u770B\u63D0\u9192\uFF1B\u68C0\u67E5\u94FE\u63A5\u5E76\u786E\u8BA4\u8D26\u53F7\u53EF\u8BBF\u95EE\u540E\u91CD\u65B0\u6DFB\u52A0\u8BA2\u9605\u5373\u53EF\u3002",
+    "subscriptions.paused.notParticipant": "\u26A0\uFE0F \u5DF2\u6682\u505C\u8BA2\u9605 {source}\n\u5F53\u524D Telegram \u7528\u6237\u8D26\u53F7\u5DF2\u4E0D\u5728\u8BE5\u79C1\u5BC6\u9891\u9053/\u7FA4\u5185\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u4E0B\u8F7D\u3002\n\n\u4F60\u53EF\u4EE5\u5728 /tg_subs \u6216 /tg_sub \u8BA2\u9605\u5217\u8868\u4E2D\u67E5\u770B\u63D0\u9192\uFF1B\u91CD\u65B0\u52A0\u5165\u5E76\u786E\u8BA4\u8D26\u53F7\u53EF\u8BBF\u95EE\u540E\u91CD\u65B0\u6DFB\u52A0\u8BA2\u9605\u5373\u53EF\u3002",
+    "subscriptions.paused.inaccessible": "\u26A0\uFE0F \u5DF2\u6682\u505C\u8BA2\u9605 {source}\n\u5F53\u524D Telegram \u7528\u6237\u8D26\u53F7\u65E0\u6CD5\u8BBF\u95EE\u8BE5\u9891\u9053/\u7FA4\uFF0C\u53EF\u80FD\u5DF2\u9000\u51FA\u3001\u88AB\u79FB\u9664\u6216\u9891\u9053\u53D8\u4E3A\u79C1\u5BC6\u3002\n\n\u4F60\u53EF\u4EE5\u5728 /tg_subs \u6216 /tg_sub \u8BA2\u9605\u5217\u8868\u4E2D\u67E5\u770B\u63D0\u9192\uFF1B\u786E\u8BA4\u8D26\u53F7\u53EF\u8BBF\u95EE\u540E\u91CD\u65B0\u6DFB\u52A0\u8BA2\u9605\u5373\u53EF\u3002",
+    "subscriptions.paused.unknown": "\u26A0\uFE0F \u5DF2\u6682\u505C\u8BA2\u9605 {source}\n\u65E0\u6CD5\u8BBF\u95EE\u6216\u4E0B\u8F7D\u8BE5\u9891\u9053/\u7FA4\u5185\u5BB9\uFF08{error}\uFF09\u3002\n\n\u4F60\u53EF\u4EE5\u5728 /tg_subs \u6216 /tg_sub \u8BA2\u9605\u5217\u8868\u4E2D\u67E5\u770B\u63D0\u9192\uFF1B\u786E\u8BA4\u8D26\u53F7\u53EF\u8BBF\u95EE\u540E\u91CD\u65B0\u6DFB\u52A0\u8BA2\u9605\u5373\u53EF\u3002",
+    "ads.reason.allowRule": "\u547D\u4E2D\u5141\u8BB8\u89C4\u5219",
+    "ads.reason.blockedTemplate": "\u547D\u4E2D\u5DF2\u786E\u8BA4\u5E7F\u544A\u6A21\u677F",
+    "ads.reason.blockRule": "\u547D\u4E2D\u5C4F\u853D\u89C4\u5219",
+    "ads.reason.normalTemplate": "\u4E0E\u5DF2\u786E\u8BA4\u6B63\u5E38\u5185\u5BB9\u76F8\u4F3C",
+    "ads.reason.adHistoryTemplate": "\u4E0E\u5386\u53F2\u5E7F\u544A\u6A21\u677F\u9AD8\u5EA6\u76F8\u4F3C",
+    "ads.reason.transactionContact": "\u5305\u542B\u4EA4\u6613\u610F\u56FE\u548C\u5916\u90E8\u8054\u7CFB\u65B9\u5F0F",
+    "ads.reason.transactionIntent": "\u5305\u542B\u4EA4\u6613\u6216\u4FC3\u9500\u610F\u56FE",
+    "ads.reason.ctaLink": "\u5305\u542B\u884C\u52A8\u53F7\u53EC\u548C\u5916\u90E8\u8DF3\u8F6C",
+    "ads.reason.callToAction": "\u5305\u542B\u660E\u663E\u884C\u52A8\u53F7\u53EC",
+    "ads.reason.linkDensity": "\u5916\u90E8\u94FE\u63A5\u6216\u8054\u7CFB\u65B9\u5F0F\u5BC6\u96C6",
+    "ads.reason.scarcity": "\u5305\u542B\u9650\u65F6\u6216\u7A00\u7F3A\u6027\u8BDD\u672F",
+    "ads.reason.decorativeMarketing": "\u8425\u9500\u5F0F\u7B26\u53F7\u8F83\u591A",
+    "task.pause": "\u23F8 \u6682\u505C",
+    "task.resume": "\u25B6\uFE0F \u7EE7\u7EED",
+    "task.cancel": "\u{1F6D1} \u53D6\u6D88",
+    "task.retryFailed": "\u{1F504} \u91CD\u8BD5\u5931\u8D25 ({count})",
+    "task.failureDetails": "\u67E5\u770B\u5931\u8D25\u660E\u7EC6",
+    "upload.success": "\u2705 **\u4E0A\u4F20\u6210\u529F\uFF01**",
+    "upload.failed": "\u274C **\u4E0A\u4F20\u5931\u8D25**",
+    "upload.downloading": "\u23F3 **\u6B63\u5728\u4E0B\u8F7D**",
+    "upload.saving": "\u{1F4BE} **\u6B63\u5728\u4FDD\u5B58...**",
+    "upload.queued": "\u23F3 **\u5DF2\u52A0\u5165\u4E0B\u8F7D\u961F\u5217**",
+    "upload.retrying": "\u{1F504} **\u4E0A\u4F20\u5931\u8D25\uFF0C\u6B63\u5728\u91CD\u8BD5...**",
+    "upload.duplicateSkipped": "\u23ED\uFE0F **\u5DF2\u8DF3\u8FC7\u91CD\u590D\u6587\u4EF6**",
+    "upload.reason": "\u539F\u56E0: {error}",
+    "upload.currentQueue": "\u{1F4CA} \u5F53\u524D\u6392\u961F: {count} \u4E2A\u4EFB\u52A1",
+    "upload.wait": "\u{1F4A1} Bot \u5C06\u6309\u987A\u5E8F\u5904\u7406\uFF0C\u8BF7\u8010\u5FC3\u7B49\u5F85",
+    "upload.duplicateCopiedOutcome": "\u267B\uFE0F \u91CD\u590D\u5904\u7406\uFF1A\u5DF2\u751F\u6210\u526F\u672C",
+    "upload.duplicateSkippedOutcome": "\u23ED\uFE0F \u91CD\u590D\u5904\u7406\uFF1A\u5DF2\u8DF3\u8FC7",
+    "upload.manageHint": "\u{1F447} \u53EF\u5728\u201C\u641C\u7D22\u548C\u64CD\u4F5C\u6587\u4EF6\u201D\u4E2D\u7EE7\u7EED\u7BA1\u7406\u3002",
+    "upload.failureRetryNote": "\u{1F504} \u5927\u6587\u4EF6\u53EF\u80FD\u56E0\u7F51\u7EDC\u6CE2\u52A8\u3001Telegram \u9650\u6D41\u6216\u4E34\u65F6\u65AD\u6D41\u5931\u8D25\uFF1BBot \u5DF2\u81EA\u52A8\u91CD\u8BD5\u4E00\u6B21\u3002",
+    "upload.failureAdvice": "\u{1F4A1} \u53EF\u91CD\u65B0\u53D1\u9001\u8BE5\u6587\u4EF6\uFF0C\u6216\u7528 /download_workers \u964D\u4F4E\u5E76\u53D1\u540E\u518D\u8BD5\u3002",
+    "upload.receipt.saved": "\u2705 **\u6587\u4EF6\u5DF2\u4FDD\u5B58**",
+    "upload.receipt.partial": "\u26A0\uFE0F **\u6279\u91CF\u4EFB\u52A1\u90E8\u5206\u5B8C\u6210**",
+    "upload.receipt.failed": "\u274C **\u4FDD\u5B58\u5931\u8D25**",
+    "upload.receipt.processing": "\u23F3 **\u6B63\u5728\u5904\u7406**",
+    "upload.receipt.stats": "\u{1F4CA} \u5171 {total} \xB7 \u6210\u529F {successful} \xB7 \u5931\u8D25 {failed}",
+    "upload.receipt.duplicateCopied": "\u267B\uFE0F \u91CD\u590D\u5904\u7406\uFF1A\u5DF2\u751F\u6210\u526F\u672C",
+    "upload.receipt.duplicateSkipped": "\u23ED\uFE0F \u91CD\u590D\u5904\u7406\uFF1A\u5DF2\u8DF3\u8FC7",
+    "upload.receipt.task": "\u4EFB\u52A1\uFF1A{taskId}",
+    "upload.receipt.findFolder": "\u641C\u7D22\u540C\u76EE\u5F55",
+    "upload.receipt.deleteFile": "\u5220\u9664\u8BE5\u6587\u4EF6",
+    "upload.existingId": "\u{1F194} \u5DF2\u5B58\u5728: {id}",
+    "upload.duplicateCopyAdvice": "\u5982\u9700\u4FDD\u7559\u526F\u672C\uFF0C\u8BF7\u6253\u5F00\u201C\u91CD\u590D\u6587\u4EF6\u5904\u7406\u201D\u5E76\u9009\u62E9\u201C\u751F\u6210\u526F\u672C\u201D\u3002",
+    "upload.taskCancelled.title": "\u{1F6D1} **\u540E\u53F0\u4EFB\u52A1\u5DF2\u53D6\u6D88**",
+    "upload.taskCancelled.id": "\u{1F194} \u4EFB\u52A1\uFF1A`{taskId}`",
+    "upload.taskCancelled.completed": "\u2705 \u5DF2\u5B8C\u6210: {count} \u4E2A\u6587\u4EF6",
+    "upload.taskCancelled.failed": "\u274C \u5931\u8D25: {count} \u4E2A\u6587\u4EF6",
+    "upload.taskCancelled.stopped": "\u{1F6AB} \u5DF2\u505C\u6B62/\u6E05\u7A7A: {count} \u4E2A\u7B49\u5F85\u6216\u8FDB\u884C\u4E2D\u7684\u4EFB\u52A1",
+    "upload.taskCancelled.controlsRemoved": "\u5DF2\u79FB\u9664\u6682\u505C / \u7EE7\u7EED / \u53D6\u6D88\u6309\u94AE\uFF0C\u6B64\u4EFB\u52A1\u4E0D\u4F1A\u518D\u54CD\u5E94\u65E7\u6309\u94AE\u64CD\u4F5C\u3002",
+    "upload.error.unknown": "\u672A\u77E5\u9519\u8BEF",
+    "upload.failedDetail.batch": "{name}: {count} \u9879\u5931\u8D25",
+    "upload.cleanup.expired": "\u8BE5\u6E05\u7406\u4EFB\u52A1\u5DF2\u8FC7\u671F\u6216\u4E0D\u5B58\u5728",
+    "upload.cleanup.success": "\u2705 \u5DF2\u6E05\u7406 {fileName} \u7684\u5783\u573E\u7F13\u5B58 ({size})",
+    "upload.cleanup.failed": "\u6E05\u7406\u5931\u8D25: {error}",
+    "taskCenter.kind.single": "\u5355\u6587\u4EF6",
+    "taskCenter.kind.album": "\u76F8\u518C",
+    "taskCenter.kind.channel": "\u9891\u9053\u4EFB\u52A1",
+    "taskCenter.state.running": "\u6B63\u5728\u8FD0\u884C",
+    "taskCenter.state.waiting": "\u7B49\u5F85\u5F00\u59CB",
+    "taskCenter.state.pausing": "\u6B63\u5728\u5B8C\u6210\u5F53\u524D\u6587\u4EF6",
+    "taskCenter.state.paused": "\u5DF2\u6682\u505C",
+    "taskCenter.state.cooling": "\u7CFB\u7EDF\u7B49\u5F85",
+    "taskCenter.state.failed": "\u5904\u7406\u5931\u8D25",
+    "taskCenter.age.justNow": "\u521A\u521A",
+    "taskCenter.age.minutes": "{count} \u5206\u949F\u524D",
+    "taskCenter.age.hours": "{count} \u5C0F\u65F6\u524D",
+    "taskCenter.age.days": "{count} \u5929\u524D",
+    "taskCenter.progress.active": "\u4E0B\u8F7D\u4E2D {count}",
+    "taskCenter.progress.pending": "\u5F85\u5904\u7406 {count}",
+    "taskCenter.progress.failed": "\u5931\u8D25 {count}",
+    "taskCenter.progress.skipped": "\u8DF3\u8FC7 {count}",
+    "taskCenter.title": "\u{1F4E5} **\u4E0B\u8F7D\u4EFB\u52A1**",
+    "taskCenter.summary": "\u{1F7E2} \u8FD0\u884C\u4E2D {running}\u3000\u23F3 \u7B49\u5F85 {waiting}\u3000\u23F8 \u5DF2\u6682\u505C {paused}",
+    "taskCenter.summaryCooling": "\u{1F9CA} \u7CFB\u7EDF\u7B49\u5F85 {count}",
+    "taskCenter.total": "\u5171 {count} \u4E2A\u8FDB\u884C\u4E2D\u7684\u4EFB\u52A1",
+    "taskCenter.totalPaged": "\u5171 {count} \u4E2A\u8FDB\u884C\u4E2D\u7684\u4EFB\u52A1 \xB7 \u7B2C {page}/{totalPages} \u9875",
+    "taskCenter.item.current": "{kind} \xB7 {progress} \xB7 \u5F53\u524D\uFF1A{file}",
+    "taskCenter.item.state": "{kind} \xB7 {progress} \xB7 {state}",
+    "taskCenter.openHint": "\u70B9\u51FB\u7F16\u53F7\u67E5\u770B\u8BE6\u60C5\u5E76\u63A7\u5236\u9009\u4E2D\u7684\u4EFB\u52A1\u3002",
+    "taskCenter.button.previous": "\u25C0\uFE0F \u4E0A\u4E00\u9875",
+    "taskCenter.button.refresh": "\u{1F504} \u5237\u65B0",
+    "taskCenter.button.next": "\u4E0B\u4E00\u9875 \u25B6\uFE0F",
+    "taskCenter.button.start": "\u25B6\uFE0F \u4F18\u5148\u5F00\u59CB",
+    "taskCenter.button.pause": "\u23F8 \u6682\u505C\u4EFB\u52A1",
+    "taskCenter.button.resume": "\u25B6\uFE0F \u7EE7\u7EED",
+    "taskCenter.button.undoPause": "\u25B6\uFE0F \u64A4\u9500\u6682\u505C",
+    "taskCenter.button.retry": "\u{1F504} \u91CD\u8BD5",
+    "taskCenter.button.cancel": "\u{1F6D1} \u53D6\u6D88",
+    "taskCenter.button.backList": "\u21A9\uFE0F \u8FD4\u56DE\u4EFB\u52A1\u5217\u8868",
+    "taskCenter.button.confirmCancel": "\u26A0\uFE0F \u786E\u8BA4\u53D6\u6D88",
+    "taskCenter.button.backDetail": "\u8FD4\u56DE\u8BE6\u60C5",
+    "taskCenter.untitled": "\u672A\u547D\u540D\u4EFB\u52A1",
+    "taskCenter.detail.type": "\u7C7B\u578B\uFF1A{value}",
+    "taskCenter.detail.source": "\u6765\u6E90\uFF1A{value}",
+    "taskCenter.detail.progress": "\u8FDB\u5EA6\uFF1A{value}",
+    "taskCenter.detail.currentFile": "\u5F53\u524D\u6587\u4EF6\uFF1A{value}",
+    "taskCenter.detail.targetFolder": "\u4FDD\u5B58\u4F4D\u7F6E\uFF1A{value}",
+    "taskCenter.detail.reason": "\u539F\u56E0\uFF1A{value}",
+    "taskCenter.detail.created": "\u521B\u5EFA\uFF1A{value}",
+    "taskCenter.detail.updated": "\u6700\u8FD1\u6D3B\u52A8\uFF1A{value}",
+    "taskCenter.detail.id": "\u4EFB\u52A1 ID\uFF1A{value}",
+    "taskCenter.protection.retryAt": "\u7CFB\u7EDF\u4F1A\u5728 {value} \u540E\u91CD\u65B0\u68C0\u67E5\u5E76\u81EA\u52A8\u6062\u590D\u3002",
+    "taskCenter.protection.recheck": "\u7CFB\u7EDF\u6BCF {count} \u79D2\u91CD\u65B0\u68C0\u67E5\uFF0C\u6761\u4EF6\u6EE1\u8DB3\u540E\u81EA\u52A8\u6062\u590D\u3002",
+    "taskCenter.protection.autoResume": "\u7CFB\u7EDF\u4F1A\u6301\u7EED\u68C0\u67E5\uFF0C\u6761\u4EF6\u6EE1\u8DB3\u540E\u81EA\u52A8\u6062\u590D\u3002",
+    "taskCenter.protection.manual": "\u6B64\u72B6\u6001\u4E0D\u4F1A\u81EA\u52A8\u6062\u590D\uFF0C\u8BF7\u6309\u539F\u56E0\u5904\u7406\u540E\u91CD\u8BD5\u3002",
+    "taskCenter.protection.paused": "\u8BE5\u4EFB\u52A1\u7531\u7CFB\u7EDF\u4FDD\u62A4\u6682\u505C\uFF1B{recovery}",
+    "taskCenter.note.pausing": "\u5F53\u524D\u6587\u4EF6\u5B8C\u6210\u540E\u4F1A\u81EA\u52A8\u8FDB\u5165\u5DF2\u6682\u505C\u72B6\u6001\u3002",
+    "taskCenter.note.failed": "\u8BE5\u4EFB\u52A1\u6CA1\u6709\u7EE7\u7EED\u8FD0\u884C\uFF1B\u786E\u8BA4\u5916\u90E8\u5199\u7ED3\u679C\u5DF2\u5BF9\u8D26\u540E\uFF0C\u53EF\u4EE5\u91CD\u65B0\u63D0\u4EA4\u4E0B\u8F7D\u3002",
+    "taskCenter.note.start": "\u201C\u4F18\u5148\u5F00\u59CB\u201D\u4F1A\u628A\u8BE5\u4EFB\u52A1\u79FB\u5230\u7B49\u5F85\u961F\u5217\u524D\u9762\uFF0C\u4E0D\u4F1A\u4E2D\u65AD\u6B63\u5728\u4E0B\u8F7D\u7684\u6587\u4EF6\u3002",
+    "taskCenter.note.pause": "\u6682\u505C\u4F1A\u5148\u5B8C\u6210\u5F53\u524D\u6587\u4EF6\uFF0C\u518D\u505C\u6B62\u8FD9\u4E2A\u4EFB\u52A1\u7684\u540E\u7EED\u6587\u4EF6\u3002",
+    "taskCenter.cancel.title": "\u26A0\uFE0F **\u786E\u8BA4\u53D6\u6D88\u8FD9\u4E2A\u4EFB\u52A1\uFF1F**",
+    "taskCenter.cancel.activeWarning": "\u6B63\u5728\u4E0B\u8F7D\u7684\u6587\u4EF6\u4F1A\u88AB\u4E2D\u6B62\u5E76\u6E05\u7406\u4E34\u65F6\u6587\u4EF6\uFF0C\u7B49\u5F85\u4E2D\u7684\u6587\u4EF6\u4F1A\u7ACB\u5373\u79FB\u51FA\u961F\u5217\u3002",
+    "taskCenter.cancel.waitingWarning": "\u7B49\u5F85\u4E2D\u7684\u6587\u4EF6\u4F1A\u7ACB\u5373\u79FB\u51FA\u961F\u5217\u3002",
+    "taskCenter.cancel.unaffected": "\u5176\u5B83\u4EFB\u52A1\u4E0D\u4F1A\u53D7\u5230\u5F71\u54CD\u3002",
+    "taskCenter.stage.waiting": "\u7B49\u5F85\u5F00\u59CB",
+    "taskCenter.stage.recovering": "\u670D\u52A1\u91CD\u542F\u540E\u6062\u590D",
+    "taskCenter.stage.downloading": "\u4E0B\u8F7D\u6E90\u6587\u4EF6",
+    "taskCenter.stage.uploading": "\u4E0A\u4F20\u5230\u5B58\u50A8",
+    "taskCenter.stage.processing": "\u670D\u52A1\u5668\u5904\u7406\u4E2D",
+    "taskCenter.defaultAccount": "\u9ED8\u8BA4\u8D26\u6237",
+    "taskCenter.cooldown.storageLimit": "Google Drive \u4ECA\u65E5\u4E0A\u4F20\u989D\u5EA6\u5DF2\u8FBE\u4E0A\u9650",
+    "taskCenter.cooldown.floodWait": "Telegram \u8BF7\u6C42\u9891\u7387\u53D7\u9650\uFF08FloodWait\uFF09",
+    "taskCenter.cooldown.autoResume": "{cause}\uFF1B\u7CFB\u7EDF\u4F1A\u6301\u7EED\u68C0\u67E5\u5E76\u81EA\u52A8\u6062\u590D",
+    "taskCenter.cooldown.autoResumeAt": "{cause}\uFF1B\u9884\u8BA1 {time} \u540E\u81EA\u52A8\u6062\u590D",
+    "taskCenter.cooldown.system": "\u7CFB\u7EDF\u51B7\u5374\u4E2D",
+    "taskCenter.reason.userPaused": "\u7528\u6237\u8BF7\u6C42\u6682\u505C",
+    "status.none": "\u65E0",
+    "status.redacted": "[\u5DF2\u8131\u654F]",
+    "status.state.healthy": "\u6B63\u5E38",
+    "status.state.running": "\u8FD0\u884C\u4E2D",
+    "status.state.connected": "\u5DF2\u8FDE\u63A5",
+    "status.state.disabled": "\u672A\u542F\u7528",
+    "status.state.expired": "\u767B\u5F55\u5DF2\u8FC7\u671F",
+    "status.state.failed": "\u5F02\u5E38",
+    "status.state.unknown": "\u672A\u77E5",
+    "status.state.cooldown": "\u51B7\u5374\u4E2D",
+    "status.title": "\u{1FA7A} **TG Vault \u8BCA\u65AD\u72B6\u6001**",
+    "status.requestId": "\u64CD\u4F5C ID\uFF1A{requestId}",
+    "status.degraded": "\uFF08\u964D\u7EA7\uFF09",
+    "status.bot": "Bot\uFF1A{status}{degraded} \xB7 \u91CD\u8FDE {reconnectCount} \u6B21",
+    "status.userClient": "\u8D26\u53F7\u4E0B\u8F7D\u5668\uFF1A{status}{username}",
+    "status.accountRecovery": "\u8D26\u53F7\u6062\u590D\uFF1A{action}",
+    "status.storage": "\u5F53\u524D\u5B58\u50A8\uFF1A{provider} \xB7 {accountName}",
+    "status.probe": "\u8FDE\u63A5\u68C0\u67E5\uFF1A{status}",
+    "status.recoveryTime": "\u6062\u590D\u65F6\u95F4\uFF1A{time}",
+    "status.storageError": "\u5B58\u50A8\u9519\u8BEF\uFF1A{error}",
+    "status.disk": "\u4E34\u65F6\u78C1\u76D8\uFF1A\u53EF\u7528 {free} / {total} \xB7 \u5DF2\u7528 {usedPercent}%",
+    "status.queue": "\u961F\u5217\uFF1A\u6D3B\u8DC3 {active} \xB7 \u7B49\u5F85 {pending} \xB7 \u5931\u8D25 {failed}{paused}",
+    "status.queuePaused": " \xB7 \u5DF2\u6682\u505C",
+    "status.subscriptions": "\u8BA2\u9605\uFF1A\u542F\u7528 {enabled} \xB7 \u6700\u8FD1\u626B\u63CF {lastScan}",
+    "status.subscriptionError": "\u8BA2\u9605\u9519\u8BEF\uFF1A{error}",
+    "status.reconciliation": "\u5BF9\u8D26\uFF1A\u5F85\u5BF9\u8D26\uFF1A{pending} \xB7 \u9700\u4EBA\u5DE5\uFF1A{operatorRequired}",
+    "status.advice": "\u5EFA\u8BAE\uFF1A{action}",
+    "status.defaultAdvice": "\u5EFA\u8BAE\uFF1A\u5982\u7EC4\u4EF6\u5F02\u5E38\uFF0C\u8BF7\u643A\u5E26\u64CD\u4F5C ID \u67E5\u770B\u7ED3\u6784\u5316\u65E5\u5FD7\u3002",
+    "path.preview": "\u4FDD\u5B58\u5230\uFF1A{folder}/\u6587\u4EF6\u540D\uFF08\u4E0D\u4F1A\u8FFD\u52A0\u9891\u9053\u540D\u6216\u6587\u4EF6\u7C7B\u578B\u76EE\u5F55\uFF09",
+    "path.prompt.onceTitle": "\u{1F4CC} **\u8BBE\u7F6E\u4E0B\u4E00\u6B21\u4E0B\u8F7D\u76EE\u5F55**",
+    "path.prompt.sessionTitle": "\u{1F4CD} **\u8BBE\u7F6E\u4F1A\u8BDD\u4E0B\u8F7D\u76EE\u5F55**",
+    "path.prompt.sendFolder": "\u8BF7\u76F4\u63A5\u53D1\u9001\u76EE\u5F55\u540D\u79F0\uFF1A",
+    "path.prompt.onceExample": "\u4F8B\u5982\uFF1A`PIXIV/\u6BCF\u65E5Top50`",
+    "path.prompt.sessionExample": "\u4F8B\u5982\uFF1A`\u76F8\u518C/2026-07`",
+    "path.prompt.recent": "\u6700\u8FD1\u4F7F\u7528\u76EE\u5F55\uFF1A",
+    "path.prompt.onceNote": "\u8BF4\u660E\uFF1A\u53EA\u5F71\u54CD\u4E0B\u4E00\u6B21\u8FDB\u5165\u4E0B\u8F7D\u6D41\u7A0B\u7684\u6587\u4EF6\u3002",
+    "path.prompt.sessionNote": "\u8BF4\u660E\uFF1A\u4F1A\u5F71\u54CD\u5F53\u524D\u804A\u5929\u540E\u7EED\u4E0B\u8F7D\uFF0C\u76F4\u5230\u53D1\u9001 `/pc` \u6216\u70B9\u51FB\u6E05\u9664\u3002",
+    "path.prompt.cancel": "\u53D1\u9001\u201C\u53D6\u6D88\u201D\u53EF\u9000\u51FA\u672C\u6B21\u8BBE\u7F6E\u3002",
+    "path.state.current": "\u5F53\u524D\u4FDD\u5B58\uFF1A{value}",
+    "path.state.custom": "{folder}\uFF08\u81EA\u5B9A\u4E49\u76EE\u5F55\uFF09",
+    "path.state.automatic": "\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B",
+    "path.state.defaultExample": "\u9ED8\u8BA4\u793A\u4F8B\uFF1A`telegram/\u8D44\u6E90\u4E0B\u8F7D/images`",
+    "path.state.once": "\u{1F4CC} \u4E0B\u4E00\u6B21\u76EE\u5F55\uFF1A{value}",
+    "path.state.session": "\u{1F4CD} \u672C\u4F1A\u8BDD\u76EE\u5F55\uFF1A{value}",
+    "path.state.unset": "\u672A\u8BBE\u7F6E",
+    "path.button.setOnce": "\u{1F4CC} \u8BBE\u7F6E\u4E0B\u4E00\u6B21\u76EE\u5F55",
+    "path.button.setSession": "\u{1F4CD} \u8BBE\u7F6E\u4F1A\u8BDD\u76EE\u5F55",
+    "path.button.recent": "\u{1F558} \u6700\u8FD1\u76EE\u5F55",
+    "path.button.clear": "\u{1F9F9} \u6E05\u9664\u81EA\u5B9A\u4E49\u76EE\u5F55",
+    "path.settings.title": "\u{1F4C1} **\u4FDD\u5B58\u4F4D\u7F6E**",
+    "path.settings.defaultLogicTitle": "**\u9ED8\u8BA4\u4FDD\u5B58\u903B\u8F91**",
+    "path.settings.defaultLogic": "\u672A\u8BBE\u7F6E\u81EA\u5B9A\u4E49\u76EE\u5F55\u65F6\uFF1A\u81EA\u52A8\u6309\u6765\u6E90/\u9891\u9053 + \u6587\u4EF6\u7C7B\u578B\u4FDD\u5B58\u3002",
+    "path.settings.examples": "\u4F8B\u5982\uFF1A`telegram/\u8D44\u6E90\u4E0B\u8F7D/images`\u3001`telegram/\u8D44\u6E90\u4E0B\u8F7D/videos`\u3002",
+    "path.settings.customLogic": "\u8BBE\u7F6E\u81EA\u5B9A\u4E49\u76EE\u5F55\u540E\uFF1A\u6587\u4EF6\u4F1A\u76F4\u63A5\u4FDD\u5B58\u5230\u8BE5\u76EE\u5F55\u672C\u8EAB\uFF0C\u4E0D\u518D\u8FFD\u52A0\u9891\u9053\u540D\u6216\u6587\u4EF6\u7C7B\u578B\u76EE\u5F55\u3002",
+    "path.settings.currentTitle": "**\u5F53\u524D\u8DEF\u5F84\u72B6\u6001**",
+    "path.settings.choose": "\u{1F447} \u70B9\u51FB\u6309\u94AE\u9009\u62E9\u4FDD\u5B58\u4F4D\u7F6E\u3002",
+    "path.recent.title": "\u{1F558} **Recently used folders**",
+    "path.recent.hint": "To use a folder, choose one-time or chat folder in \u201CSave location\u201D, then send its name.",
+    "path.recent.empty": "\u{1F558} No recently used folders. Folders are recorded after you set one.",
+    "path.toast.recentSent": "Recent folders sent",
+    "path.toast.sendFolder": "Send a folder name, or send \u201Ccancel\u201D to exit",
+    "path.toast.updated": "\u5DF2\u66F4\u65B0\u4FDD\u5B58\u4F4D\u7F6E",
+    "path.toast.cancelled": "\u5DF2\u53D6\u6D88\u4FDD\u5B58\u8DEF\u5F84\u8BBE\u7F6E\u3002",
+    "bot.home.category.main": "\u5E38\u7528\u5165\u53E3",
+    "bot.home.category.files": "\u6587\u4EF6\u4E0E\u4FDD\u5B58\u4F4D\u7F6E",
+    "bot.home.category.channels": "\u9891\u9053\u4E0E\u8BA2\u9605",
+    "bot.home.category.settings": "\u4EFB\u52A1\u4E0E\u7CFB\u7EDF\u8BBE\u7F6E",
+    "bot.home.category.security": "\u5B89\u5168",
+    "bot.home.page": "\u7B2C {page}/{totalPages} \u9875",
+    "bot.home.hint": "\u70B9\u51FB\u6309\u94AE\u53EF\u76F4\u63A5\u6253\u5F00\u5BF9\u5E94\u529F\u80FD\u3002",
+    "bot.home.uploadHint": "\u{1F4E4} \u76F4\u63A5\u53D1\u9001\u6216\u8F6C\u53D1\u6587\u4EF6\u5373\u53EF\u4E0A\u4F20\u3002\n\n\u4E0B\u65B9\u53EF\u6253\u5F00\u4EFB\u52A1\u6216\u66F4\u591A\u529F\u80FD\u3002",
+    "bot.home.logoutHint": "\u53D1\u9001 /logout \u53EF\u7ACB\u5373\u64A4\u9500\u5F53\u524D Bot \u8BA4\u8BC1\u3002",
+    "bot.home.twoFactorHint": "\u8BF7\u4ECE Telegram \u547D\u4EE4\u83DC\u5355\u53D1\u9001\u201C\u914D\u7F6E\u53CC\u91CD\u9A8C\u8BC1\u201D\u3002",
+    "bot.home.prompt.oncePath": "\u8BF7\u53D1\u9001\u4E0B\u4E00\u6B21\u8981\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002",
+    "bot.home.prompt.sessionPath": "\u8BF7\u53D1\u9001\u672C\u804A\u5929\u8981\u6301\u7EED\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002",
+    "bot.home.prompt.delete": "\u8BF7\u5728\u201C\u641C\u7D22\u548C\u64CD\u4F5C\u6587\u4EF6\u201D\u4E2D\u9009\u62E9\u6587\u4EF6\u5E76\u70B9\u51FB\u5220\u9664\u3002",
+    "bot.home.prompt.cancelTask": "\u8BF7\u5728\u4EFB\u52A1\u4E2D\u5FC3\u9009\u62E9\u8981\u53D6\u6D88\u7684\u4EFB\u52A1\u3002",
+    "bot.home.prompt.unsubscribe": "\u8BF7\u5728\u9891\u9053\u8BA2\u9605\u9762\u677F\u9009\u62E9\u8981\u53D6\u6D88\u7684\u8BA2\u9605\u3002",
+    "bot.home.followPrompt": "{description}\n\n\u8BF7\u6309\u63D0\u793A\u8F93\u5165\uFF0C\u6216\u8FD4\u56DE\u201C\u66F4\u591A\u529F\u80FD\u201D\u9009\u62E9\u5176\u5B83\u5165\u53E3\u3002",
+    "bot.home.unavailable": "\u8FD9\u4E2A\u5165\u53E3\u6682\u65F6\u4E0D\u53EF\u7528\u3002",
+    "bot.button.dateMode": "\u{1F5D3}\uFE0F \u6309\u65E5\u671F\u4E0B\u8F7D",
+    "bot.button.tagMode": "\u{1F3F7}\uFE0F \u6309\u6807\u7B7E\u4E0B\u8F7D",
+    "bot.button.channelOnly": "\u4EC5\u9891\u9053\u6B63\u6587",
+    "bot.button.channelComments": "\u9891\u9053 + \u8BC4\u8BBA\u533A",
+    "bot.button.editFolder": "\u270F\uFE0F \u4FEE\u6539\u4E13\u5C5E\u76EE\u5F55",
+    "bot.button.clearFolder": "\u{1F9F9} \u6E05\u9664\u76EE\u5F55",
+    "bot.button.unsubscribe": "\u53D6\u6D88\u8BA2\u9605",
+    "bot.button.previous": "\u25C0\uFE0F \u4E0A\u4E00\u9875",
+    "bot.button.next": "\u4E0B\u4E00\u9875 \u25B6\uFE0F",
+    "bot.button.addSubscription": "\u2795 \u65B0\u589E\u8BA2\u9605",
+    "bot.button.bestVideo": "\u6700\u4F73\u89C6\u9891",
+    "bot.button.audioOnly": "\u4EC5\u97F3\u9891",
+    "bot.wizard.title.subscription": "\u{1F4E1} **\u8BA2\u9605\u9891\u9053\u7BA1\u7406**",
+    "bot.wizard.title.tag": "\u{1F3F7}\uFE0F **\u6309\u6807\u7B7E\u4E0B\u8F7D\u9891\u9053\u6587\u4EF6**",
+    "bot.wizard.title.date": "\u{1F5D3}\uFE0F **\u6309\u65E5\u671F\u4E0B\u8F7D\u9891\u9053\u6587\u4EF6**",
+    "bot.wizard.title.download": "\u{1F4E6} **\u9891\u9053\u6587\u4EF6\u4E0B\u8F7D**",
+    "bot.wizard.mode": "{title}\n\n\u8BF7\u9009\u62E9\u4E0B\u8F7D\u65B9\u5F0F\uFF1A\n\u2022 \u6309\u65E5\u671F\uFF1A\u4E0B\u8F7D\u6307\u5B9A\u65E5\u671F\u8303\u56F4\u5185\u7684\u6587\u4EF6\n\u2022 \u6309\u6807\u7B7E\uFF1A\u4E0B\u8F7D\u5E26\u6307\u5B9A\u6807\u7B7E\u7684\u6587\u4EF6\n\n\u{1F447} \u70B9\u51FB\u6309\u94AE\u7EE7\u7EED\u3002",
+    "bot.wizard.source": "{title}\n\n\u8BF7\u53D1\u9001\u9891\u9053\u7528\u6237\u540D\u6216\u94FE\u63A5\u3002\n\u652F\u6301\u516C\u5F00\u9891\u9053\u3001\u79C1\u5BC6\u9080\u8BF7\u94FE\u63A5\u548C\u5DF2\u52A0\u5165\u7684\u9891\u9053\u3002\n\n\u53D1\u9001\u201C\u53D6\u6D88\u201D\u53EF\u9000\u51FA\u3002",
+    "bot.wizard.path": "{title}\n\u{1F4CD} \u9891\u9053\uFF1A{source}\n\n\u662F\u5426\u8981\u7ED9{scope}\u5355\u72EC\u6307\u5B9A\u4FDD\u5B58\u76EE\u5F55\uFF1F\n\n\u76F4\u63A5\u53D1\u9001\u76EE\u5F55\uFF0C\u4F8B\u5982\uFF1A`\u9891\u9053\u5907\u4EFD/\u58C1\u7EB8`\n\u53D1\u9001 `\u8DF3\u8FC7` / `skip` \u4F7F\u7528\u9ED8\u8BA4\u4FDD\u5B58\u8DEF\u5F84\u89C4\u5219\u3002\n\n\u8BF4\u660E\uFF1A\u8FD9\u91CC\u8BBE\u7F6E\u7684\u76EE\u5F55\u53EA\u5BF9{scope}\u751F\u6548\uFF0C\u4E0D\u4F1A\u6539\u53D8\u5168\u5C40 /path_rules\uFF0C\u4E5F\u4E0D\u4F1A\u5F71\u54CD\u5176\u5B83\u4E0B\u8F7D\u3002\n\u53D1\u9001\u201C\u53D6\u6D88\u201D\u53EF\u9000\u51FA\u3002",
+    "bot.wizard.scope.subscription": "\u8FD9\u4E2A\u8BA2\u9605",
+    "bot.wizard.scope.newSubscription": "\u672C\u6B21\u8BA2\u9605",
+    "bot.wizard.scope.download": "\u672C\u6B21\u4E0B\u8F7D\u4EFB\u52A1",
+    "bot.wizard.comments": "{title}\n\u{1F4CD} \u9891\u9053\uFF1A{source}\n{folder}\n\n\u662F\u5426\u540C\u65F6\u626B\u63CF\u9891\u9053\u5E16\u5B50\u4E0B\u65B9\u7684\u8BC4\u8BBA\u533A\u6587\u4EF6\uFF1F\n\n\u9ED8\u8BA4\u5173\u95ED\uFF1B\u5F00\u542F\u540E\u6BCF\u4E2A\u9891\u9053\u5E16\u5B50\u6700\u591A\u626B\u63CF {count} \u6761\u8BC4\u8BBA\u3002\n\u6587\u5B57\u8BC4\u8BBA\u3001\u666E\u901A\u94FE\u63A5\u548C\u5176\u5B83\u65E0\u6587\u4EF6\u6D88\u606F\u4F1A\u81EA\u52A8\u5FFD\u7565\u3002\n\n\u{1F447} \u70B9\u51FB\u6309\u94AE\u9009\u62E9\u662F\u5426\u626B\u63CF\u8BC4\u8BBA\u533A\u3002",
+    "bot.wizard.folder.custom": "\u{1F4C1} \u4FDD\u5B58\u76EE\u5F55\uFF1A{folder}",
+    "bot.wizard.folder.default": "\u{1F4C1} \u4FDD\u5B58\u7B56\u7565\uFF1A\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B",
+    "bot.wizard.tag": "{title}\n\u{1F4CD} \u9891\u9053\uFF1A{source}\n\n\u8BF7\u53D1\u9001\u8981\u4E0B\u8F7D\u7684\u6807\u7B7E\uFF1A\n\u4F8B\u5982\uFF1A`#\u58C1\u7EB8` \u6216 `\u58C1\u7EB8`\n\n\u53D1\u9001\u201C\u53D6\u6D88\u201D\u53EF\u9000\u51FA\u3002",
+    "bot.wizard.startDate": "{title}\n\u{1F4CD} \u9891\u9053\uFF1A{source}\n\n\u8BF7\u53D1\u9001\u5F00\u59CB\u65E5\u671F\uFF1A\n\u683C\u5F0F\uFF1A`YYYY-MM-DD`\uFF0C\u4F8B\u5982 `2026-06-01`\n\n\u53D1\u9001\u201C\u53D6\u6D88\u201D\u53EF\u9000\u51FA\u3002",
+    "bot.wizard.endDate": "{title}\n\u{1F4CD} \u9891\u9053\uFF1A{source}\n\u{1F5D3}\uFE0F \u5F00\u59CB\u65E5\u671F\uFF1A{startDate}\n\n\u8BF7\u53D1\u9001\u7ED3\u675F\u65E5\u671F\uFF1A\n\u683C\u5F0F\uFF1A`YYYY-MM-DD`\uFF0C\u4F8B\u5982 `2026-06-27`\n\n\u53D1\u9001\u201C\u53D6\u6D88\u201D\u53EF\u9000\u51FA\u3002",
+    "bot.wizard.expired": "\u231B \u5F53\u524D\u5411\u5BFC\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u3002",
+    "bot.wizard.cancelled": "\u5DF2\u53D6\u6D88 Telegram \u9891\u9053\u64CD\u4F5C\u5411\u5BFC\u3002",
+    "bot.wizard.invalidMode": "\u274C \u8BF7\u53D1\u9001 `date`/`\u65E5\u671F` \u6216 `tag`/`\u6807\u7B7E`\uFF0C\u4E5F\u53EF\u4EE5\u53D1\u9001\u201C\u53D6\u6D88\u201D\u9000\u51FA\u3002",
+    "bot.wizard.invalidComments": "\u274C \u8BF7\u53D1\u9001 `\u5F00`/`\u5173`\uFF0C\u6216\u70B9\u51FB\u6309\u94AE\u9009\u62E9\u662F\u5426\u5305\u542B\u8BC4\u8BBA\u533A\u6587\u4EF6\u3002",
+    "bot.wizard.confirmInput": "\u8BF7\u53D1\u9001 `\u786E\u8BA4` \u5F00\u59CB\u4EFB\u52A1\uFF0C\u6216\u53D1\u9001 `\u53D6\u6D88` \u653E\u5F03\u3002",
+    "bot.wizard.invalidDate": "\u274C \u65E5\u671F\u683C\u5F0F\u5FC5\u987B\u662F YYYY-MM-DD\uFF0C\u4F8B\u5982\uFF1A{example}",
+    "bot.wizard.invalidRange": "\u65E5\u671F\u8303\u56F4\u65E0\u6548",
+    "bot.wizard.callbackExpired": "\u5411\u5BFC\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00",
+    "bot.wizard.downloadCancelled": "\u5DF2\u53D6\u6D88\u9891\u9053\u6587\u4EF6\u4E0B\u8F7D\u5411\u5BFC\u3002",
+    "bot.wizard.modeDate": "\u6309\u65E5\u671F\u4E0B\u8F7D",
+    "bot.wizard.modeTag": "\u6309\u6807\u7B7E\u4E0B\u8F7D",
+    "bot.wizard.commentsOn": "\u5C06\u5305\u542B\u8BC4\u8BBA\u533A\u6587\u4EF6",
+    "bot.wizard.commentsOff": "\u4EC5\u4E0B\u8F7D\u9891\u9053\u6B63\u6587\u6587\u4EF6",
+    "bot.subscription.confirmTitle": "\u26A0\uFE0F **\u786E\u8BA4\u53D6\u6D88\u8FD9\u4E2A\u9891\u9053\u8BA2\u9605\uFF1F**",
+    "bot.subscription.source": "\u6765\u6E90\uFF1A{source}",
+    "bot.subscription.folder": "\u4E13\u5C5E\u76EE\u5F55\uFF1A{folder}",
+    "bot.subscription.defaultFolder": "\u4FDD\u5B58\u7B56\u7565\uFF1A\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B",
+    "bot.subscription.position": "\u540C\u6B65\u4F4D\u7F6E\uFF1A\u7B2C {messageId} \u6761\u6D88\u606F\u4E4B\u540E",
+    "bot.subscription.panelTitle": "\u{1F4E1} **\u9891\u9053\u8BA2\u9605**",
+    "bot.subscription.page": "\u7B2C {page}/{totalPages} \u9875 \xB7 \u5171 {count} \u4E2A",
+    "bot.subscription.empty": "\u5F53\u524D\u6CA1\u6709\u8BA2\u9605\u3002",
+    "bot.subscription.manageHint": "\u{1F447} \u70B9\u51FB\u4E0B\u65B9\u6309\u94AE\u7BA1\u7406\u6216\u65B0\u589E\u8BA2\u9605\u3002",
+    "bot.subscription.action.sync": "\u7ACB\u5373\u540C\u6B65",
+    "bot.subscription.action.pause": "\u6682\u505C",
+    "bot.subscription.action.resume": "\u6062\u590D",
+    "bot.subscription.action.target": "\u4FEE\u6539\u76EE\u6807",
+    "bot.subscription.action.fromNow": "\u4ECE\u73B0\u5728\u5F00\u59CB",
+    "bot.subscription.action.backfill": "\u6309\u65E5\u671F\u8865\u6293",
+    "bot.subscription.action.result": "\u6700\u8FD1\u7ED3\u679C",
+    "bot.subscription.action.retry": "\u91CD\u8BD5\u5931\u8D25\u9879",
+    "bot.subscription.followSystemDefault": "\u8DDF\u968F\u7CFB\u7EDF\u9ED8\u8BA4",
+    "bot.subscription.target": "\u{1F3AF} \u5B58\u50A8\uFF1A{target}",
+    "bot.subscription.lastScan": "\u{1F50E} \u4E0A\u6B21\u626B\u63CF\uFF1A{time}",
+    "bot.subscription.nextScan": "\u23ED\uFE0F \u4E0B\u6B21\u626B\u63CF\u7EA6\uFF1A{time}",
+    "bot.subscription.notScanned": "\u{1F50E} \u5C1A\u672A\u626B\u63CF",
+    "bot.subscription.lastResult": "\u{1F4CA} \u6700\u8FD1\u7ED3\u679C\uFF1A{status}\uFF0C\u53D1\u73B0 {found}\uFF0C\u5931\u8D25 {failed}",
+    "bot.subscription.disabledReason": "\u26A0\uFE0F {reason}",
+    "bot.subscription.error": "   \u26A0\uFE0F \u9519\u8BEF\uFF1A{error}",
+    "bot.subscription.result.recorded": "\u5DF2\u8BB0\u5F55",
+    "bot.subscription.result.completed": "\u5B8C\u6210",
+    "bot.subscription.result.partial": "\u90E8\u5206\u5B8C\u6210",
+    "bot.subscription.result.running": "\u8FDB\u884C\u4E2D",
+    "bot.subscription.result.paused": "\u5DF2\u6682\u505C",
+    "bot.subscription.confirmBody": "\u786E\u8BA4\u540E\u4F1A\u505C\u6B62\u81EA\u52A8\u540C\u6B65\uFF0C\u5E76\u4ECE\u8BA2\u9605\u7BA1\u7406\u5217\u8868\u4E2D\u79FB\u9664\uFF1B\u5DF2\u4FDD\u5B58\u7684\u6587\u4EF6\u4E0D\u4F1A\u5220\u9664\u3002",
+    "bot.subscription.confirmButton": "\u26A0\uFE0F \u786E\u8BA4\u53D6\u6D88",
+    "bot.subscription.backButton": "\u8FD4\u56DE\u8BA2\u9605\u5217\u8868",
+    "bot.callback.cancelled": "\u5DF2\u53D6\u6D88",
+    "bot.callback.expired": "\u5DF2\u5931\u6548",
+    "bot.callback.submitted": "\u4EFB\u52A1\u5DF2\u63D0\u4EA4",
+    "bot.callback.failed": "\u64CD\u4F5C\u5931\u8D25\uFF1A{error}",
+    "bot.legacy.pausedTitle": "\u23F8\uFE0F **\u9891\u9053\u4E0B\u8F7D\u5DF2\u6682\u505C**",
+    "bot.legacy.floodWaitTitle": "\u23F3 **Telegram FloodWait \u51B7\u5374\u4E2D**",
+    "bot.legacy.storageCooldownTitle": "\u23F8\uFE0F **\u5B58\u50A8\u670D\u52A1\u4FDD\u62A4\u51B7\u5374\u4E2D**",
+    "bot.legacy.cancelledTitle": "\u{1F6D1} **\u9891\u9053\u4E0B\u8F7D\u5DF2\u53D6\u6D88**",
+    "bot.legacy.completedTitle": "\u2705 **\u9891\u9053\u4EFB\u52A1\u5B8C\u6210**",
+    "bot.legacy.runningTitle": "\u{1F50E} **\u9891\u9053\u4EFB\u52A1\u8FD0\u884C\u4E2D**",
+    "bot.legacy.controlsPaused": "\u53EF\u5728\u4EFB\u52A1\u4E2D\u5FC3\u7EE7\u7EED\u6216\u53D6\u6D88\u3002",
+    "bot.legacy.controlsActive": "\u53EF\u5728\u4EFB\u52A1\u4E2D\u5FC3\u6682\u505C\u6216\u53D6\u6D88\u3002",
+    "bot.legacy.job": "\u{1F194} job: {jobId}",
+    "bot.legacy.source": "\u{1F4CD} \u9891\u9053\uFF1A{source}",
+    "bot.legacy.scan": "\u{1F50E} \u626B\u63CF\uFF1A{status}",
+    "bot.legacy.channelScan": "\u{1F4C4} \u9891\u9053\u6B63\u6587\uFF1A\u5DF2\u626B {scanned} \u6761\uFF0C\u53D1\u73B0 {found} \u4E2A\u6587\u4EF6",
+    "bot.legacy.commentScan": "\u{1F4AC} \u8BC4\u8BBA\u533A\uFF1A\u5DF2\u626B {scanned} \u6761\uFF0C\u53D1\u73B0 {found} \u4E2A\u6587\u4EF6",
+    "bot.legacy.download": "\u2B07\uFE0F \u4E0B\u8F7D\uFF1A{status}",
+    "bot.legacy.counts": "\u2705 \u6210\u529F {completed}\u3000\u23F3 \u5F85\u4E0B\u8F7D {pending}\u3000\u{1F504} \u4E0B\u8F7D\u4E2D {downloading}\u3000\u274C \u5931\u8D25 {failed}\u3000\u23ED \u8DF3\u8FC7 {skipped}",
+    "bot.legacy.floodWait": "\u23F3 Telegram FloodWait\u51B7\u5374\u5230\uFF1A{until}",
+    "bot.legacy.storageCooldown": "\u23F8\uFE0F \u5B58\u50A8\u670D\u52A1\u4FDD\u62A4\u51B7\u5374\u5230\uFF1A{until}",
+    "bot.legacy.scanComplete": "\u{1F50E} **\u626B\u63CF\u5B8C\u6210\uFF0C\u5F00\u59CB\u4E0B\u8F7D**",
+    "bot.legacy.channelScanned": "\u{1F4C4} \u9891\u9053\u6B63\u6587\uFF1A\u626B\u63CF {scanned} \u6761\uFF0C\u53D1\u73B0 {found} \u4E2A\u6587\u4EF6",
+    "bot.legacy.commentsScanned": "\u{1F4AC} \u8BC4\u8BBA\u533A\uFF1A\u626B\u63CF {scanned} \u6761\uFF0C\u53D1\u73B0 {found} \u4E2A\u6587\u4EF6\uFF08\u6BCF\u5E16\u6700\u591A {max} \u6761\uFF09",
+    "bot.legacy.commentsDisabled": "\u{1F4AC} \u8BC4\u8BBA\u533A\uFF1A\u672A\u542F\u7528",
+    "bot.legacy.pending": "\u{1F4E6} \u5F85\u4E0B\u8F7D\uFF1A{count} \u4E2A\u6587\u4EF6",
+    "bot.legacy.queueing": "\u23F3 \u6B63\u5728\u52A0\u5165\u4E0B\u8F7D\u961F\u5217\uFF0C\u53EF\u7528 /tasks \u67E5\u770B\u540E\u53F0\u4EFB\u52A1\u3002",
+    "bot.legacy.commentLine": "\u8BC4\u8BBA\u533A: \u626B\u63CF {scanned} \u6761\uFF0C\u53D1\u73B0 {found} \u4E2A\u6587\u4EF6",
+    "bot.legacy.cancelledResult": "\u{1F6D1} {mode}\u4E0B\u8F7D\u4EFB\u52A1\u5DF2\u53D6\u6D88\nID: {jobId}\n\u5DF2\u5B8C\u6210: {successful}\n\u8DF3\u8FC7: {skipped}{commentLine}",
+    "bot.legacy.tagResult": "\u2705 \u6807\u7B7E\u4E0B\u8F7D\u4EFB\u52A1\u5B8C\u6210\n\u6807\u7B7E: {tag}\nID: {jobId}\n\u5165\u961F: {found}\n\u8DF3\u8FC7: {skipped}\n\u5931\u8D25: {failed}{commentLine}",
+    "bot.legacy.dateResult": "\u2705 \u65E5\u671F\u8303\u56F4\u4EFB\u52A1\u5B8C\u6210\nID: {jobId}\n\u5165\u961F: {found}\n\u8DF3\u8FC7: {skipped}\n\u5931\u8D25: {failed}{commentLine}",
+    "bot.legacy.failed": "\u274C {mode}\u4E0B\u8F7D\u5931\u8D25: {error}",
+    "bot.link.empty": "\u8FD9\u6761\u6D88\u606F\u6CA1\u6709\u53EF\u4E0B\u8F7D\u7684\u6587\u4EF6\uFF0C\u53EF\u80FD\u5DF2\u88AB\u5220\u9664\u6216\u5F53\u524D\u4E0B\u8F7D\u8D26\u53F7\u65E0\u6CD5\u8BBF\u95EE\u3002",
+    "bot.legacy.emptyResult": "\u2139\uFE0F \u6CA1\u6709\u627E\u5230\u7B26\u5408\u65E5\u671F\u6216\u6807\u7B7E\u6761\u4EF6\u7684\u6587\u4EF6\uFF0C\u672C\u6B21\u672A\u4E0B\u8F7D\u4EFB\u4F55\u6587\u4EF6\u3002\n\u5982\u679C\u8981\u4E0B\u8F7D\u5355\u6761\u6D88\u606F\u5E76\u6309\u76EE\u5F55\u5206\u7C7B\uFF0C\u8BF7\u76F4\u63A5\u53D1\u9001\uFF1A\u6D88\u606F\u94FE\u63A5 \u6587\u4EF6\u5939\u540D\uFF08\u4F8B\u5982\uFF1A\u94FE\u63A5 \u620F\u7CBE\u5973\u738B\uFF09\u3002\u4E0D\u8981\u8FDB\u5165\u6309\u6807\u7B7E\u4E0B\u8F7D\u3002",
+    "bot.link.failed": "\u94FE\u63A5\u4E0B\u8F7D\u5931\u8D25: {error}",
+    "menu.tg_link": "\u94FE\u63A5\u4E0B\u8F7D / \u540D\u79F0\u6216\u65E5\u671F\u5206\u7C7B",
+    "menu.ps": "\u5207\u6362\u9ED8\u8BA4\u4E0B\u8F7D\u6839\u76EE\u5F55\uFF08\u957F\u671F\u6709\u6548\uFF09",
+    "bot.link.help": "\u{1F517} \u94FE\u63A5\u4E0B\u8F7D\n\n\u76F4\u63A5\u53D1\u9001\uFF1A\u6D88\u606F\u94FE\u63A5 [\u6587\u4EF6\u5939\u540D]\n\nhttps://t.me/lspyanxi/4375 \u89C6\u98911\n\u2192 \u4FDD\u5B58\u5230\u5DF2\u8BBE\u7F6E\u76EE\u5F55\u4E0B\u7684 \u89C6\u98911/\n\nhttps://t.me/lspyanxi/4375 2026-09-09\n\u2192 \u4FDD\u5B58\u5230\u5DF2\u8BBE\u7F6E\u76EE\u5F55\u4E0B\u7684 2026-09-09/\n\nhttps://t.me/lspyanxi/4375\n\u2192 \u6309\u4E0A\u6D77\u65F6\u533A\u5F53\u5929\u65E5\u671F\u5EFA\u7ACB\u5B50\u6587\u4EF6\u5939\n\n\u4E5F\u652F\u6301 /tg_link \u6D88\u606F\u94FE\u63A5 [\u6587\u4EF6\u5939\u540D]\u3002\n\u4F7F\u7528 /ps \u8BBE\u7F6E\u957F\u671F\u6839\u76EE\u5F55\uFF0C/p \u8BBE\u7F6E\u4E0B\u4E00\u6B21\u6839\u76EE\u5F55\uFF0C/target \u9009\u62E9\u5B58\u50A8\u3002\u6587\u4EF6\u5939\u540E\u7F00\u53EA\u5BF9\u672C\u6B21\u751F\u6548\uFF0C\u4E0D\u7B5B\u9009\u6D88\u606F\u53D1\u5E03\u65E5\u671F\u3002",
+    "bot.legacy.confirmTag": "\u23F3 \u5DF2\u786E\u8BA4\uFF0C\u5F00\u59CB\u540E\u53F0\u626B\u63CF {source} \u4E2D\u5E26\u6709 {tag} \u7684\u5A92\u4F53\u6D88\u606F\u2026",
+    "bot.legacy.confirmDate": "\u23F3 \u5DF2\u786E\u8BA4\uFF0C\u5F00\u59CB\u540E\u53F0\u626B\u63CF {source}\uFF1A{startDate} \u2192 {endDate}\u2026",
+    "bot.legacy.submitFailed": "\u274C \u4EFB\u52A1\u63D0\u4EA4\u5931\u8D25: {error}",
+    "bot.legacy.usageDate": "\u274C \u7528\u6CD5\uFF1A/tg_date @channel YYYY-MM-DD YYYY-MM-DD",
+    "bot.legacy.usageTag": "\u274C \u7528\u6CD5\uFF1A/tg_tag @channel #tag",
+    "bot.auth.rateLimited": "\u23F3 \u64CD\u4F5C\u8FC7\u4E8E\u9891\u7E41\uFF0C\u8BF7 {seconds} \u79D2\u540E\u518D\u8BD5\u3002",
+    "bot.auth.pinLocked": "\u5BC6\u7801\u9519\u8BEF\u6B21\u6570\u8FC7\u591A\uFF0C\u8BF7 {seconds} \u79D2\u540E\u518D\u8BD5",
+    "bot.auth.pinLockedBody": "\u274C \u5BC6\u7801\u9519\u8BEF\u6B21\u6570\u8FC7\u591A\uFF0C\u5DF2\u4E34\u65F6\u9501\u5B9A {seconds} \u79D2\u3002",
+    "bot.auth.pinLockedShort": "\u5DF2\u4E34\u65F6\u9501\u5B9A",
+    "bot.auth.pinWrongShort": "\u5BC6\u7801\u9519\u8BEF",
+    "bot.auth.notAllowed": "\u26D4 \u5F53\u524D Telegram \u7528\u6237\u4E0D\u5728\u5141\u8BB8\u5217\u8868\u4E2D\uFF0C\u8BF7\u5728 TELEGRAM_ALLOWED_USER_IDS \u6216\u540E\u53F0\u5141\u8BB8\u5217\u8868\u4E2D\u52A0\u5165\u4F60\u7684 user id\u3002",
+    "bot.auth.notAllowedShort": "\u672A\u5728\u5141\u8BB8\u5217\u8868\u4E2D",
+    "bot.auth.twoFactorEnabled": "\u{1F510} \u53CC\u91CD\u9A8C\u8BC1\u5DF2\u542F\u7528\u3002\u4E3A\u4FDD\u62A4\u73B0\u6709\u5BC6\u94A5\uFF0CBot \u4E0D\u4F1A\u518D\u6B21\u663E\u793A\u4E8C\u7EF4\u7801\u3002",
+    "bot.auth.loggedOut": "\u2705 \u5F53\u524D Telegram \u7528\u6237\u7684 Bot \u8BA4\u8BC1\u5DF2\u64A4\u9500\u3002\u53D1\u9001 /start \u53EF\u91CD\u65B0\u8BA4\u8BC1\u3002",
+    "bot.auth.logoutFailed": "\u274C \u9000\u51FA\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002\n\u64CD\u4F5C ID\uFF1A{operationId}",
+    "bot.notification.securityLogin": "\u{1F514} **\u5B89\u5168\u767B\u5F55\u63D0\u793A**",
+    "bot.notification.passthrough": "{message}",
+    "menu.start": "\u5F00\u59CB\u4F7F\u7528 / \u9A8C\u8BC1\u8EAB\u4EFD",
+    "menu.tasks": "\u67E5\u770B\u5B9E\u65F6\u4EFB\u52A1",
+    "menu.storage": "\u5B58\u50A8\u72B6\u6001 / \u5220\u9664\u672C\u5730\u5B9E\u4F53\u6587\u4EF6",
+    "menu.path_rules": "\u4FDD\u5B58\u4F4D\u7F6E / \u81EA\u5B9A\u4E49\u76EE\u5F55",
+    "menu.tg_download": "\u6309\u65E5\u671F / \u6807\u7B7E\u4E0B\u8F7D\u9891\u9053\u6587\u4EF6",
+    "menu.list": "\u67E5\u770B\u6700\u8FD1\u6587\u4EF6",
+    "menu.find": "\u641C\u7D22\u548C\u64CD\u4F5C\u6587\u4EF6",
+    "menu.tg_sub": "\u7BA1\u7406\u9891\u9053\u81EA\u52A8\u540C\u6B65",
+    "menu.storage_switch": "\u5207\u6362\u7CFB\u7EDF\u9ED8\u8BA4\u5B58\u50A8",
+    "menu.target": "\u8BBE\u7F6E\u5F53\u524D\u804A\u5929\u5B58\u50A8\u76EE\u6807",
+    "menu.help": "\u67E5\u770B\u5B8C\u6574\u5E2E\u52A9",
+    "menu.status": "\u7CFB\u7EDF\u8BCA\u65AD\u72B6\u6001",
+    "menu.notifications": "\u901A\u77E5\u504F\u597D",
+    "menu.language": "\u66F4\u6539 Bot \u754C\u9762\u8BED\u8A00",
+    "commands.auto001": "\u2699\uFE0F **Telegram \u5206\u7247\u5E76\u53D1\u8BBE\u7F6E**",
+    "commands.auto002": "\u5F53\u524D\u5206\u7247\u6570\uFF1A**{value0}**",
+    "commands.auto003": "\u8FD9\u91CC\u63A7\u5236\u5355\u4E2A\u6587\u4EF6\u540C\u65F6\u4E0B\u8F7D\u591A\u5C11\u4E2A\u5206\u7247\uFF1B\u6570\u503C\u8D8A\u9AD8\u8D8A\u5FEB\uFF0C\u4E5F\u8D8A\u5BB9\u6613\u89E6\u53D1\u9650\u6D41\u3002",
+    "commands.auto004": "\u5EFA\u8BAE\uFF1A4 \u7A33\u5B9A\u4F18\u5148\uFF0C8 \u901F\u5EA6\u4E0E\u7A33\u5B9A\u5E73\u8861\uFF1B12 \u6216 16 \u5C5E\u4E8E\u6FC0\u8FDB\u6A21\u5F0F\uFF0C\u9700\u8981\u4E8C\u6B21\u786E\u8BA4\u3002",
+    "commands.auto005": "\u{1F4E6} **Telegram \u6587\u4EF6\u7EA7\u5E76\u53D1\u8BBE\u7F6E**",
+    "commands.auto006": "\u5F53\u524D\u540C\u65F6\u4E0B\u8F7D\u6587\u4EF6\u6570\uFF1A**{value0}**",
+    "commands.auto007": "\u5F53\u524D\u961F\u5217\uFF1A\u8FDB\u884C\u4E2D {value0}\uFF0C\u7B49\u5F85\u4E2D {value1}",
+    "commands.auto008": "\u8FD9\u91CC\u63A7\u5236\u4E00\u6B21\u540C\u65F6\u4E0B\u8F7D\u591A\u5C11\u4E2A\u6587\u4EF6\u3002",
+    "commands.auto009": "\u5EFA\u8BAE\uFF1A1 \u6700\u7A33\u5B9A\uFF0C2 \u9ED8\u8BA4\u63A8\u8350\uFF0C3 \u901F\u5EA6\u4F18\u5148\uFF1B4 \u5C5E\u4E8E\u6FC0\u8FDB\u6A21\u5F0F\uFF0C\u9700\u8981\u4E8C\u6B21\u786E\u8BA4\u3002",
+    "commands.auto010": "\u4FEE\u6539\u540E\u53EA\u5F71\u54CD\u65B0\u5F00\u59CB\u7684\u6587\u4EF6\uFF0C\u6B63\u5728\u4E0B\u8F7D\u7684\u6587\u4EF6\u4E0D\u4F1A\u4E2D\u65AD\u3002",
+    "commands.auto011": "{value0} \u8DF3\u8FC7\u91CD\u590D",
+    "commands.auto012": "{value0} \u751F\u6210\u526F\u672C",
+    "commands.auto013": "\u{1F9EC} **\u91CD\u590D\u6587\u4EF6\u5904\u7406**",
+    "commands.auto014": "\u5F53\u524D\u6A21\u5F0F\uFF1A{value0}",
+    "commands.auto015": "\u2022 \u8DF3\u8FC7\u91CD\u590D\uFF1A\u540D\u79F0\u3001\u76EE\u5F55\u548C\u5927\u5C0F\u90FD\u76F8\u540C\u65F6\u4E0D\u518D\u4FDD\u5B58",
+    "commands.auto016": "\u2022 \u751F\u6210\u526F\u672C\uFF1A\u81EA\u52A8\u6539\u540D\u5E76\u4FDD\u7559\u4E00\u4EFD\u526F\u672C",
+    "commands.auto017": "\u53EA\u5F71\u54CD\u4E4B\u540E\u4FDD\u5B58\u7684\u6587\u4EF6\u3002",
+    "commands.auto018": "{value0} \u5173\u95ED\u81EA\u52A8\u6E05\u7406",
+    "commands.auto019": "{value0} \u5F00\u542F\u81EA\u52A8\u6E05\u7406",
+    "commands.auto020": "\u{1F9F9} **\u81EA\u52A8\u6E05\u7406\u672A\u7D22\u5F15\u4E34\u65F6\u6587\u4EF6**",
+    "commands.auto021": "\u5F53\u524D\u72B6\u6001\uFF1A{value0}",
+    "commands.auto022": "\u5F00\u542F\u540E\u6BCF\u5C0F\u65F6\u68C0\u67E5\u670D\u52A1\u5668\u4E0B\u8F7D\u76EE\u5F55\uFF0C\u53EA\u5220\u9664\u8D85\u8FC7 10 \u5206\u949F\u4E14\u672A\u51FA\u73B0\u5728\u6587\u4EF6\u5217\u8868\u4E2D\u7684\u4E34\u65F6\u6587\u4EF6\u3002",
+    "commands.auto023": "\u4E0D\u4F1A\u5220\u9664\u4EFB\u52A1\u8BB0\u5F55\u3001\u5DF2\u767B\u8BB0\u6587\u4EF6\u6216\u4E91\u7AEF\u6587\u4EF6\u3002",
+    "commands.auto024": "\u5982\u679C\u4F60\u4F1A\u7ED5\u8FC7 TG Vault \u76F4\u63A5\u5199\u5165\u670D\u52A1\u5668\u4E0B\u8F7D\u76EE\u5F55\uFF0C\u8BF7\u4FDD\u6301\u5173\u95ED\u3002",
+    "commands.auto025": "\u{1F4CC} \u4E0B\u4E00\u6B21\u4F7F\u7528\u5F53\u524D\u5B58\u50A8",
+    "commands.auto026": "\u{1F4CD} \u672C\u804A\u5929\u4F7F\u7528\u5F53\u524D\u5B58\u50A8",
+    "commands.auto027": "\u{1F9F9} \u6062\u590D\u7CFB\u7EDF\u9ED8\u8BA4",
+    "commands.auto028": "\u{1F3AF} **\u5F53\u524D\u804A\u5929\u5B58\u50A8\u76EE\u6807**",
+    "commands.auto029": "\u7CFB\u7EDF\u9ED8\u8BA4",
+    "commands.auto031": "\u7CFB\u7EDF\u9ED8\u8BA4",
+    "commands.auto033": "\u7CFB\u7EDF\u9ED8\u8BA4\uFF1A{value0}",
+    "commands.auto034": "\u{1F447} \u70B9\u51FB\u6309\u94AE\uFF0C\u7528\u5F53\u524D\u7CFB\u7EDF\u5B58\u50A8\u8BBE\u7F6E\u4E34\u65F6\u76EE\u6807\u3002",
+    "commands.auto035": "\u2705 \u5DF2\u8BBE\u7F6E{value0}\u76EE\u6807\uFF1A{value1} / {value2}\n\u4E0D\u4F1A\u4FEE\u6539\u7CFB\u7EDF\u5168\u5C40\u9ED8\u8BA4\u3002",
+    "commands.auto036": "\u{1F3AF} **\u5F53\u524D\u804A\u5929\u5B58\u50A8\u76EE\u6807**",
+    "commands.auto037": "\u7CFB\u7EDF\u9ED8\u8BA4",
+    "commands.auto039": "\u7CFB\u7EDF\u9ED8\u8BA4",
+    "commands.auto041": "\u7CFB\u7EDF\u9ED8\u8BA4\uFF1A{value0}",
+    "commands.auto042": "\u{1F447} \u70B9\u51FB\u6309\u94AE\uFF0C\u7528\u5F53\u524D\u7CFB\u7EDF\u5B58\u50A8\u8BBE\u7F6E\u4E34\u65F6\u76EE\u6807\u3002",
+    "commands.auto043": "\u6E05\u7406\u786E\u8BA4\u65E0\u6548\u6216\u5DF2\u8FC7\u671F",
+    "commands.auto044": "\u5DF2\u53D6\u6D88\u6E05\u7406\u3002\u5F53\u524D\u6CA1\u6709\u672C\u5730\u4E0B\u8F7D\u6587\u4EF6\u3002",
+    "commands.auto045": "\u5DF2\u53D6\u6D88\u6E05\u7406\u3002\u5F53\u524D\u672C\u5730\u4E0B\u8F7D\u6587\u4EF6\uFF1A{value0} \u4E2A\uFF0C\u5360\u7528 {value1}\u3002",
+    "commands.auto046": "\u26A0\uFE0F **\u786E\u8BA4\u5220\u9664\u672C\u5730\u670D\u52A1\u5668\u5168\u90E8\u4E0B\u8F7D\u6587\u4EF6\uFF1F**",
+    "commands.auto047": "\u5C06\u5220\u9664 uploads \u672C\u5730\u76EE\u5F55\u4E2D\u7684 **{value0}** \u4E2A\u6587\u4EF6\uFF0C\u5360\u7528 **{value1}**\u3002",
+    "commands.auto048": "\u8FD9\u4F1A\u5220\u9664\u672C\u5730\u5B9E\u4F53\u6587\u4EF6\u53CA\u5BF9\u5E94\u7684\u672C\u5730\u6587\u4EF6\u7D22\u5F15\uFF1B\u4E0D\u4F1A\u5220\u9664\u4EFB\u52A1\u5386\u53F2\u6216\u4EFB\u4F55\u7B2C\u4E09\u65B9\u4E91\u7AEF\u5B9E\u4F53\u3002",
+    "commands.auto049": "\u5982\u786E\u8BA4\uFF0C\u8BF7\u70B9\u51FB\u4E0B\u65B9\u7EA2\u8272\u786E\u8BA4\u6309\u94AE\u3002",
+    "commands.auto050": "\u6E05\u7406\u786E\u8BA4\u65E0\u6548\u3001\u5DF2\u8FC7\u671F\u6216\u5DF2\u4F7F\u7528",
+    "commands.auto051": "\u2705 **\u672C\u5730\u670D\u52A1\u5668\u4E0B\u8F7D\u6587\u4EF6\u5DF2\u6E05\u7406**",
+    "commands.auto052": "\u5DF2\u5220\u9664\uFF1A{value0} \u4E2A\u6587\u4EF6",
+    "commands.auto053": "\u91CA\u653E\u7A7A\u95F4\uFF1A{value0}",
+    "commands.auto054": "\u5269\u4F59\u672C\u5730\u6587\u4EF6\uFF1A{value0} \u4E2A",
+    "commands.auto055": "\u65E7\u6E05\u7406\u6309\u94AE\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u53D1\u9001 /storage",
+    "commands.auto056": "\u6E05\u7406\u5931\u8D25: {value0}",
+    "commands.auto057": "\u8BE5\u64CD\u4F5C\u4F1A\u5220\u9664\u5B9E\u4F53\u6587\u4EF6\u548C\u7D22\u5F15\u3002",
+    "commands.auto058": "\u26A0\uFE0F **\u786E\u8BA4\u5220\u9664\u8FD9\u4E2A\u6587\u4EF6\uFF1F**",
+    "commands.auto059": '\u274C \u672A\u627E\u5230 ID \u4EE5 "{value0}" \u5F00\u5934\u7684\u6587\u4EF6',
+    "commands.auto060": '\u274C ID \u524D\u7F00 "{value0}" \u5339\u914D\u5230\u591A\u4E2A\u6587\u4EF6\uFF0C\u8BF7\u590D\u5236\u66F4\u957F\u7684 ID \u524D\u7F00\u540E\u91CD\u8BD5\u3002',
+    "commands.auto061": "\u26A0\uFE0F **\u786E\u8BA4\u5220\u9664\u8FD9\u4E2A\u6587\u4EF6\uFF1F**",
+    "commands.auto062": "\u5220\u9664\u4F1A\u79FB\u9664\u6570\u636E\u5E93\u8BB0\u5F55\u5E76\u5C1D\u8BD5\u5220\u9664\u5B9E\u9645\u6587\u4EF6\u3002\u8BF7\u786E\u8BA4\u65E0\u8BEF\u540E\u70B9\u51FB\u6309\u94AE\u3002",
+    "commands.auto063": "\u5DF2\u53D6\u6D88\u5220\u9664\uFF1A{value0}",
+    "commands.auto064": "\u274C \u6587\u4EF6\u5DF2\u4E0D\u5B58\u5728\u6216\u4E0D\u5728\u5F53\u524D\u5B58\u50A8\u8303\u56F4\u5185\u3002",
+    "commands.auto065": "\u274C OpenList \u5B58\u50A8\u4E0D\u63D0\u4F9B\u7528\u6237\u5220\u9664\u529F\u80FD\u3002",
+    "commands.auto066": "\u5220\u9664\u5931\u8D25: {value0}",
+    "commands.auto067": "\u8BE5\u9891\u9053\u4EFB\u52A1\u8BF7\u4F7F\u7528\u73B0\u6709\u5931\u8D25\u91CD\u8BD5\u5165\u53E3",
+    "commands.auto068": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u5237\u65B0\u4EFB\u52A1\u5217\u8868",
+    "commands.auto069": "\u4EFB\u52A1\u5F53\u524D\u4E0D\u5728\u8FD0\u884C\u72B6\u6001",
+    "commands.auto070": "\u4EFB\u52A1\u5DF2\u7ED3\u675F\u6216\u65E0\u6CD5\u6682\u505C",
+    "commands.auto071": "\u4EFB\u52A1\u5F53\u524D\u6CA1\u6709\u53EF\u4F18\u5148\u7684\u7B49\u5F85\u6587\u4EF6",
+    "commands.auto072": "\u4EFB\u52A1\u4E0D\u5728\u53EF\u7EE7\u7EED\u72B6\u6001",
+    "commands.auto073": "\u4EFB\u52A1\u5DF2\u7ED3\u675F\u6216\u65E0\u6CD5\u53D6\u6D88",
+    "commands.auto074": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u5237\u65B0\u4EFB\u52A1\u5217\u8868",
+    "commands.auto075": "\u4EFB\u52A1\u5DF2\u7ED3\u675F\u6216\u65E0\u6CD5\u53D6\u6D88",
+    "commands.auto076": "\u4EFB\u52A1\u5DF2\u7ED3\u675F\u6216\u65E0\u6CD5\u53D6\u6D88",
+    "commands.auto077": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u5237\u65B0\u4EFB\u52A1\u5217\u8868",
+    "commands.auto078": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u5237\u65B0\u4EFB\u52A1\u5217\u8868",
+    "commands.auto079": "\u4EFB\u52A1\u5B58\u5728\u672A\u5B8C\u6210\u5BF9\u8D26\u6216\u5F53\u524D\u65E0\u6CD5\u91CD\u8BD5",
+    "commands.auto080": "\u6B63\u5728\u5B8C\u6210\u5F53\u524D\u6587\u4EF6\uFF0C\u968F\u540E\u6682\u505C",
+    "commands.auto081": "\u7528\u6237\u5DF2\u6682\u505C\u4EFB\u52A1",
+    "commands.auto082": "\u26A0\uFE0F **\u786E\u8BA4\u53D6\u6D88\u5F53\u524D\u804A\u5929\u5168\u90E8\u4EFB\u52A1\uFF1F**",
+    "commands.auto083": "\u666E\u901A\u4E0B\u8F7D\uFF1A{value0} \u4E2A\u4EFB\u52A1\uFF08\u5904\u7406\u4E2D {value1} \u4E2A\u6587\u4EF6\uFF0C\u7B49\u5F85 {value2} \u4E2A\u6587\u4EF6\uFF09",
+    "commands.auto084": "\u9891\u9053\u4EFB\u52A1\uFF1A{value0} \u4E2A",
+    "commands.auto085": "\u4EFB\u52A1\u603B\u6570\uFF1A{value0}",
+    "commands.auto086": "\u786E\u8BA4\u540E\u4F1A\u4E2D\u6B62\u6B63\u5728\u8FD0\u884C\u7684\u4EFB\u52A1\u5E76\u6E05\u7406\u5BF9\u5E94\u4E34\u65F6\u6587\u4EF6\u3002\u5176\u5B83\u804A\u5929\u548C\u5176\u5B83\u7528\u6237\u7684\u4EFB\u52A1\u4E0D\u53D7\u5F71\u54CD\u3002",
+    "commands.auto087": "\u7528\u6237\u786E\u8BA4\u53D6\u6D88\u5F53\u524D\u804A\u5929\u5168\u90E8\u4EFB\u52A1",
+    "commands.auto088": "\u{1F6D1} **\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u5DF2\u53D6\u6D88**",
+    "commands.auto089": "\u666E\u901A\u4E0B\u8F7D\uFF1A{value0} \u4E2A\u4EFB\u52A1\uFF08\u5904\u7406\u4E2D {value1} / \u7B49\u5F85 {value2} \u4E2A\u6587\u4EF6\uFF09",
+    "commands.auto090": "\u9891\u9053\u4EFB\u52A1\uFF1A{value0} \u4E2A",
+    "commands.auto091": "\u4EFB\u52A1\u603B\u6570\uFF1A{value0}",
+    "commands.auto092": "\u7528\u6237\u5DF2\u6682\u505C\u4EFB\u52A1",
+    "commands.auto093": "\u6B63\u5728\u5B8C\u6210\u5F53\u524D\u6587\u4EF6\uFF0C\u968F\u540E\u6682\u505C",
+    "commands.auto094": "\u23F8\uFE0F \u5DF2\u6682\u505C\u8BE5\u4EFB\u52A1",
+    "commands.auto095": "\u23F8\uFE0F \u5DF2\u8BBE\u7F6E\uFF1A\u5B8C\u6210\u5F53\u524D\u6587\u4EF6\u540E\u6682\u505C\u8BE5\u4EFB\u52A1",
+    "commands.auto096": "\u23F8\uFE0F \u5DF2\u6682\u505C\u9891\u9053\u4EFB\u52A1 {value0}\n\u6765\u6E90\uFF1A{value1}",
+    "commands.auto097": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u4EFB\u52A1\uFF1A{value0}\u3002\u672A\u6682\u505C\u5F53\u524D\u804A\u5929\u4E0B\u8F7D\u961F\u5217\u3002",
+    "commands.auto098": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u4EFB\u52A1\uFF1A{value0}\u3002\u672A\u6682\u505C\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u3002",
+    "commands.auto099": "\u23F8\uFE0F \u5DF2\u6682\u505C\u5F53\u524D\u804A\u5929\u7684\u666E\u901A\u4E0B\u8F7D\u4EFB\u52A1\n\n\u8FDB\u884C\u4E2D: {value0}\n\u7B49\u5F85\u4E2D: {value1}\n\n\u5F53\u524D\u6B63\u5728\u4E0B\u8F7D\u7684\u6587\u4EF6\u4F1A\u7EE7\u7EED\u5B8C\u6210\uFF0C\u65B0\u7684\u7B49\u5F85\u4EFB\u52A1\u6682\u4E0D\u5F00\u59CB\u3002",
+    "commands.auto100": "\u25B6\uFE0F \u5DF2\u7EE7\u7EED\u8BE5\u4EFB\u52A1",
+    "commands.auto101": "\u25B6\uFE0F \u5DF2\u7EE7\u7EED\u9891\u9053\u4EFB\u52A1 {value0}\n\u6765\u6E90\uFF1A{value1}",
+    "commands.auto102": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u4EFB\u52A1\uFF1A{value0}\u3002\u672A\u7EE7\u7EED\u5F53\u524D\u804A\u5929\u4E0B\u8F7D\u961F\u5217\u3002",
+    "commands.auto103": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u4EFB\u52A1\uFF1A{value0}\u3002\u672A\u7EE7\u7EED\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u3002",
+    "commands.auto104": "\u25B6\uFE0F \u5DF2\u7EE7\u7EED\u5F53\u524D\u804A\u5929\u7684\u666E\u901A\u4E0B\u8F7D\u4EFB\u52A1\n\n\u8FDB\u884C\u4E2D: {value0}\n\u7B49\u5F85\u4E2D: {value1}",
+    "commands.auto105": "\u{1F6D1} \u5DF2\u53D6\u6D88\u8BE5\u4E0B\u8F7D\u4EFB\u52A1",
+    "commands.auto106": "\u5DF2\u53D6\u6D88\u9891\u9053\u4EFB\u52A1 {value0}\n\u6765\u6E90\uFF1A{value1}",
+    "commands.auto107": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u5F53\u524D\u804A\u5929\u4E2D\u7684\u5339\u914D\u4EFB\u52A1\uFF1A{value0}",
+    "commands.auto108": "\u65E7\u7248\u53D6\u6D88\u6309\u94AE\u5DF2\u5931\u6548\uFF0C\u8BF7\u4F7F\u7528\u65B0\u7248 /tasks \u91CD\u65B0\u8FDB\u5165\u4EFB\u52A1\u8BE6\u60C5\u5E76\u786E\u8BA4",
+    "commands.auto109": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u5F53\u524D\u804A\u5929\u4E2D\u7684\u5339\u914D\u4EFB\u52A1\uFF1A{value0}",
+    "commands.auto110": "\u65E7\u7248\u53D6\u6D88\u6309\u94AE\u5DF2\u5931\u6548\uFF0C\u8BF7\u4F7F\u7528\u65B0\u7248 /tasks \u91CD\u65B0\u8FDB\u5165\u4EFB\u52A1\u8BE6\u60C5\u5E76\u786E\u8BA4",
+    "commands.auto111": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u4F7F\u7528\u65B0\u7248 /tasks \u5237\u65B0",
+    "commands.auto112": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u552F\u4E00\u7684\u9891\u9053\u4EFB\u52A1\uFF0C\u672A\u91CD\u8BD5\u5176\u5B83\u4EFB\u52A1\u3002",
+    "commands.auto113": "\u{1F4EE} \u8BE5\u9891\u9053\u4EFB\u52A1\u6CA1\u6709\u53EF\u91CD\u8BD5\u5931\u8D25\u9879",
+    "commands.auto114": "\u{1F504} \u5DF2\u91CD\u65B0\u52A0\u5165\u9891\u9053\u4EFB\u52A1\u5931\u8D25\u9879 {value0} \u4E2A\n\u4EFB\u52A1: {value1}",
+    "commands.auto115": "\u{1F4EE} \u65E0\u6CD5\u8BC6\u522B\u5F53\u524D\u804A\u5929\uFF0C\u672A\u6267\u884C\u5931\u8D25\u4EFB\u52A1\u91CD\u8BD5\u3002",
+    "commands.auto116": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u5F53\u524D\u804A\u5929\u4E2D\u7684\u5931\u8D25\u4EFB\u52A1\uFF1A{value0}",
+    "commands.auto117": "\u{1F4EE} \u6700\u8FD1\u6CA1\u6709\u53EF\u91CD\u8BD5\u7684\u5931\u8D25\u4EFB\u52A1",
+    "commands.auto119": "\u274C \u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u5355\u6587\u4EF6\u5206\u7247\u5E76\u53D1\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002",
+    "commands.auto120": "\u274C \u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u6587\u4EF6\u5E76\u53D1\u8BBE\u7F6E\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002",
+    "commands.auto121": "\u{1F4CC} \u5DF2\u8BBE\u7F6E\u4E0B\u4E00\u6B21\u4E0B\u8F7D\u76EE\u5F55\uFF1A`{value0}`\n{value1}\n\n\u6B64\u8BBE\u7F6E\u4F1A\u5728\u4E0B\u4E00\u6B21\u6210\u529F\u8FDB\u5165\u4E0B\u8F7D\u6D41\u7A0B\u65F6\u81EA\u52A8\u5931\u6548\u3002",
+    "commands.auto122": "\u{1F4CD} \u5DF2\u8BBE\u7F6E\u672C\u4F1A\u8BDD\u4E0B\u8F7D\u76EE\u5F55\uFF1A`{value0}`\n{value1}\n\n\u540E\u7EED\u6B64\u804A\u5929\u4E2D\u7684\u4E0B\u8F7D\u4F1A\u4F18\u5148\u4FDD\u5B58\u5230\u8BE5\u76EE\u5F55\uFF1B\u53EF\u5728\u201C\u4FDD\u5B58\u4F4D\u7F6E\u201D\u4E2D\u6E05\u9664\u3002",
+    "commands.auto123": "\u5982\u9700\u4F7F\u7528\u67D0\u4E2A\u76EE\u5F55\uFF0C\u8BF7\u5728\u201C\u4FDD\u5B58\u4F4D\u7F6E\u201D\u4E2D\u9009\u62E9\u4E0B\u4E00\u6B21\u6216\u672C\u804A\u5929\u76EE\u5F55\uFF0C\u7136\u540E\u53D1\u9001\u76EE\u5F55\u540D\u79F0\u3002",
+    "commands.auto124": "\u{1F558} **\u6700\u8FD1\u4F7F\u7528\u76EE\u5F55**",
+    "commands.auto125": "\u5DF2\u8BBE\u7F6E\u4E3A{value0}",
+    "commands.auto126": "\u5DF2\u5173\u95ED\u81EA\u52A8\u6E05\u7406",
+    "commands.auto127": "\u5DF2\u5F00\u542F\u81EA\u52A8\u6E05\u7406",
+    "commands.auto128": "\u26A0\uFE0F **\u786E\u8BA4\u4F7F\u7528 {value0} \u4E2A\u5206\u7247\uFF1F**",
+    "commands.auto129": "\u8FD9\u662F\u6FC0\u8FDB\u5206\u7247\u5E76\u53D1\u6A21\u5F0F\uFF0C\u53EF\u80FD\u51FA\u73B0\uFF1A",
+    "commands.auto130": "- Telegram \u98CE\u63A7\u6216\u9650\u6D41",
+    "commands.auto131": "- \u4E0B\u8F7D\u65AD\u6D41 / \u91CD\u8BD5\u589E\u591A",
+    "commands.auto132": "- Telegram \u7528\u6237\u8D26\u53F7\u53EF\u80FD\u88AB\u9650\u6D41\uFF0C\u6781\u7AEF\u60C5\u51B5\u4E0B\u4F1A\u5F71\u54CD\u8D26\u53F7",
+    "commands.auto133": "\u5982\u679C\u53EA\u662F\u65E5\u5E38\u4E0B\u8F7D\uFF0C\u5EFA\u8BAE\u4F7F\u7528 4 \u6216 8\u3002",
+    "commands.auto134": "{value0}\n\n\u2705 \u5DF2\u5207\u6362\u4E3A {value1} \u4E2A\u5206\u7247\uFF0C\u540E\u7EED\u65B0\u4E0B\u8F7D\u4EFB\u52A1\u7ACB\u5373\u751F\u6548\u3002",
+    "commands.auto135": "\u5DF2\u8BBE\u7F6E\u4E3A {value0}",
+    "commands.auto136": "{value0}\n\n\u26A0\uFE0F \u5DF2\u786E\u8BA4\u5E76\u5207\u6362\u4E3A {value1} \u4E2A\u5206\u7247\u3002\u82E5\u51FA\u73B0\u65AD\u6D41\u3001\u9650\u901F\u3001\u98CE\u63A7\u63D0\u793A\uFF0C\u8BF7\u7ACB\u5373\u964D\u56DE 4 \u6216 8\u3002",
+    "commands.auto137": "\u5DF2\u786E\u8BA4 {value0} workers",
+    "commands.auto138": "\u26A0\uFE0F **\u786E\u8BA4\u540C\u65F6\u4E0B\u8F7D 4 \u4E2A\u6587\u4EF6\uFF1F**",
+    "commands.auto139": "\u8FD9\u662F\u6587\u4EF6\u7EA7\u6FC0\u8FDB\u5E76\u53D1\u6A21\u5F0F\uFF0C\u53EF\u80FD\u51FA\u73B0\uFF1A",
+    "commands.auto140": "- Telegram \u98CE\u63A7\u6216\u9650\u6D41",
+    "commands.auto141": "- \u4E91\u76D8\u4E0A\u4F20\u9650\u901F / \u5931\u8D25\u91CD\u8BD5\u589E\u591A",
+    "commands.auto142": "- \u670D\u52A1\u5668\u78C1\u76D8\u548C\u7F51\u7EDC\u538B\u529B\u660E\u663E\u589E\u52A0",
+    "commands.auto143": "\u5982\u679C\u53EA\u662F\u65E5\u5E38\u4E0B\u8F7D\uFF0C\u5EFA\u8BAE\u4F7F\u7528 2 \u6216 3\u3002",
+    "commands.auto144": "{value0}\n\n\u2705 \u5DF2\u5207\u6362\u4E3A\u540C\u65F6\u4E0B\u8F7D {value1} \u4E2A\u6587\u4EF6\u3002",
+    "commands.auto145": "\u5DF2\u8BBE\u7F6E\u4E3A {value0}",
+    "commands.auto146": "{value0}\n\n\u26A0\uFE0F \u5DF2\u786E\u8BA4\u5E76\u5207\u6362\u4E3A\u540C\u65F6\u4E0B\u8F7D 4 \u4E2A\u6587\u4EF6\u3002\u82E5\u51FA\u73B0\u9650\u6D41\u3001\u65AD\u6D41\u6216\u4E0A\u4F20\u5931\u8D25\uFF0C\u8BF7\u7ACB\u5373\u964D\u56DE 2 \u6216 3\u3002",
+    "commands.auto147": "\u5DF2\u786E\u8BA4 4 \u4E2A\u6587\u4EF6\u5E76\u53D1",
+    "commands.authRequired": "\u{1F510} \u8BF7\u5148\u53D1\u9001 /start \u9A8C\u8BC1\u5BC6\u7801",
+    "commands.helpUnavailable": "\u274C \u6682\u65F6\u65E0\u6CD5\u663E\u793A\u5E2E\u52A9\u3002",
+    "commands.settingsSaved": "\u2705 \u8BBE\u7F6E\u5DF2\u4FDD\u5B58\u3002",
+    "commands.settingsFailed": "\u8BBE\u7F6E\u5931\u8D25\uFF1A{error}",
+    "commands.notificationsHint": "\u53D1\u9001 /notifications \u53EF\u91CD\u65B0\u67E5\u770B\u8BF4\u660E\u548C\u5FEB\u6377\u6309\u94AE\u3002",
+    "commands.alreadyCurrent": "\u5DF2\u662F\u5F53\u524D\u8BBE\u7F6E",
+    "commands.notificationsUpdated": "\u901A\u77E5\u8BBE\u7F6E\u5DF2\u66F4\u65B0",
+    "commands.settingFailedRetry": "\u8BBE\u7F6E\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5",
+    "commands.statusFailed": "\u274C \u8BCA\u65AD\u72B6\u6001\u8BFB\u53D6\u5931\u8D25\u3002\u64CD\u4F5C ID\uFF1A{requestId}",
+    "commands.localAccount": "\u670D\u52A1\u5668\u672C\u5730\u76EE\u5F55",
+    "commands.defaultAccount": "\u9ED8\u8BA4\u8D26\u6237",
+    "commands.unnamedAccount": "\u672A\u547D\u540D\u8D26\u6237",
+    "commands.localStorage": "\u672C\u5730\u5B58\u50A8",
+    "commands.refreshList": "\u{1F504} \u5237\u65B0\u5217\u8868",
+    "commands.storageSwitchTitle": "\u{1F5C4}\uFE0F **\u5B58\u50A8\u6E90\u5207\u6362**",
+    "commands.storageSwitchCurrent": "\u5F53\u524D\u4F7F\u7528\uFF1A{value}",
+    "commands.storageSwitchHint": "\u70B9\u51FB\u4E0B\u9762\u6309\u94AE\u5373\u53EF\u5207\u6362\u5230\u5DF2\u5728\u7F51\u9875\u7AEF\u914D\u7F6E\u597D\u7684\u5B58\u50A8\u8D26\u6237\uFF1B\u4E0D\u9700\u8981\u6253\u5F00\u524D\u7AEF\u9875\u9762\u3002",
+    "commands.storageSwitchOptions": "**\u53EF\u9009\u5B58\u50A8\uFF1A**",
+    "commands.storageSwitchNote": "\u63D0\u793A\uFF1A\u8FD9\u91CC\u53EA\u80FD\u5207\u6362\u5DF2\u6709\u8D26\u6237\uFF1B\u65B0\u589E OAuth/\u5BC6\u94A5\u914D\u7F6E\u4ECD\u9700\u5728\u7F51\u9875\u7AEF\u5B8C\u6210\u3002",
+    "commands.accountUnnamed": "\u672A\u547D\u540D\u8D26\u6237",
+    "commands.storageSwitchFailed": "\u274C \u83B7\u53D6\u5B58\u50A8\u6E90\u5207\u6362\u83DC\u5355\u5931\u8D25\uFF1A{error}",
+    "commands.storageRefreshed": "\u5DF2\u5237\u65B0",
+    "commands.storageInvalid": "\u65E0\u6548\u7684\u5B58\u50A8\u6E90\u9009\u62E9",
+    "commands.storageAlreadyLocal": "\u5F53\u524D\u5DF2\u7ECF\u662F\u672C\u5730\u5B58\u50A8",
+    "commands.storageSwitchedLocal": "\u5DF2\u5207\u6362\u5230\u672C\u5730\u5B58\u50A8",
+    "commands.storageMissing": "\u8BE5\u5B58\u50A8\u8D26\u6237\u5DF2\u4E0D\u5B58\u5728",
+    "commands.storageAlreadyAccount": "\u5F53\u524D\u5DF2\u7ECF\u5728\u4F7F\u7528\u8BE5\u8D26\u6237",
+    "commands.storageSwitched": "\u5DF2\u5207\u6362\u5230 {name}",
+    "commands.storageSwitchError": "\u5207\u6362\u5931\u8D25\uFF1A{error}",
+    "commands.deleteConfirm": "\u26A0\uFE0F \u786E\u8BA4\u5220\u9664",
+    "commands.bulkConfirm": "\u26A0\uFE0F \u786E\u8BA4\u53D6\u6D88\u5168\u90E8",
+    "commands.confirmCancelAll": "\u26A0\uFE0F \u786E\u8BA4\u53D6\u6D88\u5168\u90E8",
+    "commands.confirmUse": "\u26A0\uFE0F \u786E\u8BA4\u4F7F\u7528 {count}",
+    "commands.confirmFiles": "\u26A0\uFE0F \u786E\u8BA4\u540C\u65F6\u4E0B\u8F7D {count} \u4E2A\u6587\u4EF6",
+    "commands.clearLocalConfirm": "\u26A0\uFE0F \u786E\u8BA4\u5220\u9664\u672C\u5730\u5168\u90E8\u4E0B\u8F7D\u6587\u4EF6",
+    "commands.clearLocalButton": "\u{1F9F9} \u5220\u9664\u672C\u5730\u5168\u90E8\u4E0B\u8F7D\u6587\u4EF6 ({count})",
+    "commands.secondConfirm": "\u9700\u8981\u4E8C\u6B21\u786E\u8BA4",
+    "commands.cancelled": "\u5DF2\u53D6\u6D88",
+    "commands.returned": "\u5DF2\u8FD4\u56DE",
+    "commands.deleted": "\u5DF2\u5220\u9664",
+    "commands.deletedCount": "\u5DF2\u5220\u9664 {count} \u4E2A\u6587\u4EF6",
+    "commands.targetNextButton": "\u{1F4CC} \u4E0B\u4E00\u6B21\u4F7F\u7528\u5F53\u524D\u5B58\u50A8",
+    "commands.targetSessionButton": "\u{1F4CD} \u672C\u804A\u5929\u4F7F\u7528\u5F53\u524D\u5B58\u50A8",
+    "commands.targetClearButton": "\u{1F9F9} \u6062\u590D\u7CFB\u7EDF\u9ED8\u8BA4",
+    "commands.targetTitle": "\u{1F3AF} **\u5F53\u524D\u804A\u5929\u5B58\u50A8\u76EE\u6807**",
+    "commands.targetNext": "\u4E0B\u4E00\u6B21\uFF1A{value}",
+    "commands.targetSession": "\u672C\u804A\u5929\uFF1A{value}",
+    "commands.targetSystem": "\u7CFB\u7EDF\u9ED8\u8BA4\uFF1A{value}",
+    "commands.targetSet": "{value}\uFF08\u5DF2\u8BBE\u7F6E\uFF09",
+    "commands.targetDefault": "\u7CFB\u7EDF\u9ED8\u8BA4",
+    "commands.targetHint": "\u{1F447} \u70B9\u51FB\u6309\u94AE\uFF0C\u7528\u5F53\u524D\u7CFB\u7EDF\u5B58\u50A8\u8BBE\u7F6E\u4E34\u65F6\u76EE\u6807\u3002",
+    "commands.targetCleared": "\u2705 \u5DF2\u6E05\u9664\u5F53\u524D\u804A\u5929\u7684\u5B58\u50A8\u76EE\u6807\u8986\u76D6\uFF1B\u540E\u7EED\u4EFB\u52A1\u4F7F\u7528\u7CFB\u7EDF\u9ED8\u8BA4\u3002",
+    "commands.targetRestored": "\u5DF2\u6062\u590D\u7CFB\u7EDF\u9ED8\u8BA4",
+    "commands.targetInvalid": "\u274C \u65E0\u6CD5\u8BC6\u522B\u8FD9\u4E2A\u5B58\u50A8\u76EE\u6807\u3002\u8BF7\u4F7F\u7528\u4E0B\u65B9\u6309\u94AE\u3002",
+    "commands.targetAccountMissing": "\u274C \u672A\u627E\u5230\u8BE5\u5B58\u50A8\u8D26\u6237\uFF1B\u8BF7\u4ECE /storage_switch \u67E5\u770B\u5B8C\u6574\u8D26\u6237\u5217\u8868\u3002",
+    "commands.targetSaved": "\u2705 \u5DF2\u8BBE\u7F6E{scope}\u76EE\u6807\uFF1A{provider} / {account}\n\u4E0D\u4F1A\u4FEE\u6539\u7CFB\u7EDF\u5168\u5C40\u9ED8\u8BA4\u3002",
+    "commands.targetScopeNext": "\u4E0B\u4E00\u6B21",
+    "commands.targetScopeSession": "\u5F53\u524D\u804A\u5929\u4F1A\u8BDD",
+    "commands.targetNextSet": "\u5DF2\u8BBE\u7F6E\u4E0B\u4E00\u6B21\u5B58\u50A8",
+    "commands.targetSessionSet": "\u5DF2\u8BBE\u7F6E\u672C\u804A\u5929\u5B58\u50A8",
+    "commands.fileSearchFailed": "\u274C \u641C\u7D22\u5931\u8D25\uFF1A{error}",
+    "commands.fileUnavailable": "\u6587\u4EF6\u5DF2\u4E0D\u5B58\u5728\u6216\u4E0D\u5728\u5F53\u524D\u5B58\u50A8\u8303\u56F4\u5185",
+    "commands.fileDetail": "\u6587\u4EF6\u8BE6\u60C5",
+    "commands.confirmRequired": "\u9700\u8981\u4E8C\u6B21\u786E\u8BA4",
+    "commands.fileFavorited": "\u5DF2\u6536\u85CF",
+    "commands.fileUnfavorited": "\u5DF2\u53D6\u6D88\u6536\u85CF",
+    "commands.fileShareUnsupported": "\u5F53\u524D provider \u4E0D\u652F\u6301\u5206\u4EAB\uFF1B\u53EF\u5728 Web \u4E2D\u4E0B\u8F7D",
+    "commands.fileSignedLink": "\u{1F517} 1 \u5C0F\u65F6\u7B7E\u540D\u94FE\u63A5\uFF1A\n{link}",
+    "commands.fileLinkCreated": "\u5DF2\u751F\u6210\u7B7E\u540D\u94FE\u63A5",
+    "commands.fileMovePrompt": "\u8BF7\u53D1\u9001\u76EE\u6807\u76EE\u5F55\uFF1B\u53D1\u9001\u201C\u53D6\u6D88\u201D\u9000\u51FA\u3002",
+    "commands.fileRenamePrompt": "\u8BF7\u53D1\u9001\u65B0\u6587\u4EF6\u540D\uFF08\u5FC5\u987B\u4FDD\u7559\u539F\u6269\u5C55\u540D\uFF09\uFF1B\u53D1\u9001\u201C\u53D6\u6D88\u201D\u9000\u51FA\u3002",
+    "commands.fileAwaitFolder": "\u7B49\u5F85\u76EE\u6807\u76EE\u5F55",
+    "commands.fileAwaitName": "\u7B49\u5F85\u65B0\u6587\u4EF6\u540D",
+    "commands.fileDeleteTitle": "\u26A0\uFE0F **\u786E\u8BA4\u5220\u9664\u8FD9\u4E2A\u6587\u4EF6\uFF1F**",
+    "commands.fileDeleteImpact": "\u8BE5\u64CD\u4F5C\u4F1A\u5220\u9664\u5B9E\u4F53\u6587\u4EF6\u548C\u7D22\u5F15\u3002",
+    "commands.fileMutationExpired": "\u64CD\u4F5C\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u6587\u4EF6\u8BE6\u60C5\u3002",
+    "commands.fileMutationCancelled": "\u5DF2\u53D6\u6D88\u6587\u4EF6\u64CD\u4F5C\u3002",
+    "commands.fileMoved": "\u2705 \u5DF2\u79FB\u52A8\u5230\uFF1A{folder}",
+    "commands.fileRenamed": "\u2705 \u5DF2\u91CD\u547D\u540D\u4E3A\uFF1A{name}",
+    "commands.fileDeleteChoose": "\u8BF7\u4ECE\u201C\u641C\u7D22\u548C\u64CD\u4F5C\u6587\u4EF6\u201D\u4E2D\u9009\u62E9\u6587\u4EF6\uFF0C\u7136\u540E\u70B9\u51FB\u201C\u5220\u9664\u201D\u3002",
+    "commands.fileDeleteNoIndex": "\u274C \u4E3A\u907F\u514D\u8BEF\u5220\uFF0CTelegram Bot \u4E0D\u652F\u6301\u6309\u5217\u8868\u5E8F\u53F7\u5220\u9664\u3002\u8BF7\u53D1\u9001 /list \u5E76\u590D\u5236\u81F3\u5C11 8 \u4F4D\u6587\u4EF6 ID \u524D\u7F00\u3002",
+    "commands.fileIdTooShort": "\u274C ID \u524D\u7F00\u81F3\u5C11\u9700\u8981 8 \u4F4D\u3002\u8BF7\u4ECE\u7F51\u9875\u7AEF\u6587\u4EF6\u5217\u8868\u590D\u5236\u66F4\u957F\u7684\u6587\u4EF6 ID\u3002",
+    "commands.fileNotFound": '\u274C \u672A\u627E\u5230 ID \u4EE5 "{selector}" \u5F00\u5934\u7684\u6587\u4EF6',
+    "commands.fileAmbiguous": '\u274C ID \u524D\u7F00 "{selector}" \u5339\u914D\u5230\u591A\u4E2A\u6587\u4EF6\uFF0C\u8BF7\u590D\u5236\u66F4\u957F\u7684 ID \u524D\u7F00\u540E\u91CD\u8BD5\u3002',
+    "commands.fileOpenListDeleteUnsupported": "OpenList \u5B58\u50A8\u4E0D\u63D0\u4F9B\u7528\u6237\u5220\u9664\u529F\u80FD\u3002",
+    "commands.fileDeleteHint": "\u5220\u9664\u4F1A\u79FB\u9664\u6570\u636E\u5E93\u8BB0\u5F55\u5E76\u5C1D\u8BD5\u5220\u9664\u5B9E\u9645\u6587\u4EF6\u3002\u8BF7\u786E\u8BA4\u65E0\u8BEF\u540E\u70B9\u51FB\u6309\u94AE\u3002",
+    "commands.deleteExpired": "\u5220\u9664\u786E\u8BA4\u65E0\u6548\u6216\u5DF2\u8FC7\u671F",
+    "commands.deleteNotOwner": "\u5220\u9664\u786E\u8BA4\u4E0D\u5C5E\u4E8E\u4F60\u6216\u5DF2\u8FC7\u671F",
+    "commands.deleteInvalid": "\u5220\u9664\u786E\u8BA4\u4E0D\u5C5E\u4E8E\u4F60\u3001\u5DF2\u8FC7\u671F\u6216\u5DF2\u4F7F\u7528",
+    "commands.deleteCancelled": "\u5DF2\u53D6\u6D88\u5220\u9664\uFF1A{name}",
+    "commands.fileMissingShort": "\u6587\u4EF6\u4E0D\u5B58\u5728",
+    "commands.fileDeleteUnsupportedShort": "\u5F53\u524D\u5B58\u50A8\u4E0D\u652F\u6301\u7528\u6237\u5220\u9664",
+    "commands.deleteFailed": "\u5220\u9664\u5931\u8D25\uFF1A{error}",
+    "commands.pathOncePrompt": "\u8BF7\u76F4\u63A5\u53D1\u9001\u4E0B\u4E00\u6B21\u8981\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002",
+    "commands.pathSessionPrompt": "\u8BF7\u76F4\u63A5\u53D1\u9001\u672C\u804A\u5929\u8981\u6301\u7EED\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002",
+    "commands.pathOnceSaved": "\u{1F4CC} \u5DF2\u8BBE\u7F6E\u4E0B\u4E00\u6B21\u4E0B\u8F7D\u76EE\u5F55\uFF1A`{folder}`\n{preview}\n\n\u6B64\u8BBE\u7F6E\u4F1A\u5728\u4E0B\u4E00\u6B21\u6210\u529F\u8FDB\u5165\u4E0B\u8F7D\u6D41\u7A0B\u65F6\u81EA\u52A8\u5931\u6548\u3002",
+    "commands.pathSessionSaved": "\u{1F4CD} \u5DF2\u8BBE\u7F6E\u672C\u4F1A\u8BDD\u4E0B\u8F7D\u76EE\u5F55\uFF1A`{folder}`\n{preview}\n\n\u540E\u7EED\u6B64\u804A\u5929\u4E2D\u7684\u4E0B\u8F7D\u4F1A\u4F18\u5148\u4FDD\u5B58\u5230\u8BE5\u76EE\u5F55\uFF1B\u53EF\u5728\u201C\u4FDD\u5B58\u4F4D\u7F6E\u201D\u4E2D\u6E05\u9664\u3002",
+    "commands.pathInvalid": "\u274C \u8DEF\u5F84\u65E0\u6548\uFF1A{error}",
+    "commands.pathCleared": "\u{1F9F9} \u5DF2\u6E05\u9664\u4E0B\u4E00\u6B21/\u672C\u4F1A\u8BDD\u81EA\u5B9A\u4E49\u4E0B\u8F7D\u76EE\u5F55\uFF0C\u540E\u7EED\u6062\u590D\u4F7F\u7528\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B\u76EE\u5F55\u3002",
+    "commands.pathRecentTitle": "\u{1F558} **\u6700\u8FD1\u4F7F\u7528\u76EE\u5F55**",
+    "commands.pathRecentHint": "\u5982\u9700\u4F7F\u7528\u67D0\u4E2A\u76EE\u5F55\uFF0C\u8BF7\u5728\u201C\u4FDD\u5B58\u4F4D\u7F6E\u201D\u4E2D\u9009\u62E9\u4E0B\u4E00\u6B21\u6216\u672C\u804A\u5929\u76EE\u5F55\uFF0C\u7136\u540E\u53D1\u9001\u76EE\u5F55\u540D\u79F0\u3002",
+    "commands.pathRecentEmpty": "\u{1F558} \u6682\u65E0\u6700\u8FD1\u4F7F\u7528\u76EE\u5F55\u3002\u8BBE\u7F6E\u76EE\u5F55\u540E\u4F1A\u81EA\u52A8\u8BB0\u5F55\u3002",
+    "commands.pathRecentSent": "\u5DF2\u53D1\u9001\u6700\u8FD1\u76EE\u5F55",
+    "commands.pathInputToast": "\u8BF7\u76F4\u63A5\u53D1\u9001\u76EE\u5F55\uFF0C\u6216\u53D1\u9001\u201C\u53D6\u6D88\u201D\u9000\u51FA",
+    "commands.pathUpdated": "\u4FDD\u5B58\u4F4D\u7F6E\u5DF2\u66F4\u65B0",
+    "commands.taskInvalidButton": "\u4EFB\u52A1\u6309\u94AE\u65E0\u6548\u6216\u5DF2\u8FC7\u671F",
+    "commands.cleanupCancelledSummary": "\u5DF2\u53D6\u6D88\u6E05\u7406\u3002\u5F53\u524D\u672C\u5730\u4E0B\u8F7D\u6587\u4EF6\uFF1A{count} \u4E2A\uFF0C\u5360\u7528 {size}\u3002",
+    "commands.cleanupCancelledEmpty": "\u5DF2\u53D6\u6D88\u6E05\u7406\u3002\u5F53\u524D\u6CA1\u6709\u672C\u5730\u4E0B\u8F7D\u6587\u4EF6\u3002",
+    "commands.cleanupConfirmTitle": "\u26A0\uFE0F **\u786E\u8BA4\u5220\u9664\u672C\u5730\u670D\u52A1\u5668\u5168\u90E8\u4E0B\u8F7D\u6587\u4EF6\uFF1F**",
+    "commands.cleanupConfirmSummary": "\u5C06\u5220\u9664 uploads \u672C\u5730\u76EE\u5F55\u4E2D\u7684 **{count}** \u4E2A\u6587\u4EF6\uFF0C\u5360\u7528 **{size}**\u3002",
+    "commands.cleanupConfirmImpact": "\u8FD9\u4F1A\u5220\u9664\u672C\u5730\u5B9E\u4F53\u6587\u4EF6\u53CA\u5BF9\u5E94\u7684\u672C\u5730\u6587\u4EF6\u7D22\u5F15\uFF1B\u4E0D\u4F1A\u5220\u9664\u4EFB\u52A1\u5386\u53F2\u6216\u4EFB\u4F55\u7B2C\u4E09\u65B9\u4E91\u7AEF\u5B9E\u4F53\u3002",
+    "commands.cleanupConfirmHint": "\u5982\u786E\u8BA4\uFF0C\u8BF7\u70B9\u51FB\u4E0B\u65B9\u7EA2\u8272\u786E\u8BA4\u6309\u94AE\u3002",
+    "commands.cleanupConfirmRequired": "\u9700\u8981\u4E8C\u6B21\u786E\u8BA4",
+    "commands.cleanupConfirmInvalid": "\u6E05\u7406\u786E\u8BA4\u65E0\u6548\u3001\u5DF2\u8FC7\u671F\u6216\u5DF2\u4F7F\u7528",
+    "commands.cleanupDoneTitle": "\u2705 **\u672C\u5730\u670D\u52A1\u5668\u4E0B\u8F7D\u6587\u4EF6\u5DF2\u6E05\u7406**",
+    "commands.cleanupDoneSummary": "\u5DF2\u5220\u9664\uFF1A{count} \u4E2A\u6587\u4EF6\n\u91CA\u653E\u7A7A\u95F4\uFF1A{size}\n\u5269\u4F59\u672C\u5730\u6587\u4EF6\uFF1A{remaining} \u4E2A",
+    "commands.cleanupDeleted": "\u5DF2\u5220\u9664 {count} \u4E2A\u6587\u4EF6",
+    "commands.cleanupOldButton": "\u65E7\u6E05\u7406\u6309\u94AE\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u53D1\u9001 /storage",
+    "commands.cleanupFailed": "\u6E05\u7406\u5931\u8D25\uFF1A{error}",
+    "commands.bulkInvalidConfirm": "\u6279\u91CF\u53D6\u6D88\u786E\u8BA4\u65E0\u6548\u6216\u5DF2\u8FC7\u671F",
+    "commands.bulkNotOwner": "\u8BE5\u786E\u8BA4\u4E0D\u5C5E\u4E8E\u4F60\u6216\u5DF2\u8FC7\u671F",
+    "commands.bulkReturnedToast": "\u5DF2\u8FD4\u56DE",
+    "commands.bulkInvalidUsed": "\u8BE5\u786E\u8BA4\u4E0D\u5C5E\u4E8E\u4F60\u3001\u5DF2\u8FC7\u671F\u6216\u5DF2\u4F7F\u7528",
+    "commands.bulkDoneMessage": "\u5DF2\u8FD4\u56DE\uFF0C\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u672A\u88AB\u53D6\u6D88\u3002",
+    "commands.bulkCancelledToast": "\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u5DF2\u53D6\u6D88",
+    "commands.bulkCancelFailed": "\u53D6\u6D88\u5931\u8D25\uFF1A{error}",
+    "commands.taskStopFailed": "\u274C \u5F3A\u5236\u505C\u6B62\u4EFB\u52A1\u5931\u8D25\uFF1A{error}",
+    "commands.taskPausedChannel": "\u23F8\uFE0F \u5DF2\u6682\u505C\u9891\u9053\u4EFB\u52A1 {task}\n\u6765\u6E90\uFF1A{source}",
+    "commands.taskNotFoundPause": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u4EFB\u52A1\uFF1A{task}\u3002\u672A\u6682\u505C\u5F53\u524D\u804A\u5929\u4E0B\u8F7D\u961F\u5217\u3002",
+    "commands.taskResumedSingle": "\u25B6\uFE0F \u5DF2\u7EE7\u7EED\u8BE5\u4EFB\u52A1",
+    "commands.taskResumedChannel": "\u25B6\uFE0F \u5DF2\u7EE7\u7EED\u9891\u9053\u4EFB\u52A1 {task}\n\u6765\u6E90\uFF1A{source}",
+    "commands.taskNotFoundResume": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u4EFB\u52A1\uFF1A{task}\u3002\u672A\u7EE7\u7EED\u5F53\u524D\u804A\u5929\u4E0B\u8F7D\u961F\u5217\u3002",
+    "commands.taskCancelledSingle": "\u{1F6D1} \u5DF2\u53D6\u6D88\u8BE5\u4E0B\u8F7D\u4EFB\u52A1",
+    "commands.taskCancelledChannel": "\u{1F6D1} \u5DF2\u53D6\u6D88\u9891\u9053\u4EFB\u52A1 {task}\n\u6765\u6E90\uFF1A{source}",
+    "commands.taskNotFound": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u5F53\u524D\u804A\u5929\u4E2D\u7684\u5339\u914D\u4EFB\u52A1\uFF1A{task}",
+    "commands.taskLegacyCancel": "\u65E7\u7248\u53D6\u6D88\u6309\u94AE\u5DF2\u5931\u6548\uFF0C\u8BF7\u4F7F\u7528\u65B0\u7248 /tasks \u91CD\u65B0\u8FDB\u5165\u4EFB\u52A1\u8BE6\u60C5\u5E76\u786E\u8BA4",
+    "commands.taskLegacyAmbiguous": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u4F7F\u7528\u65B0\u7248 /tasks \u5237\u65B0",
+    "commands.taskLegacyEnded": "\u4EFB\u52A1\u5DF2\u7ED3\u675F\u6216\u5DF2\u5931\u6548",
+    "commands.retryNoUniqueChannel": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u552F\u4E00\u7684\u9891\u9053\u4EFB\u52A1\uFF0C\u672A\u91CD\u8BD5\u5176\u5B83\u4EFB\u52A1\u3002",
+    "commands.retryChannelDone": "\u{1F504} \u5DF2\u91CD\u65B0\u52A0\u5165\u9891\u9053\u4EFB\u52A1\u5931\u8D25\u9879 {count} \u4E2A\n\u4EFB\u52A1: {task}",
+    "commands.retryChannelEmpty": "\u{1F4EE} \u8BE5\u9891\u9053\u4EFB\u52A1\u6CA1\u6709\u53EF\u91CD\u8BD5\u5931\u8D25\u9879",
+    "commands.retryInvalidChat": "\u{1F4EE} \u65E0\u6CD5\u8BC6\u522B\u5F53\u524D\u804A\u5929\uFF0C\u672A\u6267\u884C\u5931\u8D25\u4EFB\u52A1\u91CD\u8BD5\u3002",
+    "commands.retryTaskMissing": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u5F53\u524D\u804A\u5929\u4E2D\u7684\u5931\u8D25\u4EFB\u52A1\uFF1A{task}",
+    "commands.workerReadFailed": "\u274C \u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u5355\u6587\u4EF6\u5206\u7247\u5E76\u53D1\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002",
+    "commands.concurrencyReadFailed": "\u274C \u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u6587\u4EF6\u5E76\u53D1\u8BBE\u7F6E\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002",
+    "commands.pathOncePromptDirect": "\u8BF7\u76F4\u63A5\u53D1\u9001\u4E0B\u4E00\u6B21\u8981\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002",
+    "commands.pathOnceSavedDirect": "\u{1F4CC} \u5DF2\u8BBE\u7F6E\u4E0B\u4E00\u6B21\u4E0B\u8F7D\u76EE\u5F55\uFF1A`{folder}`\n{preview}\n\n\u6B64\u8BBE\u7F6E\u4F1A\u5728\u4E0B\u4E00\u6B21\u6210\u529F\u8FDB\u5165\u4E0B\u8F7D\u6D41\u7A0B\u65F6\u81EA\u52A8\u5931\u6548\u3002",
+    "commands.pathSessionPromptDirect": "\u8BF7\u76F4\u63A5\u53D1\u9001\u672C\u804A\u5929\u8981\u6301\u7EED\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002",
+    "commands.pathSessionSavedDirect": "\u{1F4CD} \u5DF2\u8BBE\u7F6E\u672C\u4F1A\u8BDD\u4E0B\u8F7D\u76EE\u5F55\uFF1A`{folder}`\n{preview}\n\n\u540E\u7EED\u6B64\u804A\u5929\u4E2D\u7684\u4E0B\u8F7D\u4F1A\u4F18\u5148\u4FDD\u5B58\u5230\u8BE5\u76EE\u5F55\uFF1B\u53EF\u5728\u201C\u4FDD\u5B58\u4F4D\u7F6E\u201D\u4E2D\u6E05\u9664\u3002",
+    "commands.pathClearedDirect": "\u{1F9F9} \u5DF2\u6E05\u9664\u4E0B\u4E00\u6B21/\u672C\u4F1A\u8BDD\u81EA\u5B9A\u4E49\u4E0B\u8F7D\u76EE\u5F55\uFF0C\u540E\u7EED\u6062\u590D\u4F7F\u7528\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B\u76EE\u5F55\u3002",
+    "commands.pathInvalidDirect": "\u274C \u8DEF\u5F84\u65E0\u6548\uFF1A{error}",
+    "commands.taskOldCard": "\u65E7\u4EFB\u52A1\u5361\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u53D1\u9001 /tasks",
+    "commands.taskWrongOwner": "\u8BE5\u4EFB\u52A1\u5361\u4E0D\u5C5E\u4E8E\u4F60\u6216\u5DF2\u8FC7\u671F",
+    "commands.taskRefreshed": "\u4EFB\u52A1\u5217\u8868\u5DF2\u5237\u65B0",
+    "commands.taskEnded": "\u4EFB\u52A1\u5DF2\u7ED3\u675F\u6216\u5DF2\u5931\u6548",
+    "commands.taskConfirmCancel": "\u8BF7\u786E\u8BA4\u662F\u5426\u53D6\u6D88",
+    "commands.taskCancelExpired": "\u53D6\u6D88\u786E\u8BA4\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u8FDB\u5165\u4EFB\u52A1\u8BE6\u60C5",
+    "commands.taskRetryUnsupported": "\u8BE5\u4EFB\u52A1\u7C7B\u578B\u4E0D\u652F\u6301\u6B64\u91CD\u8BD5\u6309\u94AE",
+    "commands.taskPrioritized": "\u5DF2\u63D0\u5347\u5230\u7B49\u5F85\u961F\u5217\u524D\u9762",
+    "commands.taskPausing": "\u5C06\u5728\u5B8C\u6210\u5F53\u524D\u6587\u4EF6\u540E\u6682\u505C",
+    "commands.taskPaused": "\u4EFB\u52A1\u5DF2\u6682\u505C",
+    "commands.taskResumed": "\u4EFB\u52A1\u5DF2\u7EE7\u7EED",
+    "commands.taskCancelled": "\u4EFB\u52A1\u5DF2\u53D6\u6D88",
+    "commands.taskProtected": "\u4EFB\u52A1\u7531\u7CFB\u7EDF\u4FDD\u62A4\u6682\u505C\uFF0C\u9700\u7B49\u5F85\u7CFB\u7EDF\u6761\u4EF6\u6062\u590D",
+    "commands.taskForbidden": "\u4EFB\u52A1\u4E0D\u5C5E\u4E8E\u5F53\u524D\u804A\u5929",
+    "commands.taskOperationFailed": "\u64CD\u4F5C\u5931\u8D25\uFF1A{error}",
+    "commands.taskPrefixAmbiguous": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u5237\u65B0\u4EFB\u52A1\u5217\u8868",
+    "commands.bulkInvalidChat": "\u{1F4EE} \u65E0\u6CD5\u8BC6\u522B\u5F53\u524D\u804A\u5929\uFF0C\u672A\u53D6\u6D88\u4EFB\u52A1",
+    "commands.bulkEmpty": "\u{1F4EE} \u5F53\u524D\u804A\u5929\u6CA1\u6709\u53EF\u53D6\u6D88\u7684\u4EFB\u52A1",
+    "commands.bulkTitle": "\u26A0\uFE0F **\u786E\u8BA4\u53D6\u6D88\u5F53\u524D\u804A\u5929\u5168\u90E8\u4EFB\u52A1\uFF1F**",
+    "commands.bulkOrdinary": "\u666E\u901A\u4E0B\u8F7D\uFF1A{tasks} \u4E2A\u4EFB\u52A1\uFF08\u5904\u7406\u4E2D {active} \u4E2A\u6587\u4EF6\uFF0C\u7B49\u5F85 {pending} \u4E2A\u6587\u4EF6\uFF09",
+    "commands.bulkChannels": "\u9891\u9053\u4EFB\u52A1\uFF1A{count} \u4E2A",
+    "commands.bulkWarning": "\u786E\u8BA4\u540E\u4F1A\u4E2D\u6B62\u6B63\u5728\u8FD0\u884C\u7684\u4EFB\u52A1\u5E76\u6E05\u7406\u5BF9\u5E94\u4E34\u65F6\u6587\u4EF6\u3002\u5176\u5B83\u804A\u5929\u548C\u5176\u5B83\u7528\u6237\u7684\u4EFB\u52A1\u4E0D\u53D7\u5F71\u54CD\u3002",
+    "commands.bulkInvalid": "\u6279\u91CF\u53D6\u6D88\u786E\u8BA4\u65E0\u6548\u6216\u5DF2\u8FC7\u671F",
+    "commands.confirmWrongOwner": "\u8BE5\u786E\u8BA4\u4E0D\u5C5E\u4E8E\u4F60\u6216\u5DF2\u8FC7\u671F",
+    "commands.confirmInvalid": "\u8BE5\u786E\u8BA4\u4E0D\u5C5E\u4E8E\u4F60\u3001\u5DF2\u8FC7\u671F\u6216\u5DF2\u4F7F\u7528",
+    "commands.bulkReturned": "\u5DF2\u8FD4\u56DE\uFF0C\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u672A\u88AB\u53D6\u6D88\u3002",
+    "commands.bulkDoneTitle": "\u{1F6D1} **\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u5DF2\u53D6\u6D88**",
+    "commands.bulkDone": "\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u5DF2\u53D6\u6D88",
+    "commands.bulkFailed": "\u53D6\u6D88\u5931\u8D25\uFF1A{error}",
+    "commands.stopFailed": "\u274C \u5F3A\u5236\u505C\u6B62\u4EFB\u52A1\u5931\u8D25\uFF1A{error}",
+    "bot.wizard.confirmTitle": "\u8BF7\u786E\u8BA4\u4EFB\u52A1\u8303\u56F4\uFF1A",
+    "bot.wizard.confirmSource": "\u{1F4CC} \u9891\u9053\uFF1A{source}",
+    "bot.wizard.confirmComments": "\u{1F4AC} \u8BC4\u8BBA\u533A\uFF1A{value}",
+    "bot.wizard.folder.defaultValue": "\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B",
+    "bot.wizard.storage.current": "\u5F53\u524D\u5B58\u50A8",
+    "bot.wizard.storage.currentAccount": "\u5F53\u524D\u8D26\u6237",
+    "bot.wizard.confirmTagRange": "\u6807\u7B7E\uFF1A#{tag}",
+    "bot.wizard.confirmDateRange": "\u65E5\u671F\uFF1A{startDate} \u2192 {endDate}",
+    "bot.wizard.confirmDays": "\u{1F4C5} \u5171 {days} \u5929\uFF08\u542B\u9996\u5C3E\u65E5\u671F\uFF09",
+    "bot.wizard.confirmLargeRange": "\u26A0\uFE0F \u8303\u56F4\u8F83\u5927\uFF1A\u786E\u8BA4\u540E\u5C06\u6267\u884C\u5206\u6BB5\u626B\u63CF\uFF0C\u8BF7\u6838\u5BF9\u65E5\u671F\u548C\u5B58\u50A8\u76EE\u6807\u3002",
+    "bot.wizard.confirmCommentsOn": "\u5305\u542B\uFF08\u6BCF\u5E16\u6700\u591A {count} \u6761\uFF09",
+    "bot.wizard.confirmCommentsOff": "\u4E0D\u5305\u542B",
+    "bot.wizard.confirmFolder": "\u{1F4C1} \u76EE\u5F55\uFF1A{folder}",
+    "bot.wizard.confirmStorage": "\u2601\uFE0F \u56FA\u5B9A\u5B58\u50A8\uFF1A{provider} / {account}",
+    "bot.wizard.confirmNote": "\u626B\u63CF\u8FDB\u5EA6\u4F1A\u5B9E\u65F6\u66F4\u65B0\uFF1B\u53EF\u5728\u4EFB\u52A1\u4E2D\u5FC3\u968F\u65F6\u53D6\u6D88\u3002",
+    "bot.wizard.subscriptionIndexInvalid": "\u274C \u6CA1\u6709\u8FD9\u4E2A\u5E8F\u53F7\uFF0C\u8BF7\u56DE\u590D\u5217\u8868\u4E2D\u7684\u5E8F\u53F7\uFF0C\u6216\u53D1\u9001\u9891\u9053\u7528\u6237\u540D/\u94FE\u63A5\u6765\u65B0\u589E\u8BA2\u9605\u3002",
+    "bot.wizard.subscriptionInputInvalid": "\u274C \u8BF7\u56DE\u590D\u8BA2\u9605\u5E8F\u53F7\u6765\u53D6\u6D88\uFF0C\u6216\u53D1\u9001\u9891\u9053\u7528\u6237\u540D/\u94FE\u63A5\u6765\u65B0\u589E\u8BA2\u9605\uFF0C\u4F8B\u5982\uFF1A`@channel_username`\u3002",
+    "bot.wizard.pathInvalid": "\u274C \u8DEF\u5F84\u65E0\u6548\uFF1A{error}\n\n\u8BF7\u91CD\u65B0\u53D1\u9001\u76EE\u5F55\uFF0C\u6216\u53D1\u9001\u201C\u8DF3\u8FC7\u201D\u4F7F\u7528\u9ED8\u8BA4\u4FDD\u5B58\u8DEF\u5F84\u89C4\u5219\u3002",
+    "bot.wizard.subscriptionUpdated": "\u2705 \u5DF2\u66F4\u65B0\u8BA2\u9605\u76EE\u5F55\uFF1A{source}",
+    "bot.wizard.subscriptionNotFound": "\u274C \u672A\u627E\u5230\u8BE5\u8BA2\u9605",
+    "bot.wizard.subscriptionFolder": "\u{1F4C1} \u4E13\u5C5E\u76EE\u5F55\uFF1A{folder}\n{preview}",
+    "bot.wizard.defaultFolder": "\u{1F4C1} \u4FDD\u5B58\u7B56\u7565\uFF1A\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B",
+    "bot.wizard.subscribed": "\u2705 \u5DF2\u8BA2\u9605 {source}",
+    "bot.wizard.subscriptionFolderLabel": "\u{1F4C1} \u672C\u8BA2\u9605\u4E13\u5C5E\u4FDD\u5B58\u76EE\u5F55\uFF1A{folder}\n{preview}",
+    "bot.wizard.subscriptionDefaultLabel": "\u{1F4C1} \u672C\u8BA2\u9605\u4F7F\u7528\u9ED8\u8BA4\u4FDD\u5B58\u8DEF\u5F84\u89C4\u5219",
+    "bot.wizard.subscriptionStart": "\u4ECE\u5F53\u524D\u6700\u65B0\u6D88\u606F ID {messageId} \u4E4B\u540E\u5F00\u59CB\u81EA\u52A8\u540C\u6B65\u3002",
+    "bot.wizard.subscriptionFailed": "\u274C \u8BA2\u9605\u64CD\u4F5C\u5931\u8D25\uFF1A{error}",
+    "bot.wizard.dateRangeInvalid": "\u274C {error}",
+    "bot.callback.taskCardInvalid": "\u4EFB\u52A1\u5361\u5DF2\u5931\u6548\u6216\u4E0D\u5C5E\u4E8E\u5F53\u524D\u804A\u5929",
+    "bot.callback.retryCount": "\u5DF2\u91CD\u8BD5 {count} \u9879",
+    "bot.callback.noRetry": "\u6CA1\u6709\u53EF\u91CD\u8BD5\u5931\u8D25\u9879",
+    "bot.callback.failureDetailsTitle": "\u274C **\u5931\u8D25\u660E\u7EC6**",
+    "bot.callback.failureDetailsEmpty": "\u5931\u8D25\u8BB0\u5F55\u5DF2\u6E05\u7406\u6216\u4EFB\u52A1\u5DF2\u91CD\u8BD5\u3002",
+    "bot.callback.failureDetailsSent": "\u5DF2\u53D1\u9001\u5931\u8D25\u660E\u7EC6",
+    "bot.callback.taskUnavailable": "\u4EFB\u52A1\u5DF2\u5B8C\u6210\u3001\u5DF2\u5931\u6548\u6216\u4E0D\u5C5E\u4E8E\u5F53\u524D\u804A\u5929",
+    "bot.callback.queuePaused": "\u5DF2\u6682\u505C\u4E0B\u8F7D\u961F\u5217",
+    "bot.callback.noPausableTasks": "\u5F53\u524D\u6CA1\u6709\u53EF\u6682\u505C\u7684\u4E0B\u8F7D\u4EFB\u52A1",
+    "bot.callback.queueResumed": "\u5DF2\u7EE7\u7EED\u4E0B\u8F7D\u961F\u5217",
+    "bot.callback.noWaitingTasks": "\u5F53\u524D\u6CA1\u6709\u7B49\u5F85\u4E2D\u7684\u4E0B\u8F7D\u4EFB\u52A1",
+    "bot.callback.backgroundCancelled": "\u5DF2\u53D6\u6D88\u540E\u53F0\u4EFB\u52A1",
+    "bot.callback.operationFailed": "\u64CD\u4F5C\u5931\u8D25\uFF1A{error}",
+    "bot.callback.sendChannel": "\u8BF7\u53D1\u9001\u9891\u9053",
+    "bot.callback.subscriptionInvalid": "\u8BA2\u9605\u6309\u94AE\u65E0\u6548\u6216\u5DF2\u8FC7\u671F",
+    "bot.callback.subscriptionRefreshed": "\u8BA2\u9605\u5217\u8868\u5DF2\u5237\u65B0",
+    "bot.callback.subscriptionConfirmInvalid": "\u53D6\u6D88\u786E\u8BA4\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u5237\u65B0\u8BA2\u9605\u5217\u8868",
+    "bot.callback.subscriptionCancelled": "\u5DF2\u53D6\u6D88\u8BA2\u9605",
+    "bot.callback.subscriptionMissing": "\u8BA2\u9605\u4E0D\u5B58\u5728\u6216\u5DF2\u7ECF\u53D6\u6D88",
+    "bot.callback.subscriptionBack": "\u5DF2\u8FD4\u56DE\u8BA2\u9605\u5217\u8868",
+    "bot.callback.syncRequested": "\u5DF2\u8BF7\u6C42\u7ACB\u5373\u540C\u6B65",
+    "bot.callback.subscriptionResumed": "\u5DF2\u6062\u590D\u8BA2\u9605",
+    "bot.callback.subscriptionPaused": "\u5DF2\u6682\u505C\u8BA2\u9605",
+    "bot.callback.cursorUpdated": "\u6E38\u6807\u5DF2\u66F4\u65B0\u4E3A\u5F53\u524D\u6700\u65B0\u6D88\u606F",
+    "bot.callback.followGlobal": "\u5DF2\u6539\u4E3A\u8DDF\u968F\u5168\u5C40",
+    "bot.callback.fixedTarget": "\u5DF2\u56FA\u5B9A\u4E3A\u5F53\u524D\u76EE\u6807",
+    "bot.callback.noResult": "\u6682\u65E0\u8FD0\u884C\u7ED3\u679C",
+    "bot.callback.retryLatest": "\u5DF2\u91CD\u8BD5\u6700\u8FD1\u5931\u8D25\u9879",
+    "bot.callback.enterBackfillDate": "\u8BF7\u8F93\u5165\u8865\u6293\u5F00\u59CB\u65E5\u671F",
+    "bot.callback.currentFolder": "\u4E13\u5C5E\u76EE\u5F55\uFF1A{folder}",
+    "bot.callback.defaultPath": "\u5F53\u524D\u4F7F\u7528\u9ED8\u8BA4\u4FDD\u5B58\u8DEF\u5F84",
+    "bot.callback.sendFolder": "\u8BF7\u53D1\u9001\u65B0\u7684\u4E13\u5C5E\u76EE\u5F55",
+    "bot.callback.folderCleared": "\u5DF2\u6E05\u9664\u4E13\u5C5E\u76EE\u5F55",
+    "bot.callback.confirmUnsubscribe": "\u8BF7\u786E\u8BA4\u662F\u5426\u53D6\u6D88\u8BA2\u9605",
+    "bot.callback.cleanupSuccess": "\u2705 \u6E05\u7406\u6210\u529F",
+    "bot.callback.cleanupFailed": "\u274C \u6E05\u7406\u5931\u8D25"
+  },
+  en: {
+    "bot.wizard.confirmTitle": "Please confirm the task scope:",
+    "bot.wizard.confirmSource": "\u{1F4CC} Channel: {source}",
+    "bot.wizard.confirmComments": "\u{1F4AC} Comments: {value}",
+    "bot.wizard.folder.defaultValue": "Default automatic organization",
+    "bot.wizard.storage.current": "Current storage",
+    "bot.wizard.storage.currentAccount": "Current account",
+    "bot.wizard.confirmTagRange": "Tag: #{tag}",
+    "bot.wizard.confirmDateRange": "Dates: {startDate} \u2192 {endDate}",
+    "bot.wizard.confirmDays": "\u{1F4C5} {days} days, inclusive",
+    "bot.wizard.confirmLargeRange": "\u26A0\uFE0F This is a large range. The scan will run in segments after confirmation. Check the dates and storage target.",
+    "bot.wizard.confirmCommentsOn": "Included (up to {count} per post)",
+    "bot.wizard.confirmCommentsOff": "Not included",
+    "bot.wizard.confirmFolder": "\u{1F4C1} Folder: {folder}",
+    "bot.wizard.confirmStorage": "\u2601\uFE0F Fixed storage: {provider} / {account}",
+    "bot.wizard.confirmNote": "Scan progress updates in real time. You can cancel it from the task center.",
+    "bot.wizard.subscriptionIndexInvalid": "\u274C No subscription has that number. Reply with a list number, or send a channel username/link to add one.",
+    "bot.wizard.subscriptionInputInvalid": "\u274C Reply with a subscription number to cancel, or send a channel username/link to add one, for example `@channel_username`.",
+    "bot.wizard.pathInvalid": "\u274C Invalid path: {error}\n\nSend the folder again, or send \u201Cskip\u201D to use the default save rule.",
+    "bot.wizard.subscriptionUpdated": "\u2705 Subscription folder updated: {source}",
+    "bot.wizard.subscriptionNotFound": "\u274C Subscription not found",
+    "bot.wizard.subscriptionFolder": "\u{1F4C1} Dedicated folder: {folder}\n{preview}",
+    "bot.wizard.defaultFolder": "\u{1F4C1} Save rule: automatic categorization",
+    "bot.wizard.subscribed": "\u2705 Subscribed to {source}",
+    "bot.wizard.subscriptionFolderLabel": "\u{1F4C1} Dedicated folder for this subscription: {folder}\n{preview}",
+    "bot.wizard.subscriptionDefaultLabel": "\u{1F4C1} This subscription uses the default save rule",
+    "bot.wizard.subscriptionStart": "Automatic sync starts after the current latest message ID {messageId}.",
+    "bot.wizard.subscriptionFailed": "\u274C Subscription operation failed: {error}",
+    "bot.wizard.dateRangeInvalid": "\u274C {error}",
+    "bot.callback.taskCardInvalid": "The task card is invalid or does not belong to this chat",
+    "bot.callback.retryCount": "Retried {count} items",
+    "bot.callback.noRetry": "No failed items can be retried",
+    "bot.callback.failureDetailsTitle": "\u274C **Failure details**",
+    "bot.callback.failureDetailsEmpty": "Failure records were cleared or the task was retried.",
+    "bot.callback.failureDetailsSent": "Failure details sent",
+    "bot.callback.taskUnavailable": "The task is complete, expired, or does not belong to this chat",
+    "bot.callback.queuePaused": "Download queue paused",
+    "bot.callback.noPausableTasks": "There are no downloadable tasks that can be paused",
+    "bot.callback.queueResumed": "Download queue resumed",
+    "bot.callback.noWaitingTasks": "There are no waiting downloads",
+    "bot.callback.backgroundCancelled": "Background task cancelled",
+    "bot.callback.operationFailed": "Operation failed: {error}",
+    "bot.callback.sendChannel": "Send a channel",
+    "bot.callback.subscriptionInvalid": "The subscription button is invalid or expired",
+    "bot.callback.subscriptionRefreshed": "Subscription list refreshed",
+    "bot.callback.subscriptionConfirmInvalid": "The cancellation confirmation is invalid or expired. Refresh the subscription list.",
+    "bot.callback.subscriptionCancelled": "Subscription cancelled",
+    "bot.callback.subscriptionMissing": "The subscription does not exist or was already cancelled",
+    "bot.callback.subscriptionBack": "Back to the subscription list",
+    "bot.callback.syncRequested": "Sync requested",
+    "bot.callback.subscriptionResumed": "Subscription resumed",
+    "bot.callback.subscriptionPaused": "Subscription paused",
+    "bot.callback.cursorUpdated": "Cursor updated to the latest message",
+    "bot.callback.followGlobal": "Now following the global setting",
+    "bot.callback.fixedTarget": "Fixed to the current target",
+    "bot.callback.noResult": "No run result yet",
+    "bot.callback.retryLatest": "Retried the latest failed items",
+    "bot.callback.enterBackfillDate": "Enter the backfill start date",
+    "bot.callback.currentFolder": "Dedicated folder: {folder}",
+    "bot.callback.defaultPath": "Using the default save location",
+    "bot.callback.sendFolder": "Send the new dedicated folder",
+    "bot.callback.folderCleared": "Dedicated folder cleared",
+    "bot.callback.confirmUnsubscribe": "Confirm whether to unsubscribe",
+    "bot.callback.cleanupSuccess": "\u2705 Cleanup succeeded",
+    "bot.callback.cleanupFailed": "\u274C Cleanup failed",
+    "language.choose": "Please choose your language",
+    "language.title": "\u{1F310} **Language**",
+    "language.current": "Current language: {language}",
+    "language.changed": "\u2705 Language changed to English",
+    "language.chinese": "Simplified Chinese",
+    "language.english": "English",
+    "language.russian": "\u0420\u0443\u0441\u0441\u043A\u0438\u0439",
+    "language.hint": "Choose the Bot interface language. This changes presentation only.",
+    "auth.required": "\u{1F510} Send /start and verify your PIN first",
+    "auth.requiredUpload": "\u{1F510} Send /start and verify your PIN before uploading files",
+    "auth.inputPrompt": "\u{1F510} Enter your PIN using the keyboard below:",
+    "auth.cancelled": "\u{1F6AB} PIN entry cancelled\n\nSend /start to begin again",
+    "auth.wrong": "\u274C Incorrect PIN. Please try again:",
+    "auth.success": "\u2705 PIN verified!",
+    "auth.startPrompt": "\u{1F44B} **Welcome to TG Vault Bot!**\n\n\u{1F510} Enter your PIN using the keyboard below:",
+    "auth.welcomeBack": "\u{1F44B} **Welcome back!**\n\nSend or forward a file to upload it.\n\nStart with one of the four shortcuts below, or use /help for everything.",
+    "auth.successBody": "\u2705 **PIN verified!**\n\nYou can now:\n\u{1F4E4}  Send or forward any file to upload it (up to 2 GB; account downloads are not subject to this limit)\n\u{1F4CA}  /storage \u2014 View storage usage",
+    "auth.twoFactorPrompt": "\u{1F510} PIN verified!\n\nEnter your **6-digit 2FA code** to finish signing in:",
+    "auth.twoFactorToast": "Enter your 2FA code",
+    "auth.twoFactorWrong": "\u274C Incorrect code. Enter a new 6-digit code:",
+    "auth.twoFactorActivated": "\u2705 **2FA enabled successfully!**\n\n\u{1F6E1}\uFE0F Your account is now protected by two-factor authentication.",
+    "auth.twoFactorLoginOk": "\u2705 **2FA verified**\n\nWelcome back!",
+    "auth.twoFactorQrFail": "\u274C Could not generate the QR code. Check the server logs.",
+    "common.unknownText": "\u2753 Unknown command\n\nSend /start to begin or /help for help",
+    "common.unsupportedMedia": "\u26A0\uFE0F This media format is not supported",
+    "common.emptyFiles": "\u{1F4EE} No uploads yet",
+    "common.emptyTasks": "\u{1F4EE} No active tasks",
+    "common.fileCount": "{count, plural, one {# file} other {# files}}",
+    "common.refresh": "Refresh",
+    "common.confirm": "Confirm",
+    "common.cancel": "Cancel",
+    "common.back": "Back",
+    "common.failed": "Failed",
+    "common.success": "Succeeded",
+    "messages.storage.title": "\u{1F4CA} **Storage usage**",
+    "messages.storage.disk": "**\u{1F4BF} Server disk**",
+    "messages.storage.total": "  Total\u3000{value}",
+    "messages.storage.used": "  Used\u3000{value} ({percent}%)",
+    "messages.storage.free": "  Free\u3000{value}",
+    "messages.storage.indexed": "**\u{1F4C1} Indexed files**",
+    "messages.storage.fileCount": "  Files\u3000{count}",
+    "messages.storage.size": "  Size\u3000{value}",
+    "messages.storage.local": "**\u{1F5A5}\uFE0F Local download files**",
+    "messages.storage.location": "  Location\u3000local uploads/cache directory",
+    "messages.storage.queue": "**\u{1F4E1} Download queue**",
+    "messages.storage.queueCounts": "  \u{1F504} Active {active}\u3000\u23F3 Pending {pending}",
+    "messages.files.title": "\u{1F4CB} **Recently uploaded files** ({count} on this page)",
+    "messages.files.unnamed": "Unnamed file",
+    "messages.files.hint": "\u{1F4A1} To search or manage files, open \u201CSearch and manage files.\u201D",
+    "fileBrowser.detail": "Details",
+    "fileBrowser.copyId": "Copy ID",
+    "fileBrowser.favorite": "Add to favorites",
+    "fileBrowser.unfavorite": "Remove from favorites",
+    "fileBrowser.signedLink": "Signed link",
+    "fileBrowser.move": "Move",
+    "fileBrowser.rename": "Rename",
+    "fileBrowser.delete": "Delete\u2026",
+    "fileBrowser.unnamed": "Unnamed file",
+    "fileBrowser.other": "Other",
+    "fileBrowser.localStorage": "Local storage",
+    "fileBrowser.rootFolder": "Root folder",
+    "fileBrowser.unknown": "Unknown",
+    "fileBrowser.search": "File search",
+    "fileBrowser.recentFiles": "Recent files",
+    "fileBrowser.noMatches": "No matching files.",
+    "fileBrowser.hint": "Tap a file to view details, copy its ID, favorite it, create a link, move/rename it, or confirm deletion.",
+    "messages.delete.success": "\u2705 **File deleted**",
+    "keyboard.upload": "\u{1F4E4} Upload instructions",
+    "keyboard.tasks": "\u{1F527} Tasks",
+    "keyboard.storage": "\u{1F4CA} Storage",
+    "keyboard.more": "\u2630 More",
+    "keyboard.cancel": "Cancel",
+    "help.body": "\u{1F4D6} **Help**\n\n\u{1F4E4} Send or forward files: upload directly\n\u{1F517} Send a Telegram message link [folder]: download directly; omit folder for the current date\n\u{1F4E5} Tasks: view progress, pause, or cancel\n\u{1F4C1} Save location: choose a folder and storage target\n\u{1F4E1} Channels: download by date/tag or manage subscriptions\n\u{1F310} /language: change interface language\n\n\u{1F447} Choose a feature below.",
+    "notification.digestTitle": "\u{1F4EC} **Notification digest**",
+    "notification.settingsTitle": "\u{1F514} **Notification settings**",
+    "notification.securityImmediate": "Security alerts are always delivered immediately.",
+    "notification.clickToChange": "\u{1F447} Tap a button to change a setting",
+    "notifications.digestTitle": "\u{1F4EC} **Notification digest**",
+    "notifications.title": "\u{1F514} **Notification settings**",
+    "notifications.securityAlways": "Security alerts are always delivered immediately.",
+    "notifications.clickToChange": "\u{1F447} Tap a button to change a setting",
+    "notifications.successImmediate": "Success \xB7 immediate",
+    "notifications.successDigest": "Success \xB7 digest",
+    "notifications.successOff": "Success \xB7 off",
+    "notifications.invalidTimezone": "Invalid time zone",
+    "notifications.failureImmediate": "Failure \xB7 immediate",
+    "notifications.failureDigest": "Failure \xB7 digest",
+    "notifications.subscriptionImmediate": "Subscription \xB7 immediate",
+    "notifications.subscriptionDigest": "Subscription \xB7 digest",
+    "notifications.quietPreset": "Quiet 22:00\u201307:00",
+    "notifications.quietOff": "Disable quiet hours",
+    "notifications.timezoneShanghai": "Time zone \xB7 Shanghai",
+    "notifications.timezoneUtc": "Time zone \xB7 UTC",
+    "notifications.modeImmediate": "immediate",
+    "notifications.modeDigest": "digest",
+    "notifications.modeDigestCombined": "digest",
+    "notifications.modeOff": "off",
+    "notifications.quietDisabled": "off",
+    "notifications.settingsModes": "Failure: {failure} | Success: {success}",
+    "notifications.settingsSchedule": "Subscription: {subscription} | Quiet: {quiet}",
+    "notifications.settingsTimezone": "Time zone: {timezone}",
+    "notifications.error.timezoneRequired": "Enter a time zone, for example Asia/Shanghai",
+    "notifications.error.quietFormat": "Quiet hours must use HH:MM-HH:MM, for example 22:00-07:00; use quiet off to disable them",
+    "notifications.error.successMode": "Success notifications must be immediate, digest, or off",
+    "notifications.error.deliveryMode": "Notification delivery must be immediate or digest",
+    "notifications.error.unknownSetting": "Unknown setting. Send /notifications to see the available options",
+    "channels.errors.sourceAllowlistRequired": "No Telegram source allowlist is configured. Numeric IDs, private chats, and private groups are not allowed. Configure TELEGRAM_ALLOWED_SOURCES.",
+    "channels.errors.sourceNotAllowed": "Source {source} is not in the Telegram download allowlist",
+    "channels.errors.downloaderNotReady": "The Telegram user-account downloader is not ready",
+    "channels.errors.sourceRequired": "Enter a channel",
+    "channels.errors.inviteExpired": "This private channel or group invite has expired. Get a new invite, or join with the same Telegram account used to create the user session, then try again.",
+    "channels.errors.inviteInvalid": "This private channel or group invite is invalid. Check that the link is complete or create a new invite.",
+    "channels.errors.inviteAlreadyJoined": "The account has already joined, but Telegram returned an unexpected state. Try resolving the channel again.",
+    "channels.errors.inviteResolutionFailed": "Could not resolve the private channel or group invite: {error}",
+    "channels.errors.inviteNotJoined": "The Telegram user account has not joined this private channel or group, so its messages cannot be read. Open the invite and join with the same account used to create the user session, then run the subscription or download command again.",
+    "channels.errors.inviteMissingEntity": "Could not resolve the private channel or group invite because Telegram did not return a readable entity. Check that the account is still a member.",
+    "channels.errors.hashtagRequired": "Enter a hashtag",
+    "channels.errors.hashtagInvalid": "Use a hashtag in the form #example, without spaces",
+    "channels.errors.subscriptionNotFound": "Subscription not found",
+    "channels.errors.subscriptionDisabled": "This subscription is disabled",
+    "channels.errors.noDownloadableMessages": "There are no messages available to download",
+    "channels.errors.sourceMessageUnavailable": "The original message no longer exists or has no downloadable media",
+    "channels.errors.fixedTargetProviderRequired": "Choose a provider for the fixed subscription target",
+    "channels.storageCooldown": "\u23F8\uFE0F Google Drive has reached today\u2019s upload limit\n\nThis task has been paused automatically. No remaining files will be lost, and you do not need to tap Resume. It will continue when the quota resets.\n\nRetry time: {retryAt}\nTask: {jobId}",
+    "channels.recoveryComplete": "\u267B\uFE0F Recovered and completed task {jobId}: {successful} succeeded, {skipped} skipped, {failed} failed",
+    "subscriptions.syncComplete": "\u2705 Subscription {source} synced {found} new files; {skipped} skipped and {failed} failed.",
+    "subscriptions.syncCompleteContinues": "\u2705 Subscription {source} synced {found} new files; {skipped} skipped and {failed} failed. This scan reached its limit or encountered failures, so the remaining items will be handled in a later scan.",
+    "subscriptions.disabled.inviteExpired": "Subscription paused: the private channel or group invite has expired, so content can no longer be resolved or downloaded. Join again or update the link before resubscribing.",
+    "subscriptions.disabled.inviteInvalid": "Subscription paused: the private channel or group invite is invalid, so content can no longer be resolved or downloaded. Check the link before resubscribing.",
+    "subscriptions.disabled.notParticipant": "Subscription paused: the Telegram user account is no longer a member of this private channel or group. Join it again before resubscribing.",
+    "subscriptions.disabled.inaccessible": "Subscription paused: the Telegram user account cannot access this channel or group. It may have left, been removed, or the channel may now be private. Check account access before resubscribing.",
+    "subscriptions.disabled.unknown": "Subscription paused: this channel or group could not be accessed or downloaded ({error}). Check that the account still has access before resubscribing.",
+    "subscriptions.paused.inviteExpired": "\u26A0\uFE0F Subscription {source} has been paused\nThe private channel or group invite has expired, so content can no longer be resolved or downloaded.\n\nView the alert in /tg_subs or /tg_sub. Update the link and confirm account access before adding the subscription again.",
+    "subscriptions.paused.inviteInvalid": "\u26A0\uFE0F Subscription {source} has been paused\nThe private channel or group invite is invalid, so content can no longer be resolved or downloaded.\n\nView the alert in /tg_subs or /tg_sub. Check the link and confirm account access before adding the subscription again.",
+    "subscriptions.paused.notParticipant": "\u26A0\uFE0F Subscription {source} has been paused\nThe Telegram user account is no longer a member of this private channel or group, so downloads cannot continue.\n\nView the alert in /tg_subs or /tg_sub. Join again and confirm account access before adding the subscription again.",
+    "subscriptions.paused.inaccessible": "\u26A0\uFE0F Subscription {source} has been paused\nThe Telegram user account cannot access this channel or group. It may have left, been removed, or the channel may now be private.\n\nView the alert in /tg_subs or /tg_sub. Confirm account access before adding the subscription again.",
+    "subscriptions.paused.unknown": "\u26A0\uFE0F Subscription {source} has been paused\nThis channel or group could not be accessed or downloaded ({error}).\n\nView the alert in /tg_subs or /tg_sub. Confirm account access before adding the subscription again.",
+    "ads.reason.allowRule": "Matched an allow rule",
+    "ads.reason.blockedTemplate": "Matched a confirmed advertising template",
+    "ads.reason.blockRule": "Matched a block rule",
+    "ads.reason.normalTemplate": "Similar to confirmed normal content",
+    "ads.reason.adHistoryTemplate": "Highly similar to a previous advertising template",
+    "ads.reason.transactionContact": "Contains a sales pitch and off-platform contact details",
+    "ads.reason.transactionIntent": "Contains sales or promotional language",
+    "ads.reason.ctaLink": "Contains a call to action and an external destination",
+    "ads.reason.callToAction": "Contains a prominent call to action",
+    "ads.reason.linkDensity": "Contains many external links or contact details",
+    "ads.reason.scarcity": "Uses urgency or scarcity language",
+    "ads.reason.decorativeMarketing": "Uses many promotional symbols",
+    "task.pause": "\u23F8 Pause",
+    "task.resume": "\u25B6\uFE0F Resume",
+    "task.cancel": "\u{1F6D1} Cancel",
+    "task.retryFailed": "\u{1F504} Retry failures ({count})",
+    "task.failureDetails": "Failure details",
+    "upload.success": "\u2705 **Upload complete!**",
+    "upload.failed": "\u274C **Upload failed**",
+    "upload.downloading": "\u23F3 **Downloading**",
+    "upload.saving": "\u{1F4BE} **Saving...**",
+    "upload.queued": "\u23F3 **Added to download queue**",
+    "upload.retrying": "\u{1F504} **Upload failed; retrying...**",
+    "upload.duplicateSkipped": "\u23ED\uFE0F **Duplicate file skipped**",
+    "upload.reason": "Reason: {error}",
+    "upload.currentQueue": "\u{1F4CA} Queue: {count} tasks",
+    "upload.wait": "\u{1F4A1} The Bot will process tasks in order. Please wait.",
+    "upload.duplicateCopiedOutcome": "\u267B\uFE0F Duplicate handling: copy created",
+    "upload.duplicateSkippedOutcome": "\u23ED\uFE0F Duplicate handling: skipped",
+    "upload.manageHint": "\u{1F447} Continue managing this file from \u201CSearch and manage files.\u201D",
+    "upload.failureRetryNote": "\u{1F504} Large files can fail because of network instability, Telegram rate limits, or interrupted transfers. The Bot already retried once.",
+    "upload.failureAdvice": "\u{1F4A1} Send the file again, or lower concurrency with /download_workers before retrying.",
+    "upload.receipt.saved": "\u2705 **File saved**",
+    "upload.receipt.partial": "\u26A0\uFE0F **Batch partially completed**",
+    "upload.receipt.failed": "\u274C **Save failed**",
+    "upload.receipt.processing": "\u23F3 **Processing**",
+    "upload.receipt.stats": "\u{1F4CA} Total {total} \xB7 succeeded {successful} \xB7 failed {failed}",
+    "upload.receipt.duplicateCopied": "\u267B\uFE0F Duplicate handling: copy created",
+    "upload.receipt.duplicateSkipped": "\u23ED\uFE0F Duplicate handling: skipped",
+    "upload.receipt.task": "Task: {taskId}",
+    "upload.receipt.findFolder": "Search same folder",
+    "upload.receipt.deleteFile": "Delete file",
+    "upload.existingId": "\u{1F194} Existing: {id}",
+    "upload.duplicateCopyAdvice": "To keep another copy, open \u201CDuplicate file handling\u201D and choose \u201CCreate copy.\u201D",
+    "upload.taskCancelled.title": "\u{1F6D1} **Background task cancelled**",
+    "upload.taskCancelled.id": "\u{1F194} Task: `{taskId}`",
+    "upload.taskCancelled.completed": "\u2705 Completed: {count} files",
+    "upload.taskCancelled.failed": "\u274C Failed: {count} files",
+    "upload.taskCancelled.stopped": "\u{1F6AB} Stopped/cleared: {count} waiting or active tasks",
+    "upload.taskCancelled.controlsRemoved": "Pause, resume, and cancel controls were removed. Old buttons will no longer affect this task.",
+    "upload.error.unknown": "Unknown error",
+    "upload.failedDetail.batch": "{name}: {count} failures",
+    "upload.cleanup.expired": "This cleanup task has expired or does not exist",
+    "upload.cleanup.success": "\u2705 Removed temporary data for {fileName} ({size})",
+    "upload.cleanup.failed": "Cleanup failed: {error}",
+    "taskCenter.kind.single": "Single file",
+    "taskCenter.kind.album": "Album",
+    "taskCenter.kind.channel": "Channel task",
+    "taskCenter.state.running": "Running",
+    "taskCenter.state.waiting": "Waiting to start",
+    "taskCenter.state.pausing": "Finishing current file",
+    "taskCenter.state.paused": "Paused",
+    "taskCenter.state.cooling": "System wait",
+    "taskCenter.state.failed": "Failed",
+    "taskCenter.age.justNow": "Just now",
+    "taskCenter.age.minutes": "{count} min ago",
+    "taskCenter.age.hours": "{count} hr ago",
+    "taskCenter.age.days": "{count} d ago",
+    "taskCenter.progress.active": "Downloading {count}",
+    "taskCenter.progress.pending": "Pending {count}",
+    "taskCenter.progress.failed": "Failed {count}",
+    "taskCenter.progress.skipped": "Skipped {count}",
+    "taskCenter.title": "\u{1F4E5} **Download tasks**",
+    "taskCenter.summary": "\u{1F7E2} Running {running}\u3000\u23F3 Waiting {waiting}\u3000\u23F8 Paused {paused}",
+    "taskCenter.summaryCooling": "\u{1F9CA} System wait {count}",
+    "taskCenter.total": "{count} active tasks",
+    "taskCenter.totalPaged": "{count} active tasks \xB7 Page {page}/{totalPages}",
+    "taskCenter.item.current": "{kind} \xB7 {progress} \xB7 Current: {file}",
+    "taskCenter.item.state": "{kind} \xB7 {progress} \xB7 {state}",
+    "taskCenter.openHint": "Tap a number to view details and control that task.",
+    "taskCenter.button.previous": "\u25C0\uFE0F Previous",
+    "taskCenter.button.refresh": "\u{1F504} Refresh",
+    "taskCenter.button.next": "Next \u25B6\uFE0F",
+    "taskCenter.button.start": "\u25B6\uFE0F Prioritize",
+    "taskCenter.button.pause": "\u23F8 Pause task",
+    "taskCenter.button.resume": "\u25B6\uFE0F Resume",
+    "taskCenter.button.undoPause": "\u25B6\uFE0F Keep running",
+    "taskCenter.button.retry": "\u{1F504} Retry",
+    "taskCenter.button.cancel": "\u{1F6D1} Cancel",
+    "taskCenter.button.backList": "\u21A9\uFE0F Back to tasks",
+    "taskCenter.button.confirmCancel": "\u26A0\uFE0F Confirm cancellation",
+    "taskCenter.button.backDetail": "Back to details",
+    "taskCenter.untitled": "Untitled task",
+    "taskCenter.detail.type": "Type: {value}",
+    "taskCenter.detail.source": "Source: {value}",
+    "taskCenter.detail.progress": "Progress: {value}",
+    "taskCenter.detail.currentFile": "Current file: {value}",
+    "taskCenter.detail.targetFolder": "Save location: {value}",
+    "taskCenter.detail.reason": "Reason: {value}",
+    "taskCenter.detail.created": "Created: {value}",
+    "taskCenter.detail.updated": "Last activity: {value}",
+    "taskCenter.detail.id": "Task ID: {value}",
+    "taskCenter.protection.retryAt": "The system will check again after {value} and resume automatically.",
+    "taskCenter.protection.recheck": "The system checks every {count} seconds and resumes automatically when conditions allow.",
+    "taskCenter.protection.autoResume": "The system will keep checking and resume automatically when conditions allow.",
+    "taskCenter.protection.manual": "This state will not recover automatically. Address the reason, then retry.",
+    "taskCenter.protection.paused": "System protection paused this task; {recovery}",
+    "taskCenter.note.pausing": "The task will pause after the current file finishes.",
+    "taskCenter.note.failed": "This task is no longer running. Once external writes are reconciled, you can submit the download again.",
+    "taskCenter.note.start": "\u201CPrioritize\u201D moves this task to the front of the waiting queue without interrupting current downloads.",
+    "taskCenter.note.pause": "Pausing finishes the current file, then stops processing later files in this task.",
+    "taskCenter.cancel.title": "\u26A0\uFE0F **Cancel this task?**",
+    "taskCenter.cancel.activeWarning": "The active download will stop and its temporary file will be removed. Waiting files will leave the queue immediately.",
+    "taskCenter.cancel.waitingWarning": "Waiting files will leave the queue immediately.",
+    "taskCenter.cancel.unaffected": "Other tasks will not be affected.",
+    "taskCenter.stage.waiting": "Waiting to start",
+    "taskCenter.stage.recovering": "Recovering after restart",
+    "taskCenter.stage.downloading": "Downloading source file",
+    "taskCenter.stage.uploading": "Uploading to storage",
+    "taskCenter.stage.processing": "Processing on server",
+    "taskCenter.defaultAccount": "Default account",
+    "taskCenter.cooldown.storageLimit": "Google Drive\u2019s daily upload limit has been reached",
+    "taskCenter.cooldown.floodWait": "Telegram request rate limited (FloodWait)",
+    "taskCenter.cooldown.autoResume": "{cause}; the system will keep checking and resume automatically",
+    "taskCenter.cooldown.autoResumeAt": "{cause}; expected to resume automatically after {time}",
+    "taskCenter.cooldown.system": "System cooldown",
+    "taskCenter.reason.userPaused": "Paused by user",
+    "status.none": "None",
+    "status.redacted": "[redacted]",
+    "status.state.healthy": "Healthy",
+    "status.state.running": "Running",
+    "status.state.connected": "Connected",
+    "status.state.disabled": "Disabled",
+    "status.state.expired": "Session expired",
+    "status.state.failed": "Error",
+    "status.state.unknown": "Unknown",
+    "status.state.cooldown": "Cooling down",
+    "status.title": "\u{1FA7A} **TG Vault diagnostics**",
+    "status.requestId": "Request ID: {requestId}",
+    "status.degraded": " (degraded)",
+    "status.bot": "Bot: {status}{degraded} \xB7 Reconnects: {reconnectCount}",
+    "status.userClient": "Account downloader: {status}{username}",
+    "status.accountRecovery": "Account recovery: {action}",
+    "status.storage": "Current storage: {provider} \xB7 {accountName}",
+    "status.probe": "Connection check: {status}",
+    "status.recoveryTime": "Recovery time: {time}",
+    "status.storageError": "Storage error: {error}",
+    "status.disk": "Temporary disk: {free} free / {total} \xB7 {usedPercent}% used",
+    "status.queue": "Queue: {active} active \xB7 {pending} waiting \xB7 {failed} failed{paused}",
+    "status.queuePaused": " \xB7 paused",
+    "status.subscriptions": "Subscriptions: {enabled} enabled \xB7 Last scan: {lastScan}",
+    "status.subscriptionError": "Subscription error: {error}",
+    "status.reconciliation": "Reconciliation: {pending} pending \xB7 {operatorRequired} require an operator",
+    "status.advice": "Recommendation: {action}",
+    "status.defaultAdvice": "Recommendation: if a component is unhealthy, use the Request ID to find its structured logs.",
+    "path.preview": "Saves to: {folder}/filename (no channel-name or file-type folder is appended)",
+    "path.prompt.onceTitle": "\u{1F4CC} **Set folder for next download**",
+    "path.prompt.sessionTitle": "\u{1F4CD} **Set folder for this chat**",
+    "path.prompt.sendFolder": "Send the folder name:",
+    "path.prompt.onceExample": "Example: `PIXIV/DailyTop50`",
+    "path.prompt.sessionExample": "Example: `Albums/2026-07`",
+    "path.prompt.recent": "Recently used folders:",
+    "path.prompt.onceNote": "Note: this applies only to the next file that enters the download workflow.",
+    "path.prompt.sessionNote": "Note: this applies to later downloads in this chat until you send `/pc` or tap Clear.",
+    "path.prompt.cancel": "Send \u201CCancel\u201D to exit without changing the setting.",
+    "path.state.current": "Current destination: {value}",
+    "path.state.custom": "{folder} (custom folder)",
+    "path.state.automatic": "Automatic categorization",
+    "path.state.defaultExample": "Default example: `telegram/resources/images`",
+    "path.state.once": "\u{1F4CC} Next-download folder: {value}",
+    "path.state.session": "\u{1F4CD} This-chat folder: {value}",
+    "path.state.unset": "Not set",
+    "path.button.setOnce": "\u{1F4CC} Set next folder",
+    "path.button.setSession": "\u{1F4CD} Set chat folder",
+    "path.button.recent": "\u{1F558} Recent folders",
+    "path.button.clear": "\u{1F9F9} Clear custom folder",
+    "path.settings.title": "\u{1F4C1} **Save location**",
+    "path.settings.defaultLogicTitle": "**Default save behavior**",
+    "path.settings.defaultLogic": "Without a custom folder, files are organized by source/channel and file type.",
+    "path.settings.examples": "Examples: `telegram/resources/images`, `telegram/resources/videos`.",
+    "path.settings.customLogic": "With a custom folder, files are saved directly there without appending channel-name or file-type folders.",
+    "path.settings.currentTitle": "**Current path settings**",
+    "path.settings.choose": "\u{1F447} Choose a save location.",
+    "path.recent.title": "\u{1F558} **Recently used folders**",
+    "path.recent.hint": "To use a folder, choose one-time or chat folder in \u201CSave location\u201D, then send its name.",
+    "path.recent.empty": "\u{1F558} No recently used folders. Folders are recorded after you set one.",
+    "path.toast.recentSent": "Recent folders sent",
+    "path.toast.sendFolder": "Send a folder name, or send \u201Ccancel\u201D to exit",
+    "path.toast.updated": "Save location updated",
+    "path.toast.cancelled": "Save location setup cancelled.",
+    "bot.home.category.main": "Shortcuts",
+    "bot.home.category.files": "Files and save locations",
+    "bot.home.category.channels": "Channels and subscriptions",
+    "bot.home.category.settings": "Tasks and system settings",
+    "bot.home.category.security": "Security",
+    "bot.home.page": "Page {page}/{totalPages}",
+    "bot.home.hint": "Tap a button to open that feature.",
+    "bot.home.uploadHint": "\u{1F4E4} Send or forward a file to upload it.\n\nUse the buttons below for tasks or more features.",
+    "bot.home.logoutHint": "Send /logout to revoke this Telegram user\u2019s Bot authentication immediately.",
+    "bot.home.twoFactorHint": "Use \u201CSet up two-factor authentication\u201D in the Telegram command menu.",
+    "bot.home.prompt.oncePath": "Send the folder to use for the next download.",
+    "bot.home.prompt.sessionPath": "Send the folder to keep using in this chat.",
+    "bot.home.prompt.delete": "Choose a file under \u201CSearch and manage files,\u201D then tap Delete.",
+    "bot.home.prompt.cancelTask": "Choose the task to cancel in the task center.",
+    "bot.home.prompt.unsubscribe": "Choose the subscription to cancel in the channel subscription panel.",
+    "bot.home.followPrompt": "{description}\n\nFollow the prompt, or return to More features to choose another action.",
+    "bot.home.unavailable": "This shortcut is currently unavailable.",
+    "bot.button.dateMode": "\u{1F5D3}\uFE0F Download by date",
+    "bot.button.tagMode": "\u{1F3F7}\uFE0F Download by tag",
+    "bot.button.channelOnly": "Channel posts only",
+    "bot.button.channelComments": "Channel + comments",
+    "bot.button.editFolder": "\u270F\uFE0F Change folder",
+    "bot.button.clearFolder": "\u{1F9F9} Clear folder",
+    "bot.button.unsubscribe": "Unsubscribe",
+    "bot.button.previous": "\u25C0\uFE0F Previous",
+    "bot.button.next": "Next \u25B6\uFE0F",
+    "bot.button.addSubscription": "\u2795 Add subscription",
+    "bot.button.bestVideo": "Best video",
+    "bot.button.audioOnly": "Audio only",
+    "bot.wizard.title.subscription": "\u{1F4E1} **Manage channel subscriptions**",
+    "bot.wizard.title.tag": "\u{1F3F7}\uFE0F **Download channel files by tag**",
+    "bot.wizard.title.date": "\u{1F5D3}\uFE0F **Download channel files by date**",
+    "bot.wizard.title.download": "\u{1F4E6} **Download channel files**",
+    "bot.wizard.mode": "{title}\n\nChoose a download mode:\n\u2022 By date: files in a date range\n\u2022 By tag: files with a specific tag\n\n\u{1F447} Tap a button to continue.",
+    "bot.wizard.source": "{title}\n\nSend a channel username or link.\nPublic channels, private invite links, and joined channels are supported.\n\nSend \u201CCancel\u201D to exit.",
+    "bot.wizard.path": "{title}\n\u{1F4CD} Channel: {source}\n\nDo you want a separate save folder for {scope}?\n\nSend a folder such as `channel-backup/wallpapers`.\nSend `skip` to use the default save rules.\n\nThis folder applies only to {scope}; it does not change /path_rules or other downloads.\nSend \u201CCancel\u201D to exit.",
+    "bot.wizard.scope.subscription": "this subscription",
+    "bot.wizard.scope.newSubscription": "this new subscription",
+    "bot.wizard.scope.download": "this download task",
+    "bot.wizard.comments": "{title}\n\u{1F4CD} Channel: {source}\n{folder}\n\nAlso scan files in the comments under channel posts?\n\nThis is off by default. When enabled, up to {count} comments are scanned per post.\nText comments, ordinary links, and messages without files are ignored.\n\n\u{1F447} Choose whether to scan comments.",
+    "bot.wizard.folder.custom": "\u{1F4C1} Save folder: {folder}",
+    "bot.wizard.folder.default": "\u{1F4C1} Save rule: automatic categorization",
+    "bot.wizard.tag": "{title}\n\u{1F4CD} Channel: {source}\n\nSend the tag to download, for example `#wallpaper` or `wallpaper`.\n\nSend \u201CCancel\u201D to exit.",
+    "bot.wizard.startDate": "{title}\n\u{1F4CD} Channel: {source}\n\nSend the start date as `YYYY-MM-DD`, for example `2026-06-01`.\n\nSend \u201CCancel\u201D to exit.",
+    "bot.wizard.endDate": "{title}\n\u{1F4CD} Channel: {source}\n\u{1F5D3}\uFE0F Start date: {startDate}\n\nSend the end date as `YYYY-MM-DD`, for example `2026-06-27`.\n\nSend \u201CCancel\u201D to exit.",
+    "bot.wizard.expired": "\u231B This wizard expired. Open it again.",
+    "bot.wizard.cancelled": "Telegram channel wizard cancelled.",
+    "bot.wizard.invalidMode": "\u274C Send `date` or `tag`, or send \u201CCancel\u201D to exit.",
+    "bot.wizard.invalidComments": "\u274C Send `on` or `off`, or tap a button to choose whether to include comment files.",
+    "bot.wizard.confirmInput": "Send `confirm` to start, or \u201CCancel\u201D to stop.",
+    "bot.wizard.invalidDate": "\u274C Use YYYY-MM-DD, for example {example}.",
+    "bot.wizard.invalidRange": "Invalid date range",
+    "bot.wizard.callbackExpired": "This wizard expired. Open it again.",
+    "bot.wizard.downloadCancelled": "Channel download wizard cancelled.",
+    "bot.wizard.modeDate": "Download by date",
+    "bot.wizard.modeTag": "Download by tag",
+    "bot.wizard.commentsOn": "Comment files will be included",
+    "bot.wizard.commentsOff": "Only channel-post files will be downloaded",
+    "bot.subscription.confirmTitle": "\u26A0\uFE0F **Unsubscribe from this channel?**",
+    "bot.subscription.source": "Source: {source}",
+    "bot.subscription.folder": "Dedicated folder: {folder}",
+    "bot.subscription.defaultFolder": "Save rule: automatic categorization",
+    "bot.subscription.position": "Sync position: after message {messageId}",
+    "bot.subscription.panelTitle": "\u{1F4E1} **Channel subscriptions**",
+    "bot.subscription.page": "Page {page}/{totalPages} \xB7 {count} total",
+    "bot.subscription.empty": "No subscriptions.",
+    "bot.subscription.manageHint": "\u{1F447} Tap a button to manage or add a subscription.",
+    "bot.subscription.action.sync": "Sync now",
+    "bot.subscription.action.pause": "Pause",
+    "bot.subscription.action.resume": "Resume",
+    "bot.subscription.action.target": "Change target",
+    "bot.subscription.action.fromNow": "From now",
+    "bot.subscription.action.backfill": "Backfill by date",
+    "bot.subscription.action.result": "Latest result",
+    "bot.subscription.action.retry": "Retry failed",
+    "bot.subscription.followSystemDefault": "Follow system default",
+    "bot.subscription.target": "\u{1F3AF} Storage: {target}",
+    "bot.subscription.lastScan": "\u{1F50E} Last scan: {time}",
+    "bot.subscription.nextScan": "\u23ED\uFE0F Next scan: about {time}",
+    "bot.subscription.notScanned": "\u{1F50E} Not scanned yet",
+    "bot.subscription.lastResult": "\u{1F4CA} Latest result: {status}, found {found}, failed {failed}",
+    "bot.subscription.disabledReason": "\u26A0\uFE0F {reason}",
+    "bot.subscription.error": "   \u26A0\uFE0F Error: {error}",
+    "bot.subscription.result.recorded": "Recorded",
+    "bot.subscription.result.completed": "Completed",
+    "bot.subscription.result.partial": "Partially completed",
+    "bot.subscription.result.running": "Running",
+    "bot.subscription.result.paused": "Paused",
+    "bot.subscription.confirmBody": "Confirming stops automatic sync and removes this item from subscription management. Saved files are not deleted.",
+    "bot.subscription.confirmButton": "\u26A0\uFE0F Confirm unsubscribe",
+    "bot.subscription.backButton": "Back to subscriptions",
+    "bot.callback.cancelled": "Cancelled",
+    "bot.callback.expired": "Expired",
+    "bot.callback.submitted": "Task submitted",
+    "bot.callback.failed": "Operation failed: {error}",
+    "bot.legacy.pausedTitle": "\u23F8\uFE0F **Channel download paused**",
+    "bot.legacy.floodWaitTitle": "\u23F3 **Telegram FloodWait cooldown**",
+    "bot.legacy.storageCooldownTitle": "\u23F8\uFE0F **Storage protection cooldown**",
+    "bot.legacy.cancelledTitle": "\u{1F6D1} **Channel download cancelled**",
+    "bot.legacy.completedTitle": "\u2705 **Channel task complete**",
+    "bot.legacy.runningTitle": "\u{1F50E} **Channel task running**",
+    "bot.legacy.controlsPaused": "You can resume or cancel it in the task center.",
+    "bot.legacy.controlsActive": "You can pause or cancel it in the task center.",
+    "bot.legacy.job": "\u{1F194} Job: {jobId}",
+    "bot.legacy.source": "\u{1F4CD} Channel: {source}",
+    "bot.legacy.scan": "\u{1F50E} Scan: {status}",
+    "bot.legacy.channelScan": "\u{1F4C4} Channel posts: scanned {scanned}, found {found} files",
+    "bot.legacy.commentScan": "\u{1F4AC} Comments: scanned {scanned}, found {found} files",
+    "bot.legacy.download": "\u2B07\uFE0F Download: {status}",
+    "bot.legacy.counts": "\u2705 Succeeded {completed}\u3000\u23F3 Pending {pending}\u3000\u{1F504} Downloading {downloading}\u3000\u274C Failed {failed}\u3000\u23ED Skipped {skipped}",
+    "bot.legacy.floodWait": "\u23F3 Telegram FloodWait until: {until}",
+    "bot.legacy.storageCooldown": "\u23F8\uFE0F Storage protection until: {until}",
+    "bot.legacy.scanComplete": "\u{1F50E} **Scan complete; starting downloads**",
+    "bot.legacy.channelScanned": "\u{1F4C4} Channel posts: scanned {scanned}, found {found} files",
+    "bot.legacy.commentsScanned": "\u{1F4AC} Comments: scanned {scanned}, found {found} files (up to {max} per post)",
+    "bot.legacy.commentsDisabled": "\u{1F4AC} Comments: disabled",
+    "bot.legacy.pending": "\u{1F4E6} Pending downloads: {count} files",
+    "bot.legacy.queueing": "\u23F3 Adding files to the download queue. Use /tasks to view background tasks.",
+    "bot.legacy.commentLine": "Comments: scanned {scanned}, found {found} files",
+    "bot.legacy.cancelledResult": "\u{1F6D1} {mode} download task cancelled\nID: {jobId}\nCompleted: {successful}\nSkipped: {skipped}{commentLine}",
+    "bot.legacy.tagResult": "\u2705 Tag download task complete\nTag: {tag}\nID: {jobId}\nQueued: {found}\nSkipped: {skipped}\nFailed: {failed}{commentLine}",
+    "bot.legacy.dateResult": "\u2705 Date-range task complete\nID: {jobId}\nQueued: {found}\nSkipped: {skipped}\nFailed: {failed}{commentLine}",
+    "bot.legacy.failed": "\u274C {mode} download failed: {error}",
+    "bot.link.empty": "No downloadable file found in this message. It may have been deleted or be inaccessible.",
+    "bot.legacy.emptyResult": "No files matched the date or hashtag filter. Nothing was downloaded.\nTo save one message into a folder, send: message-link folder-name. Do not use hashtag download for folder names.",
+    "bot.link.failed": "Link download failed: {error}",
+    "menu.tg_link": "Download a message link / folder or date",
+    "menu.ps": "Switch default download folder (persistent)",
+    "bot.link.help": "\u{1F517} Link download\n\nSend: message-link [folder-name]\n\nhttps://t.me/lspyanxi/4375 Videos\n\u2192 Videos/ under your configured folder\n\nhttps://t.me/lspyanxi/4375 2026-09-09\n\u2192 2026-09-09/ under your configured folder\n\nhttps://t.me/lspyanxi/4375\n\u2192 Today\u2019s date in Asia/Shanghai\n\nAlso accepts /tg_link message-link [folder-name].\nUse /ps for the persistent base folder, /p for the next base folder, and /target for storage. The suffix applies only to this download and does not filter publication dates.",
+    "bot.legacy.confirmTag": "\u23F3 Confirmed. Starting a background scan of {source} for media messages with {tag}\u2026",
+    "bot.legacy.confirmDate": "\u23F3 Confirmed. Starting a background scan of {source}: {startDate} \u2192 {endDate}\u2026",
+    "bot.legacy.submitFailed": "\u274C Could not submit the task: {error}",
+    "bot.legacy.usageDate": "\u274C Usage: /tg_date @channel YYYY-MM-DD YYYY-MM-DD",
+    "bot.legacy.usageTag": "\u274C Usage: /tg_tag @channel #tag",
+    "bot.auth.rateLimited": "\u23F3 Too many actions. Try again in {seconds} seconds.",
+    "bot.auth.pinLocked": "Too many incorrect PIN attempts. Try again in {seconds} seconds.",
+    "bot.auth.pinLockedBody": "\u274C Too many incorrect PIN attempts. Locked for {seconds} seconds.",
+    "bot.auth.pinLockedShort": "Temporarily locked",
+    "bot.auth.pinWrongShort": "Incorrect PIN",
+    "bot.auth.notAllowed": "\u26D4 This Telegram user is not allowed. Add the user ID to TELEGRAM_ALLOWED_USER_IDS or the allowlist in the web interface.",
+    "bot.auth.notAllowedShort": "Not on the allowlist",
+    "bot.auth.twoFactorEnabled": "\u{1F510} Two-factor authentication is already enabled. The Bot will not show the QR code again because it contains the existing secret.",
+    "bot.auth.loggedOut": "\u2705 Bot authentication for this Telegram user has been revoked. Send /start to authenticate again.",
+    "bot.auth.logoutFailed": "\u274C Could not log out. Try again later.\nOperation ID: {operationId}",
+    "bot.notification.securityLogin": "\u{1F514} **Security login alert**",
+    "bot.notification.passthrough": "{message}",
+    "menu.start": "Start / verify identity",
+    "menu.tasks": "View live tasks",
+    "menu.storage": "Storage status / delete local files",
+    "menu.path_rules": "Save location / custom folder",
+    "menu.tg_download": "Download channel files by date / tag",
+    "menu.list": "View recent files",
+    "menu.find": "Search and manage files",
+    "menu.tg_sub": "Manage automatic channel sync",
+    "menu.storage_switch": "Switch default storage",
+    "menu.target": "Set this chat\u2019s storage target",
+    "menu.help": "View full help",
+    "menu.status": "System diagnostics",
+    "menu.notifications": "Notification preferences",
+    "menu.language": "Change Bot interface language",
+    "commands.auto001": "\u2699\uFE0F **Telegram chunk concurrency**",
+    "commands.auto002": "Current chunk count: **{value0}**",
+    "commands.auto003": "Controls how many chunks of one file are downloaded at the same time; higher values are faster but more likely to trigger rate limits.",
+    "commands.auto004": "Recommended: 4 for stability, 8 for a balance of speed and stability; 12 or 16 are aggressive and require confirmation.",
+    "commands.auto005": "\u{1F4E6} **Telegram file concurrency**",
+    "commands.auto006": "Files downloading at once: **{value0}**",
+    "commands.auto007": "Current queue: {value0} active, {value1} waiting",
+    "commands.auto008": "Controls how many files are downloaded at the same time.",
+    "commands.auto009": "Recommended: 1 for maximum stability, 2 by default, 3 for speed; 4 is aggressive and requires confirmation.",
+    "commands.auto010": "Changes apply only to newly started files; files already downloading will not be interrupted.",
+    "commands.auto011": "{value0} Skip duplicates",
+    "commands.auto012": "{value0} Create copies",
+    "commands.auto013": "\u{1F9EC} **Duplicate file handling**",
+    "commands.auto014": "Current mode: {value0}",
+    "commands.auto015": "\u2022 Skip duplicates: do not save when the name, folder, and size are identical",
+    "commands.auto016": "\u2022 Create copies: rename automatically and keep a separate copy",
+    "commands.auto017": "Only affects files saved from now on.",
+    "commands.auto018": "{value0} Disable automatic cleanup",
+    "commands.auto019": "{value0} Enable automatic cleanup",
+    "commands.auto020": "\u{1F9F9} **Automatic cleanup of unindexed temporary files**",
+    "commands.auto021": "Current status: {value0}",
+    "commands.auto022": "When enabled, checks the server download directory hourly and removes only temporary files older than 10 minutes that are not in the file list.",
+    "commands.auto023": "Task records, indexed files, and cloud files are not deleted.",
+    "commands.auto024": "Keep this disabled if you write directly to the server download directory outside TG Vault.",
+    "commands.auto025": "\u{1F4CC} Use current storage once",
+    "commands.auto026": "\u{1F4CD} Use current storage for this chat",
+    "commands.auto027": "\u{1F9F9} Restore system default",
+    "commands.auto028": "\u{1F3AF} **Storage target for this chat**",
+    "commands.auto029": "System default",
+    "commands.auto031": "System default",
+    "commands.auto033": "System default: {value0}",
+    "commands.auto034": "\u{1F447} Tap a button to set a temporary target using the current system storage.",
+    "commands.auto035": "\u2705 Set {value0} target: {value1} / {value2}\nThis does not change the system-wide default.",
+    "commands.auto036": "\u{1F3AF} **Storage target for this chat**",
+    "commands.auto037": "System default",
+    "commands.auto039": "System default",
+    "commands.auto041": "System default: {value0}",
+    "commands.auto042": "\u{1F447} Tap a button to set a temporary target using the current system storage.",
+    "commands.auto043": "Cleanup confirmation is invalid or expired",
+    "commands.auto044": "Cleanup cancelled. There are no local downloaded files.",
+    "commands.auto045": "Cleanup cancelled. Local downloaded files: {value0}; space used: {value1}.",
+    "commands.auto046": "\u26A0\uFE0F **Delete all local server downloads?**",
+    "commands.auto047": "This will delete **{value0}** files in the local uploads directory, using **{value1}**.",
+    "commands.auto048": "This deletes local files and their local indexes; task history and third-party cloud files are not deleted.",
+    "commands.auto049": "If you are sure, tap the red confirmation button below.",
+    "commands.auto050": "Cleanup confirmation is invalid, expired, or already used",
+    "commands.auto051": "\u2705 **Local server downloads cleaned up**",
+    "commands.auto052": "Deleted: {value0} files",
+    "commands.auto053": "Space freed: {value0}",
+    "commands.auto054": "Local files remaining: {value0}",
+    "commands.auto055": "The old cleanup button has expired. Send /storage again.",
+    "commands.auto056": "Cleanup failed: {value0}",
+    "commands.auto057": "This operation deletes the physical file and its index.",
+    "commands.auto058": "\u26A0\uFE0F **Delete this file?**",
+    "commands.auto059": '\u274C No file starts with ID prefix "{value0}"',
+    "commands.auto060": '\u274C ID prefix "{value0}" matches multiple files. Copy a longer prefix and try again.',
+    "commands.auto061": "\u26A0\uFE0F **Delete this file?**",
+    "commands.auto062": "This removes the database record and attempts to delete the physical file. Confirm only if this is intended.",
+    "commands.auto063": "Deletion cancelled: {value0}",
+    "commands.auto064": "\u274C The file no longer exists or is outside the current storage scope.",
+    "commands.auto065": "\u274C OpenList storage does not support user deletion.",
+    "commands.auto066": "Delete failed: {value0}",
+    "commands.auto067": "Use the existing failed-task retry entry for this channel task.",
+    "commands.auto068": "Task ID prefix is not unique. Refresh the task list.",
+    "commands.auto069": "The task is not currently running.",
+    "commands.auto070": "The task has ended or cannot be paused.",
+    "commands.auto071": "There are no waiting files that can be prioritized.",
+    "commands.auto072": "The task is not in a resumable state.",
+    "commands.auto073": "The task has ended or cannot be cancelled.",
+    "commands.auto074": "Task ID prefix is not unique. Refresh the task list.",
+    "commands.auto075": "The task has ended or cannot be cancelled.",
+    "commands.auto076": "The task has ended or cannot be cancelled.",
+    "commands.auto077": "Task ID prefix is not unique. Refresh the task list.",
+    "commands.auto078": "Task ID prefix is not unique. Refresh the task list.",
+    "commands.auto079": "The task has unfinished reconciliation or cannot currently be retried.",
+    "commands.auto080": "Finishing the current file, then pausing.",
+    "commands.auto081": "Task paused by the user.",
+    "commands.auto082": "\u26A0\uFE0F **Cancel all tasks in this chat?**",
+    "commands.auto083": "Regular downloads: {value0} task(s) ({value1} files active, {value2} waiting)",
+    "commands.auto084": "Channel tasks: {value0}",
+    "commands.auto085": "Total tasks: {value0}",
+    "commands.auto086": "Confirmation will stop running tasks and clean up their temporary files. Tasks in other chats and by other users are not affected.",
+    "commands.auto087": "User confirmed cancellation of all tasks in this chat",
+    "commands.auto088": "\u{1F6D1} **Tasks in this chat cancelled**",
+    "commands.auto089": "Regular downloads: {value0} task(s) ({value1} active / {value2} waiting files)",
+    "commands.auto090": "Channel tasks: {value0}",
+    "commands.auto091": "Total tasks: {value0}",
+    "commands.auto092": "Task paused by the user.",
+    "commands.auto093": "Finishing the current file, then pausing.",
+    "commands.auto094": "\u23F8\uFE0F Task paused",
+    "commands.auto095": "\u23F8\uFE0F Set to pause this task after the current file finishes",
+    "commands.auto096": "\u23F8\uFE0F Channel task {value0} paused\nSource: {value1}",
+    "commands.auto097": "\u{1F4EE} Task not found: {value0}. The current chat download queue was not paused.",
+    "commands.auto098": "\u{1F4EE} Task not found: {value0}. No task in this chat was paused.",
+    "commands.auto099": "\u23F8\uFE0F Regular downloads in this chat paused\n\nActive: {value0}\nWaiting: {value1}\n\nThe current file will finish; new waiting tasks will not start.",
+    "commands.auto100": "\u25B6\uFE0F Task resumed",
+    "commands.auto101": "\u25B6\uFE0F Channel task {value0} resumed\nSource: {value1}",
+    "commands.auto102": "\u{1F4EE} Task not found: {value0}. The current chat download queue was not resumed.",
+    "commands.auto103": "\u{1F4EE} Task not found: {value0}. No task in this chat was resumed.",
+    "commands.auto104": "\u25B6\uFE0F Regular downloads in this chat resumed\n\nActive: {value0}\nWaiting: {value1}",
+    "commands.auto105": "\u{1F6D1} Download task cancelled",
+    "commands.auto106": "\u{1F6D1} Channel task {value0} cancelled\nSource: {value1}",
+    "commands.auto107": "\u{1F4EE} No matching task was found in this chat: {value0}",
+    "commands.auto108": "The old cancel button has expired. Open /tasks again and confirm from the task details.",
+    "commands.auto109": "\u{1F4EE} No matching task was found in this chat: {value0}",
+    "commands.auto110": "The old cancel button has expired. Open /tasks again and confirm from the task details.",
+    "commands.auto111": "Task ID prefix is not unique. Refresh /tasks.",
+    "commands.auto112": "\u{1F4EE} No unique channel task found; no other task was retried.",
+    "commands.auto113": "\u{1F4EE} This channel task has no failed items to retry.",
+    "commands.auto114": "\u{1F504} Requeued {value0} failed items in the channel task\nTask: {value1}",
+    "commands.auto115": "\u{1F4EE} The current chat could not be identified; failed tasks were not retried.",
+    "commands.auto116": "\u{1F4EE} No failed task found in this chat: {value0}",
+    "commands.auto117": "\u{1F4EE} No recently failed tasks can be retried.",
+    "commands.auto119": "\u274C Could not read single-file chunk concurrency. Try again later.",
+    "commands.auto120": "\u274C Could not read file concurrency settings. Try again later.",
+    "commands.auto121": "\u{1F4CC} Next download directory set to: `{value0}`\n{value1}\n\nThis setting expires after the next download flow starts successfully.",
+    "commands.auto122": "\u{1F4CD} This chat\u2019s download directory set to: `{value0}`\n{value1}\n\nFuture downloads in this chat will prefer this directory. Clear it from \u201CSave location\u201D.",
+    "commands.auto123": "To use a directory, choose one-time or chat directory in \u201CSave location\u201D, then send the directory name.",
+    "commands.auto124": "\u{1F558} **Recently used directories**",
+    "commands.auto125": "Set to {value0}",
+    "commands.auto126": "Automatic cleanup disabled",
+    "commands.auto127": "Automatic cleanup enabled",
+    "commands.auto128": "\u26A0\uFE0F **Use {value0} chunks?**",
+    "commands.auto129": "This is an aggressive chunk-concurrency mode and may cause:",
+    "commands.auto130": "- Telegram rate limits or anti-abuse restrictions",
+    "commands.auto131": "- Interrupted downloads and more retries",
+    "commands.auto132": "- Rate limits on Telegram user accounts; in extreme cases, account impact",
+    "commands.auto133": "For routine downloads, 4 or 8 is recommended.",
+    "commands.auto134": "{value0}\n\n\u2705 Switched to {value1} chunks; new downloads use this immediately.",
+    "commands.auto135": "Set to {value0}",
+    "commands.auto136": "{value0}\n\n\u26A0\uFE0F Confirmed and switched to {value1} chunks. If downloads disconnect, slow down, or trigger restrictions, immediately return to 4 or 8.",
+    "commands.auto137": "Confirmed {value0} workers",
+    "commands.auto138": "\u26A0\uFE0F **Download 4 files at the same time?**",
+    "commands.auto139": "This is an aggressive file-concurrency mode and may cause:",
+    "commands.auto140": "- Telegram rate limits or anti-abuse restrictions",
+    "commands.auto141": "- Cloud upload throttling and more retries",
+    "commands.auto142": "- Significant server disk and network load",
+    "commands.auto143": "For routine downloads, 2 or 3 is recommended.",
+    "commands.auto144": "{value0}\n\n\u2705 Switched to downloading {value1} files at the same time.",
+    "commands.auto145": "Set to {value0}",
+    "commands.auto146": "{value0}\n\n\u26A0\uFE0F Confirmed and switched to downloading 4 files at the same time. If rate limits, disconnects, or upload failures occur, immediately return to 2 or 3.",
+    "commands.auto147": "Confirmed 4-file concurrency",
+    "commands.authRequired": "\u{1F510} Send /start and verify your PIN first",
+    "commands.helpUnavailable": "\u274C Help is temporarily unavailable.",
+    "commands.settingsSaved": "\u2705 Settings saved.",
+    "commands.settingsFailed": "Could not save settings: {error}",
+    "commands.notificationsHint": "Send /notifications to view the guide and shortcut buttons again.",
+    "commands.alreadyCurrent": "Already selected",
+    "commands.notificationsUpdated": "Notification settings updated",
+    "commands.settingFailedRetry": "Could not save the setting. Try again later.",
+    "commands.statusFailed": "\u274C Could not read diagnostics. Request ID: {requestId}",
+    "commands.localAccount": "Server local directory",
+    "commands.defaultAccount": "Default account",
+    "commands.unnamedAccount": "Unnamed account",
+    "commands.localStorage": "Local storage",
+    "commands.refreshList": "\u{1F504} Refresh list",
+    "commands.storageSwitchTitle": "\u{1F5C4}\uFE0F **Switch storage source**",
+    "commands.storageSwitchCurrent": "Current: {value}",
+    "commands.storageSwitchHint": "Tap an account configured in the web app to switch to it here.",
+    "commands.storageSwitchOptions": "**Available storage:**",
+    "commands.storageSwitchNote": "Only existing accounts can be selected here. Add OAuth or credential-based accounts in the web app.",
+    "commands.accountUnnamed": "Unnamed account",
+    "commands.storageSwitchFailed": "\u274C Could not load storage sources: {error}",
+    "commands.storageRefreshed": "Refreshed",
+    "commands.storageInvalid": "Invalid storage selection",
+    "commands.storageAlreadyLocal": "Local storage is already active",
+    "commands.storageSwitchedLocal": "Switched to local storage",
+    "commands.storageMissing": "That storage account no longer exists",
+    "commands.storageAlreadyAccount": "That account is already active",
+    "commands.storageSwitched": "Switched to {name}",
+    "commands.storageSwitchError": "Switch failed: {error}",
+    "commands.deleteConfirm": "\u26A0\uFE0F Confirm delete",
+    "commands.bulkConfirm": "\u26A0\uFE0F Cancel all",
+    "commands.confirmCancelAll": "\u26A0\uFE0F Cancel all tasks",
+    "commands.confirmUse": "\u26A0\uFE0F Confirm {count}",
+    "commands.confirmFiles": "\u26A0\uFE0F Confirm {count} files",
+    "commands.clearLocalConfirm": "\u26A0\uFE0F Delete all local downloaded files",
+    "commands.clearLocalButton": "\u{1F9F9} Delete all local downloaded files ({count})",
+    "commands.secondConfirm": "Confirmation required",
+    "commands.cancelled": "Cancelled",
+    "commands.returned": "Back",
+    "commands.deleted": "Deleted",
+    "commands.deletedCount": "Deleted {count} files",
+    "commands.targetNextButton": "\u{1F4CC} Use current storage once",
+    "commands.targetSessionButton": "\u{1F4CD} Use current storage for this chat",
+    "commands.targetClearButton": "\u{1F9F9} Restore system default",
+    "commands.targetTitle": "\u{1F3AF} **Storage target for this chat**",
+    "commands.targetNext": "Next download: {value}",
+    "commands.targetSession": "This chat: {value}",
+    "commands.targetSystem": "System default: {value}",
+    "commands.targetSet": "{value} (set)",
+    "commands.targetDefault": "System default",
+    "commands.targetHint": "\u{1F447} Use the buttons to temporarily target the current system storage.",
+    "commands.targetCleared": "\u2705 Cleared this chat\u2019s storage override. Future tasks use the system default.",
+    "commands.targetRestored": "System default restored",
+    "commands.targetInvalid": "\u274C That storage target is not recognized. Use a button below.",
+    "commands.targetAccountMissing": "\u274C Storage account not found. View all accounts with /storage_switch.",
+    "commands.targetSaved": "\u2705 Set the {scope} target to {provider} / {account}\nThe system-wide default was not changed.",
+    "commands.targetScopeNext": "next-download",
+    "commands.targetScopeSession": "chat-session",
+    "commands.targetNextSet": "Next-download storage set",
+    "commands.targetSessionSet": "This-chat storage set",
+    "commands.fileSearchFailed": "\u274C Search failed: {error}",
+    "commands.fileUnavailable": "The file no longer exists or is outside the current storage scope",
+    "commands.fileDetail": "File details",
+    "commands.confirmRequired": "Second confirmation required",
+    "commands.fileFavorited": "Added to favorites",
+    "commands.fileUnfavorited": "Removed from favorites",
+    "commands.fileShareUnsupported": "This provider cannot create share links. Download it in the web app.",
+    "commands.fileSignedLink": "\u{1F517} Signed link (valid for 1 hour):\n{link}",
+    "commands.fileLinkCreated": "Signed link created",
+    "commands.fileMovePrompt": "Send the destination folder, or \u201CCancel\u201D to exit.",
+    "commands.fileRenamePrompt": "Send the new file name (keep the original extension), or \u201CCancel\u201D to exit.",
+    "commands.fileAwaitFolder": "Waiting for destination folder",
+    "commands.fileAwaitName": "Waiting for new file name",
+    "commands.fileDeleteTitle": "\u26A0\uFE0F **Delete this file?**",
+    "commands.fileDeleteImpact": "This removes the physical file and its index.",
+    "commands.fileMutationExpired": "This operation expired. Open the file details again.",
+    "commands.fileMutationCancelled": "File operation cancelled.",
+    "commands.fileMoved": "\u2705 Moved to: {folder}",
+    "commands.fileRenamed": "\u2705 Renamed to: {name}",
+    "commands.fileDeleteChoose": "Select a file under \u201CSearch and manage files\u201D, then tap Delete.",
+    "commands.fileDeleteNoIndex": "\u274C To prevent mistakes, the Telegram Bot cannot delete by list number. Send /list and copy at least the first 8 characters of the file ID.",
+    "commands.fileIdTooShort": "\u274C The ID prefix must be at least 8 characters. Copy a longer file ID from the web app.",
+    "commands.fileNotFound": '\u274C No file has an ID starting with "{selector}"',
+    "commands.fileAmbiguous": '\u274C The ID prefix "{selector}" matches multiple files. Copy a longer prefix and try again.',
+    "commands.fileOpenListDeleteUnsupported": "OpenList storage does not support user deletion.",
+    "commands.fileDeleteHint": "Deletion removes the database record and attempts to remove the physical file. Check the details, then confirm.",
+    "commands.deleteExpired": "The deletion confirmation is invalid or expired",
+    "commands.deleteNotOwner": "This deletion confirmation is not yours or has expired",
+    "commands.deleteInvalid": "This deletion confirmation is not yours, expired, or already used",
+    "commands.deleteCancelled": "Deletion cancelled: {name}",
+    "commands.fileMissingShort": "File not found",
+    "commands.fileDeleteUnsupportedShort": "This storage does not support user deletion",
+    "commands.deleteFailed": "Delete failed: {error}",
+    "commands.pathOncePrompt": "Send the folder to use for the next download.",
+    "commands.pathSessionPrompt": "Send the folder to use for downloads in this chat.",
+    "commands.pathOnceSaved": "\u{1F4CC} Next-download folder set to `{folder}`\n{preview}\n\nThis setting expires after the next file successfully enters the download workflow.",
+    "commands.pathSessionSaved": "\u{1F4CD} Chat-session folder set to `{folder}`\n{preview}\n\nFuture downloads in this chat prefer this folder. Clear it under \u201CSave location\u201D.",
+    "commands.pathInvalid": "\u274C Invalid path: {error}",
+    "commands.pathCleared": "\u{1F9F9} Cleared custom next-download and chat-session folders. Automatic categorization is active again.",
+    "commands.pathRecentTitle": "\u{1F558} **Recently used folders**",
+    "commands.pathRecentHint": "To reuse one, choose next-download or this-chat folder under \u201CSave location\u201D, then send the folder name.",
+    "commands.pathRecentEmpty": "\u{1F558} No recently used folders. Folders are recorded after you set one.",
+    "commands.pathRecentSent": "Recent folders sent",
+    "commands.pathInputToast": "Send a folder, or \u201CCancel\u201D to exit",
+    "commands.pathUpdated": "Save location updated",
+    "commands.taskInvalidButton": "This task button is invalid or expired",
+    "commands.taskOldCard": "This task card expired. Send /tasks again.",
+    "commands.taskWrongOwner": "This task card is not yours or has expired",
+    "commands.taskRefreshed": "Task list refreshed",
+    "commands.taskEnded": "The task ended or is no longer available",
+    "commands.taskConfirmCancel": "Confirm cancellation",
+    "commands.taskCancelExpired": "The cancellation confirmation expired. Open task details again.",
+    "commands.taskRetryUnsupported": "This task type does not support this retry button",
+    "commands.taskPrioritized": "Moved to the front of the waiting queue",
+    "commands.taskPausing": "Will pause after the current file finishes",
+    "commands.taskPaused": "Task paused",
+    "commands.taskResumed": "Task resumed",
+    "commands.taskCancelled": "Task cancelled",
+    "commands.taskProtected": "System protection paused this task; wait for conditions to recover",
+    "commands.taskForbidden": "This task does not belong to the current chat",
+    "commands.taskOperationFailed": "Operation failed: {error}",
+    "commands.taskPrefixAmbiguous": "The task ID prefix is ambiguous. Refresh the task list.",
+    "commands.bulkInvalidChat": "\u{1F4EE} Could not identify this chat. No tasks were cancelled.",
+    "commands.bulkEmpty": "\u{1F4EE} This chat has no cancellable tasks.",
+    "commands.bulkTitle": "\u26A0\uFE0F **Cancel every task in this chat?**",
+    "commands.bulkOrdinary": "Regular downloads: {tasks} tasks ({active} active files, {pending} waiting files)",
+    "commands.bulkChannels": "Channel tasks: {count}",
+    "commands.bulkWarning": "Running tasks will stop and their temporary files will be removed. Tasks in other chats and tasks owned by other users are unaffected.",
+    "commands.bulkInvalid": "The bulk-cancellation confirmation is invalid or expired",
+    "commands.confirmWrongOwner": "This confirmation is not yours or has expired",
+    "commands.confirmInvalid": "This confirmation is not yours, expired, or already used",
+    "commands.bulkReturned": "Returned without cancelling tasks in this chat.",
+    "commands.bulkDoneTitle": "\u{1F6D1} **Tasks in this chat cancelled**",
+    "commands.bulkDone": "Tasks in this chat cancelled",
+    "commands.bulkFailed": "Cancellation failed: {error}",
+    "commands.stopFailed": "\u274C Could not force-stop tasks: {error}",
+    "commands.cleanupCancelledSummary": "Cleanup cancelled. Local files: {count}, using {size}.",
+    "commands.cleanupCancelledEmpty": "Cleanup cancelled. There are no local download files.",
+    "commands.cleanupConfirmTitle": "\u26A0\uFE0F **Delete all local server download files?**",
+    "commands.cleanupConfirmSummary": "This will delete **{count}** files from the local uploads directory, using **{size}**.",
+    "commands.cleanupConfirmImpact": "This removes local files and their indexes, but not task history or cloud files.",
+    "commands.cleanupConfirmHint": "Click the red confirmation button below to continue.",
+    "commands.cleanupConfirmRequired": "Confirmation required",
+    "commands.cleanupConfirmInvalid": "The cleanup confirmation is invalid, expired, or already used",
+    "commands.cleanupDoneTitle": "\u2705 **Local server download files cleared**",
+    "commands.cleanupDoneSummary": "Deleted: {count} files\nSpace freed: {size}\nRemaining local files: {remaining}",
+    "commands.cleanupDeleted": "Deleted {count} files",
+    "commands.cleanupOldButton": "The old cleanup button expired. Send /storage again.",
+    "commands.cleanupFailed": "Cleanup failed: {error}",
+    "commands.bulkInvalidConfirm": "The bulk-cancellation confirmation is invalid or expired",
+    "commands.bulkNotOwner": "This confirmation is not yours or has expired",
+    "commands.bulkReturnedToast": "Returned",
+    "commands.bulkInvalidUsed": "This confirmation is not yours, expired, or already used",
+    "commands.bulkDoneMessage": "Returned without cancelling tasks in this chat.",
+    "commands.bulkCancelledToast": "Tasks in this chat cancelled",
+    "commands.bulkCancelFailed": "Cancellation failed: {error}",
+    "commands.taskStopFailed": "\u274C Could not force-stop tasks: {error}",
+    "commands.taskPausedChannel": "\u23F8\uFE0F Channel task {task} paused\nSource: {source}",
+    "commands.taskNotFoundPause": "\u{1F4EE} Task {task} was not found. This chat download queue was not paused.",
+    "commands.taskResumedSingle": "\u25B6\uFE0F Task resumed",
+    "commands.taskResumedChannel": "\u25B6\uFE0F Channel task {task} resumed\nSource: {source}",
+    "commands.taskNotFoundResume": "\u{1F4EE} Task {task} was not found. This chat download queue was not resumed.",
+    "commands.taskCancelledSingle": "\u{1F6D1} Download task cancelled",
+    "commands.taskCancelledChannel": "\u{1F6D1} Channel task {task} cancelled\nSource: {source}",
+    "commands.taskNotFound": "\u{1F4EE} No matching task found in this chat: {task}",
+    "commands.taskLegacyCancel": "The old cancel button expired. Use /tasks to open the task details and confirm.",
+    "commands.taskLegacyAmbiguous": "The task ID prefix is not unique. Refresh /tasks.",
+    "commands.taskLegacyEnded": "The task ended or is no longer available",
+    "commands.retryNoUniqueChannel": "\u{1F4EE} No unique channel task found; no other task was retried.",
+    "commands.retryChannelDone": "\u{1F504} Rejoined {count} failed channel-task items\nTask: {task}",
+    "commands.retryChannelEmpty": "\u{1F4EE} This channel task has no failed items to retry",
+    "commands.retryInvalidChat": "\u{1F4EE} Could not identify this chat; no failed task was retried.",
+    "commands.retryTaskMissing": "\u{1F4EE} No failed task found in this chat: {task}",
+    "commands.workerReadFailed": "\u274C Could not read single-file chunk concurrency. Try again later.",
+    "commands.concurrencyReadFailed": "\u274C Could not read file concurrency settings. Try again later.",
+    "commands.pathOncePromptDirect": "Send the folder name for the next download.",
+    "commands.pathOnceSavedDirect": "\u{1F4CC} Next-download folder set to `{folder}`\n{preview}\n\nThis setting expires after the next file enters the download workflow.",
+    "commands.pathSessionPromptDirect": "Send the folder name to use for this chat.",
+    "commands.pathSessionSavedDirect": "\u{1F4CD} Chat-session folder set to `{folder}`\n{preview}\n\nFuture downloads in this chat prefer this folder. Clear it under \u201CSave location\u201D.",
+    "commands.pathInvalidDirect": "\u274C Invalid path: {error}",
+    "commands.pathClearedDirect": "\u{1F9F9} Cleared custom next-download and chat-session folders. Automatic categorization is active again."
+  },
+  ru: telegramRussian_default
+};
+function resolveLocale(value) {
+  const normalized = String(value || "").trim().toLowerCase().replace("_", "-");
+  for (const locale of Object.values(TELEGRAM_LOCALES)) {
+    if (locale.code.toLowerCase() === normalized || locale.aliases.includes(normalized)) return locale.code;
+    if (locale.code === "en" && normalized.startsWith("en-")) return "en";
+    if (locale.code === "zh-CN" && normalized.startsWith("zh-")) return "zh-CN";
+  }
+  return FALLBACK_LOCALE;
+}
+function interpolate(template, values, locale = DEFAULT_LOCALE) {
+  let rendered = template.replace(/\{([A-Za-z0-9_]+),\s*plural,\s*one\s*\{([^{}]*)\}\s*other\s*\{([^{}]*)\}\}/g, (_all, name, one, other) => {
+    if (!(name in values)) throw new Error(`missing interpolation variable: ${name}`);
+    const count = Number(values[name]);
+    return (new Intl.PluralRules(TELEGRAM_LOCALES[locale].intlLocale).select(count) === "one" ? one : other).replace(/#/g, formatNumber(count, locale));
+  });
+  rendered = rendered.replace(/\{([A-Za-z0-9_]+)\}/g, (_all, name) => {
+    if (!(name in values)) throw new Error(`missing interpolation variable: ${name}`);
+    return String(values[name]);
+  });
+  return rendered;
+}
+function t(locale, key, values = {}, options = {}) {
+  const resolved = resolveLocale(locale);
+  const translated = resources[resolved][key] ?? resources[FALLBACK_LOCALE][key];
+  if (translated === void 0) {
+    if (options.strict !== false) throw new Error(`missing Telegram translation: ${key}`);
+    return key;
+  }
+  return interpolate(translated, values, resolved);
+}
+function formatNumber(value, locale = DEFAULT_LOCALE) {
+  return new Intl.NumberFormat(TELEGRAM_LOCALES[locale].intlLocale).format(value);
+}
+function formatDate(value, locale = DEFAULT_LOCALE, options = { dateStyle: "medium", timeStyle: "short" }) {
+  return new Intl.DateTimeFormat(TELEGRAM_LOCALES[locale].intlLocale, options).format(new Date(value));
+}
+function formatBytes2(bytes, locale = DEFAULT_LOCALE) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return `0 B`;
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  const value = bytes / Math.pow(1024, index);
+  return `${new Intl.NumberFormat(TELEGRAM_LOCALES[locale].intlLocale, { maximumFractionDigits: value < 10 && index > 0 ? 1 : 0 }).format(value)} ${units[index]}`;
+}
+
+// src/utils/telegramPathSettings.ts
+var chatPathState = /* @__PURE__ */ new Map();
+var pendingPathInputState = new ScopedInteractionMap({
+  ttlMs: Math.max(6e4, Number.parseInt(process.env.TELEGRAM_INTERACTION_TTL_MS || "900000", 10) || 9e5),
+  maxEntries: Math.max(10, Number.parseInt(process.env.TELEGRAM_INTERACTION_MAX_ENTRIES || "1000", 10) || 1e3)
+});
+var recentPathState = /* @__PURE__ */ new Map();
+var MAX_RECENT_PATHS = 6;
+var RECENT_PATH_SETTING_PREFIX = "telegram_recent_paths:";
+function pendingPathInputKey(chatId, userId) {
+  return `${chatId}:${userId}`;
+}
+function recentPathSettingKey(chatId) {
+  return `${RECENT_PATH_SETTING_PREFIX}${chatId}`;
+}
+function normalizePathSegment(segment) {
+  return sanitizeFilename(segment.trim()).replace(/^\.+/, "_").replace(/^\.+$/, "_");
+}
+function parseRecentPaths(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(String(raw));
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean).slice(0, MAX_RECENT_PATHS);
+  } catch {
+    return [];
+  }
+}
+async function loadRecentTelegramPaths(chatId) {
+  const cached = recentPathState.get(chatId);
+  if (cached) return [...cached];
+  const raw = await getSetting(recentPathSettingKey(chatId), "[]");
+  const loaded = parseRecentPaths(raw);
+  recentPathState.set(chatId, loaded);
+  return [...loaded];
+}
+async function persistRecentTelegramPaths(chatId, paths) {
+  recentPathState.set(chatId, paths);
+  await setSetting(recentPathSettingKey(chatId), JSON.stringify(paths));
+}
+function sanitizeCustomStoragePath(input, locale = DEFAULT_LOCALE) {
+  const raw = input.trim().replace(/\\+/g, "/").replace(/\/+/g, "/").replace(/^\/+|\/+$/g, "");
+  if (!raw) throw new Error(t(locale, "path.error.empty"));
+  if (raw.startsWith("~") || raw.includes("\0")) throw new Error(t(locale, "path.error.illegalChars"));
+  const segments = raw.split("/").map((segment) => segment.trim()).filter(Boolean);
+  if (segments.length === 0) throw new Error(t(locale, "path.error.empty"));
+  if (segments.some((segment) => segment === "." || segment === ".." || segment.includes(".."))) {
+    throw new Error(t(locale, "path.error.dotSegments"));
+  }
+  const normalized = segments.map((segment) => normalizePathSegment(segment)).filter(Boolean).join("/");
+  if (!normalized) throw new Error(t(locale, "path.error.invalid"));
+  if (normalized.length > 180) throw new Error(t(locale, "path.error.tooLong"));
+  return normalized;
+}
+async function rememberRecentTelegramPathPersistent(chatId, folder, locale = DEFAULT_LOCALE) {
+  const normalized = sanitizeCustomStoragePath(folder, locale);
+  const current3 = await loadRecentTelegramPaths(chatId);
+  const next = [normalized, ...current3.filter((item) => item !== normalized)].slice(0, MAX_RECENT_PATHS);
+  await persistRecentTelegramPaths(chatId, next);
+  return normalized;
+}
+async function getRecentTelegramPathsPersistent(chatId) {
+  return loadRecentTelegramPaths(chatId);
+}
+function buildPathPreviewLine(folder, locale = DEFAULT_LOCALE) {
+  return t(locale, "path.preview", { folder });
+}
+function getTelegramPathState(chatId) {
+  return { ...chatPathState.get(chatId) || {} };
+}
+async function refreshTelegramPathState(chatId) {
+  const saved = await previewTelegramPersistentPath(chatId);
+  chatPathState.set(chatId, { nextFolder: saved.once || void 0, sessionFolder: saved.session || void 0 });
+}
+async function setNextTelegramPathPersistent(chatId, folder) {
+  const normalized = await rememberRecentTelegramPathPersistent(chatId, folder);
+  await setTelegramPathStateRow(void 0, chatId, "once", normalized, new Date(Date.now() + 24 * 60 * 60 * 1e3));
+  const state = chatPathState.get(chatId) || {};
+  state.nextFolder = normalized;
+  chatPathState.set(chatId, state);
+  return normalized;
+}
+async function setSessionTelegramPathPersistent(chatId, folder) {
+  const normalized = await rememberRecentTelegramPathPersistent(chatId, folder);
+  await setTelegramPathStateRow(void 0, chatId, "session", normalized, "infinity");
+  const state = chatPathState.get(chatId) || {};
+  state.sessionFolder = normalized;
+  chatPathState.set(chatId, state);
+  return normalized;
+}
+async function clearTelegramPathStatePersistent(chatId) {
+  clearTelegramPathState(chatId);
+  await clearTelegramPathStateRows(void 0, chatId);
+}
+function clearTelegramPathState(chatId) {
+  chatPathState.delete(chatId);
+}
+function setPendingTelegramPathInput(chatId, userId, mode) {
+  pendingPathInputState.set(pendingPathInputKey(chatId, userId), mode);
+}
+function getPendingTelegramPathInput(chatId, userId) {
+  return pendingPathInputState.get(pendingPathInputKey(chatId, userId));
+}
+function clearPendingTelegramPathInput(chatId, userId) {
+  pendingPathInputState.delete(pendingPathInputKey(chatId, userId));
+}
+async function applyPendingTelegramPathInputPersistent(chatId, userId, folder) {
+  const mode = getPendingTelegramPathInput(chatId, userId);
+  if (!mode) return null;
+  const normalized = mode === "once" ? await setNextTelegramPathPersistent(chatId, folder) : await setSessionTelegramPathPersistent(chatId, folder);
+  clearPendingTelegramPathInput(chatId, userId);
+  return { mode, folder: normalized };
+}
+function renderPendingPathPrompt(mode, recent, locale) {
+  const once = mode === "once";
+  return [
+    t(locale, once ? "path.prompt.onceTitle" : "path.prompt.sessionTitle"),
+    "",
+    t(locale, "path.prompt.sendFolder"),
+    t(locale, once ? "path.prompt.onceExample" : "path.prompt.sessionExample"),
+    ...recent.length > 0 ? ["", t(locale, "path.prompt.recent"), ...recent.slice(0, 4).map((item) => `- ${item}`)] : [],
+    "",
+    t(locale, once ? "path.prompt.onceNote" : "path.prompt.sessionNote"),
+    t(locale, "path.prompt.cancel")
+  ].join("\n");
+}
+async function buildPendingPathPromptPersistent(mode, chatId, locale = DEFAULT_LOCALE) {
+  const recent = chatId ? await getRecentTelegramPathsPersistent(chatId) : [];
+  return renderPendingPathPrompt(mode, recent, locale);
+}
+async function resolveTelegramStorageFolderPersistent(chatId, automaticFolder) {
+  const once = await consumeTelegramOncePath(void 0, chatId);
+  if (once) {
+    const state = chatPathState.get(chatId);
+    if (state) delete state.nextFolder;
+    return once;
+  }
+  const session = await getTelegramSessionPath(void 0, chatId);
+  return session || automaticFolder || null;
+}
+async function resolveTelegramTaskStorageFolderPersistent(chatId, automaticFolder) {
+  const once = await consumeTelegramOncePath(void 0, chatId);
+  if (once) return { folder: once, custom: true };
+  const session = await getTelegramSessionPath(void 0, chatId);
+  return session ? { folder: session, custom: true } : { folder: automaticFolder || null, custom: false };
+}
+function buildTelegramPathStateLines(chatId, locale = DEFAULT_LOCALE) {
+  const state = getTelegramPathState(chatId);
+  const active2 = state.nextFolder || state.sessionFolder;
+  return [
+    t(locale, "path.state.current", { value: active2 ? t(locale, "path.state.custom", { folder: `\`${active2}\`` }) : t(locale, "path.state.automatic") }),
+    active2 ? buildPathPreviewLine(active2, locale) : t(locale, "path.state.defaultExample"),
+    t(locale, "path.state.once", { value: state.nextFolder ? `\`${state.nextFolder}\`` : t(locale, "path.state.unset") }),
+    t(locale, "path.state.session", { value: state.sessionFolder ? `\`${state.sessionFolder}\`` : t(locale, "path.state.unset") })
+  ];
+}
+function buildPathSettingsKeyboard(_state, locale = DEFAULT_LOCALE) {
+  return new Api.ReplyInlineMarkup({
+    rows: [
+      new Api.KeyboardButtonRow({
+        buttons: [
+          new Api.KeyboardButtonCallback({ text: t(locale, "path.button.setOnce"), data: Buffer.from("pr_help_once") }),
+          new Api.KeyboardButtonCallback({ text: t(locale, "path.button.setSession"), data: Buffer.from("pr_help_session") })
+        ]
+      }),
+      new Api.KeyboardButtonRow({
+        buttons: [
+          new Api.KeyboardButtonCallback({ text: t(locale, "path.button.recent"), data: Buffer.from("pr_recent") }),
+          new Api.KeyboardButtonCallback({ text: t(locale, "path.button.clear"), data: Buffer.from("pr_clear_custom") })
+        ]
+      })
+    ]
+  });
+}
+function buildPathSettingsText(_state, chatId, locale = DEFAULT_LOCALE) {
+  return [
+    t(locale, "path.settings.title"),
+    "",
+    t(locale, "path.settings.defaultLogicTitle"),
+    t(locale, "path.settings.defaultLogic"),
+    t(locale, "path.settings.examples"),
+    t(locale, "path.settings.customLogic"),
+    "",
+    t(locale, "path.settings.currentTitle"),
+    ...buildTelegramPathStateLines(chatId, locale),
+    "",
+    t(locale, "path.settings.choose")
+  ].join("\n");
 }
 
 // src/services/telegramUpload.ts
@@ -4300,7 +7402,7 @@ var startTelegramDownloadAttempt = telegramAccountRepository.startDownloadAttemp
 var finishTelegramDownloadAttempt = telegramAccountRepository.finishDownloadAttempt.bind(telegramAccountRepository);
 
 // src/services/telegramMultiAccountLogin.ts
-import { Api, TelegramClient as TelegramClient2 } from "telegram";
+import { Api as Api2, TelegramClient as TelegramClient2 } from "telegram";
 import { StringSession as StringSession2 } from "telegram/sessions/index.js";
 import { Raw } from "telegram/events/index.js";
 
@@ -4945,7 +8047,7 @@ var GramJsMultiAccountLoginClient = class {
   client;
   credentials;
   qrHandler = null;
-  qrEvent = new Raw({ types: [Api.UpdateLoginToken] });
+  qrEvent = new Raw({ types: [Api2.UpdateLoginToken] });
   async connect() {
     await this.client.connect();
   }
@@ -4954,7 +8056,7 @@ var GramJsMultiAccountLoginClient = class {
   }
   async signInCode(phone, phoneCodeHash, code) {
     try {
-      await this.client.invoke(new Api.auth.SignIn({ phoneNumber: phone, phoneCodeHash, phoneCode: code }));
+      await this.client.invoke(new Api2.auth.SignIn({ phoneNumber: phone, phoneCodeHash, phoneCode: code }));
       return "authorized";
     } catch (error) {
       if (this.errorName(error).includes("SESSION_PASSWORD_NEEDED")) return "password_needed";
@@ -4981,7 +8083,7 @@ var GramJsMultiAccountLoginClient = class {
   async exportQrLoginToken() {
     let result;
     try {
-      result = await this.client.invoke(new Api.auth.ExportLoginToken({
+      result = await this.client.invoke(new Api2.auth.ExportLoginToken({
         apiId: this.credentials.apiId,
         apiHash: this.credentials.apiHash,
         exceptIds: []
@@ -4992,7 +8094,7 @@ var GramJsMultiAccountLoginClient = class {
       }
       throw error;
     }
-    if (result instanceof Api.auth.LoginToken) {
+    if (result instanceof Api2.auth.LoginToken) {
       return {
         kind: "token",
         token: Buffer.from(result.token),
@@ -5000,12 +8102,12 @@ var GramJsMultiAccountLoginClient = class {
       };
     }
     let imported = result;
-    if (result instanceof Api.auth.LoginTokenMigrateTo) {
+    if (result instanceof Api2.auth.LoginTokenMigrateTo) {
       await this.client._switchDC(result.dcId);
-      imported = await this.client.invoke(new Api.auth.ImportLoginToken({ token: result.token }));
+      imported = await this.client.invoke(new Api2.auth.ImportLoginToken({ token: result.token }));
     }
-    if (imported instanceof Api.auth.LoginTokenSuccess) return { kind: "authorized" };
-    if (imported instanceof Api.auth.LoginToken) {
+    if (imported instanceof Api2.auth.LoginTokenSuccess) return { kind: "authorized" };
+    if (imported instanceof Api2.auth.LoginToken) {
       return {
         kind: "token",
         token: Buffer.from(imported.token),
@@ -5396,16 +8498,16 @@ import crypto15 from "crypto";
 import bigInt from "big-integer";
 
 // src/utils/thumbnail.ts
-import path4 from "path";
+import path5 from "path";
 import sharp from "sharp";
 import ffmpeg from "fluent-ffmpeg";
 import fs4 from "fs";
 import crypto8 from "crypto";
-var THUMBNAIL_DIR = path4.resolve(process.env.THUMBNAIL_DIR || "./data/thumbnails");
+var THUMBNAIL_DIR = path5.resolve(process.env.THUMBNAIL_DIR || "./data/thumbnails");
 if (!fs4.existsSync(THUMBNAIL_DIR)) {
   fs4.mkdirSync(THUMBNAIL_DIR, { recursive: true });
 }
-var PREVIEW_DIR = path4.resolve(process.env.PREVIEW_DIR || "./data/previews");
+var PREVIEW_DIR = path5.resolve(process.env.PREVIEW_DIR || "./data/previews");
 if (!fs4.existsSync(PREVIEW_DIR)) {
   fs4.mkdirSync(PREVIEW_DIR, { recursive: true });
 }
@@ -5419,19 +8521,19 @@ function ffmpegRun(command, label) {
   });
 }
 async function generateMediaPreview(filePath, storedName, mimeType) {
-  const absFilePath = path4.resolve(filePath);
+  const absFilePath = path5.resolve(filePath);
   if (!fs4.existsSync(absFilePath)) return null;
   try {
     if (mimeType.startsWith("image/") && mimeType !== "image/gif") {
       const previewName = `preview_${crypto8.randomUUID()}.webp`;
-      const previewPath = path4.join(PREVIEW_DIR, previewName);
+      const previewPath = path5.join(PREVIEW_DIR, previewName);
       await sharp(absFilePath).rotate().resize(2048, 2048, { fit: "inside", withoutEnlargement: true }).webp({ quality: 86, effort: 4 }).toFile(previewPath);
       console.log(`[Preview] \u2705 Image preview created: ${previewName}`);
       return previewPath;
     }
     if (mimeType.startsWith("video/")) {
       const previewName = `preview_${crypto8.randomUUID()}.mp4`;
-      const previewPath = path4.join(PREVIEW_DIR, previewName);
+      const previewPath = path5.join(PREVIEW_DIR, previewName);
       const mp4Like = isMp4Like(mimeType, storedName || absFilePath);
       if (mp4Like) {
         try {
@@ -5474,9 +8576,9 @@ async function generateMediaPreview(filePath, storedName, mimeType) {
   return null;
 }
 async function generateThumbnail(filePath, storedName, mimeType) {
-  const absFilePath = path4.resolve(filePath);
+  const absFilePath = path5.resolve(filePath);
   const thumbName = `thumb_${crypto8.randomUUID()}.webp`;
-  const thumbPath = path4.join(THUMBNAIL_DIR, thumbName);
+  const thumbPath = path5.join(THUMBNAIL_DIR, thumbName);
   console.log(`[Thumbnail] \u{1F680} Starting generation for: ${storedName}`);
   console.log(`[Thumbnail] Source: ${absFilePath}`);
   console.log(`[Thumbnail] Target: ${thumbPath}`);
@@ -5535,7 +8637,7 @@ async function generateThumbnail(filePath, storedName, mimeType) {
   return null;
 }
 async function getImageDimensions(filePath, mimeType) {
-  const absFilePath = path4.resolve(filePath);
+  const absFilePath = path5.resolve(filePath);
   console.log(`[Dimensions] \u{1F4CF} Getting dimensions for: ${absFilePath} (${mimeType})`);
   try {
     if (mimeType.startsWith("image/")) {
@@ -5653,8 +8755,8 @@ init_storageCooldown();
 
 // src/services/telegramUserClient.ts
 import fs9 from "node:fs";
-import path8 from "node:path";
-import { Api as Api2, TelegramClient as TelegramClient3 } from "telegram";
+import path9 from "node:path";
+import { Api as Api3, TelegramClient as TelegramClient3 } from "telegram";
 import { StringSession as StringSession3 } from "telegram/sessions/index.js";
 
 // src/services/telegramUserWebLogin.ts
@@ -5992,7 +9094,7 @@ var GramJsWebLoginClient = class {
   }
   async signInCode(phone, phoneCodeHash, code) {
     try {
-      await this.client.invoke(new Api2.auth.SignIn({ phoneNumber: phone, phoneCodeHash, phoneCode: code }));
+      await this.client.invoke(new Api3.auth.SignIn({ phoneNumber: phone, phoneCodeHash, phoneCode: code }));
       return "authorized";
     } catch (error) {
       const name = String(error?.errorMessage || error.message || "");
@@ -6077,134 +9179,74 @@ function isTelegramUserClientReady() {
   return Boolean(getTelegramUserClient()?.connected);
 }
 function getTelegramUserSessionFilePath() {
-  return userSessionFilePath || path8.resolve(getSessionFilePath());
+  return userSessionFilePath || path9.resolve(getSessionFilePath());
 }
 
 // src/services/telegramUpload.ts
 init_settings();
+
+// src/services/telegramProgressSettings.ts
+init_settings();
+var TELEGRAM_PROGRESS_INTERVAL_KEY = "telegram_progress_interval_seconds";
+var TELEGRAM_PROGRESS_INTERVALS = [3, 5, 10, 15, 30, 60];
+function normalizeTelegramProgressInterval(value) {
+  const seconds = Number(value);
+  if (!TELEGRAM_PROGRESS_INTERVALS.includes(seconds)) throw new Error("\u8FDB\u5EA6\u5237\u65B0\u95F4\u9694\u5FC5\u987B\u662F 3/5/10/15/30/60 \u79D2");
+  return seconds;
+}
+var cachedSeconds = 5;
+var loadedAt = 0;
+async function getTelegramProgressIntervalMs() {
+  if (Date.now() - loadedAt > 5e3) {
+    const value = await getSetting(TELEGRAM_PROGRESS_INTERVAL_KEY, "5");
+    try {
+      cachedSeconds = normalizeTelegramProgressInterval(value);
+    } catch {
+      cachedSeconds = 5;
+    }
+    loadedAt = Date.now();
+  }
+  return cachedSeconds * 1e3;
+}
+async function setTelegramProgressInterval(value) {
+  const seconds = normalizeTelegramProgressInterval(value);
+  await setSetting(TELEGRAM_PROGRESS_INTERVAL_KEY, String(seconds));
+  cachedSeconds = seconds;
+  loadedAt = Date.now();
+}
+function startTelegramProgressTicker(refresh, interval = getTelegramProgressIntervalMs, schedule = setTimeout, cancel = clearTimeout) {
+  let stopped = false;
+  let timer;
+  let active2 = Promise.resolve();
+  const arm = async () => {
+    const delay = await interval();
+    if (stopped) return;
+    timer = schedule(() => {
+      active2 = (async () => {
+        try {
+          if (!stopped) await refresh();
+        } catch (error) {
+          console.warn("Telegram progress refresh failed:", error);
+        } finally {
+          if (!stopped) await arm();
+        }
+      })();
+    }, delay);
+    timer.unref?.();
+  };
+  active2 = arm();
+  return async () => {
+    stopped = true;
+    if (timer) cancel(timer);
+    await active2;
+  };
+}
+
+// src/services/telegramUpload.ts
 init_telegramState();
 
-// src/utils/telegramUtils.ts
-import path9 from "path";
-
-// src/utils/fileMetadata.ts
-function getFileType(mimeType) {
-  const normalized = mimeType?.toLowerCase() || "";
-  if (normalized.startsWith("image/")) return "image";
-  if (normalized.startsWith("video/")) return "video";
-  if (normalized.startsWith("audio/")) return "audio";
-  if (normalized.startsWith("text/") || normalized.includes("pdf") || normalized.includes("document") || normalized.includes("sheet") || normalized.includes("presentation") || normalized.includes("word") || normalized.includes("excel") || normalized.includes("powerpoint")) return "document";
-  return "other";
-}
-function formatBytes(bytes, binary = false) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-  const base = 1024;
-  const units = binary ? ["B", "KiB", "MiB", "GiB", "TiB"] : ["B", "KB", "MB", "GB", "TB"];
-  const unit = Math.min(Math.floor(Math.log(bytes) / Math.log(base)), units.length - 1);
-  const value = bytes / base ** unit;
-  return `${Number(value.toFixed(unit === 0 ? 0 : 2))} ${units[unit]}`;
-}
-
-// src/utils/telegramUtils.ts
-function getTypeEmoji(mimeType) {
-  if (!mimeType) return "\u{1F4C1}";
-  if (mimeType.startsWith("image/")) return "\u{1F5BC}\uFE0F";
-  if (mimeType.startsWith("video/")) return "\u{1F3AC}";
-  if (mimeType.startsWith("audio/")) return "\u{1F3B5}";
-  if (mimeType === "application/pdf") return "\u{1F4D5}";
-  if (mimeType === "text/markdown" || mimeType.includes("markdown")) return "\u{1F4DD}";
-  if (mimeType.startsWith("text/") || mimeType === "application/json" || mimeType === "application/xml") return "\u{1F4C4}";
-  if (mimeType.includes("word") || mimeType.includes("officedocument.wordprocessingml")) return "\u{1F4DD}";
-  if (mimeType.includes("excel") || mimeType.includes("spreadsheetml") || mimeType === "text/csv") return "\u{1F4CA}";
-  if (mimeType.includes("powerpoint") || mimeType.includes("presentationml")) return "\u{1F4C9}";
-  if (mimeType.includes("zip") || mimeType.includes("rar") || mimeType.includes("7z") || mimeType.includes("tar") || mimeType.includes("compressed")) return "\u{1F4E6}";
-  if (mimeType.includes("epub") || mimeType.includes("mobi")) return "\u{1F4DA}";
-  if (mimeType.includes("executable") || mimeType.includes("msdownload") || mimeType.includes("apk")) return "\u2699\uFE0F";
-  if (mimeType.includes("sql") || mimeType.includes("database")) return "\u{1F5C4}\uFE0F";
-  if (mimeType.includes("key") || mimeType.includes("pem") || mimeType.includes("certificate") || mimeType.includes("pkcs")) return "\u{1F511}";
-  if (mimeType.includes("javascript") || mimeType.includes("typescript") || mimeType.includes("python") || mimeType.includes("php") || mimeType.includes("java") || mimeType.includes("cplusplus") || mimeType.includes("x-httpd-php")) return "\u{1F4BB}";
-  if (mimeType.includes("pdf") || mimeType.includes("document")) return "\u{1F4C4}";
-  return "\u{1F4C1}";
-}
-function getMimeTypeFromFilename(filename) {
-  const ext = path9.extname(filename).toLowerCase();
-  const mimeTypes = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-    ".bmp": "image/bmp",
-    ".svg": "image/svg+xml",
-    ".mp4": "video/mp4",
-    ".webm": "video/webm",
-    ".avi": "video/x-msvideo",
-    ".mov": "video/quicktime",
-    ".mkv": "video/x-matroska",
-    ".flv": "video/x-flv",
-    ".mp3": "audio/mpeg",
-    ".wav": "audio/wav",
-    ".ogg": "audio/ogg",
-    ".flac": "audio/flac",
-    ".pdf": "application/pdf",
-    ".doc": "application/msword",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".xls": "application/vnd.ms-excel",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".ppt": "application/vnd.ms-powerpoint",
-    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    ".txt": "text/plain",
-    ".csv": "text/csv",
-    ".md": "text/markdown",
-    ".html": "text/html",
-    ".css": "text/css",
-    ".js": "application/javascript",
-    ".ts": "application/typescript",
-    ".json": "application/json",
-    ".xml": "application/xml",
-    ".py": "text/x-python",
-    ".java": "text/x-java-source",
-    ".sql": "application/sql",
-    ".zip": "application/zip",
-    ".rar": "application/x-rar-compressed",
-    ".7z": "application/x-7z-compressed",
-    ".tar": "application/x-tar",
-    ".gz": "application/x-gzip",
-    ".epub": "application/epub+zip",
-    ".mobi": "application/x-mobipocket-ebook",
-    ".exe": "application/x-msdownload",
-    ".apk": "application/vnd.android.package-archive",
-    ".iso": "application/x-iso9660-image",
-    ".dmg": "application/x-apple-diskimage",
-    ".crt": "application/x-x509-ca-cert",
-    ".pem": "application/x-pem-file",
-    ".key": "application/octet-stream"
-  };
-  return mimeTypes[ext] || "application/octet-stream";
-}
-function sanitizeFilename(name) {
-  if (!name) return "unknown";
-  const firstLine = name.split("\n")[0].trim();
-  const originalExt = path9.extname(firstLine);
-  const ext = originalExt && originalExt.length <= 15 ? originalExt : "";
-  const withoutExt = ext ? firstLine.slice(0, -ext.length) : firstLine;
-  let sanitized = withoutExt.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/\s+/g, " ").trim();
-  sanitized = sanitized.replace(/[.\s]+$/, "");
-  if (!sanitized) return "unknown";
-  const MAX_CHARS = 50;
-  const baseMaxChars = Math.max(1, MAX_CHARS - ext.length);
-  let base = sanitized.substring(0, baseMaxChars);
-  let result = `${base}${ext}`;
-  const MAX_BYTES = 150;
-  while (Buffer.byteLength(result, "utf8") > MAX_BYTES && base.length > 0) {
-    base = base.substring(0, base.length - 1);
-    result = `${base}${ext}`;
-  }
-  return result || "unknown";
-}
-
 // src/utils/telegramMedia.ts
-import { Api as Api3 } from "telegram";
+import { Api as Api4 } from "telegram";
 function getDownloadableMedia(message) {
   if (!message.media) return null;
   const media = message.media;
@@ -6284,7 +9326,7 @@ function extractFileInfo(message) {
       mimeType = "audio/ogg";
     } else {
       const media = message.media;
-      if (media.document && media.document instanceof Api3.Document) {
+      if (media.document && media.document instanceof Api4.Document) {
         const doc = media.document;
         const fileNameAttr = doc.attributes?.find((a) => a.className === "DocumentAttributeFilename");
         generatedName = !fileNameAttr?.fileName;
@@ -6315,7 +9357,7 @@ function extractFileInfo(message) {
 }
 
 // src/utils/telegramMessages.ts
-import { Api as Api4 } from "telegram";
+import { Api as Api5 } from "telegram";
 
 // src/utils/providerMetadata.ts
 var PROVIDERS = {
@@ -6335,2679 +9377,6 @@ function getProviderDisplayName(providerId) {
   return `${provider.emoji} ${provider.label}`;
 }
 
-// src/i18n/telegramRussian.json
-var telegramRussian_default = {
-  "bot.wizard.confirmSource": "\u{1F4CC} \u041A\u0430\u043D\u0430\u043B: {source}",
-  "bot.wizard.confirmComments": "\u{1F4AC} \u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438: {value}",
-  "bot.wizard.folder.defaultValue": "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0446\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "bot.wizard.storage.current": "\u0422\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435",
-  "bot.wizard.storage.currentAccount": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u0430\u043A\u043A\u0430\u0443\u043D\u0442",
-  "bot.wizard.confirmTitle": "\u041F\u043E\u0436\u0430\u043B\u0443\u0439\u0441\u0442\u0430, \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u043E\u0431\u044A\u0435\u043C \u0437\u0430\u0434\u0430\u0447\u0438:",
-  "bot.wizard.confirmTagRange": "\u0422\u0435\u0433: #{tag}",
-  "bot.wizard.confirmDateRange": "\u0414\u0430\u0442\u044B: {startDate} \u2192 {endDate}",
-  "bot.wizard.confirmDays": "\u{1F4C5} {days} \u0434\u043D\u0435\u0439 \u0432\u043A\u043B\u044E\u0447\u0438\u0442\u0435\u043B\u044C\u043D\u043E",
-  "bot.wizard.confirmLargeRange": "\u26A0\uFE0F\u042D\u0442\u043E \u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0430\u0441\u0441\u043E\u0440\u0442\u0438\u043C\u0435\u043D\u0442. \u041F\u043E\u0441\u043B\u0435 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0431\u0443\u0434\u0435\u0442 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0442\u044C\u0441\u044F \u043F\u043E \u0441\u0435\u0433\u043C\u0435\u043D\u0442\u0430\u043C. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0434\u0430\u0442\u044B \u0438 \u043C\u0435\u0441\u0442\u043E \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F.",
-  "bot.wizard.confirmCommentsOn": "\u0412\u043A\u043B\u044E\u0447\u0435\u043D\u043E (\u0434\u043E {count} \u0437\u0430 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435)",
-  "bot.wizard.confirmCommentsOff": "\u041D\u0435 \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u043E",
-  "bot.wizard.confirmFolder": "\u{1F4C1} \u041F\u0430\u043F\u043A\u0430: {folder}",
-  "bot.wizard.confirmStorage": "\u2601\uFE0F \u0424\u0438\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435: {provider} / {account}.",
-  "bot.wizard.confirmNote": "\u0421\u043A\u0430\u043D\u0438\u0440\u0443\u0439\u0442\u0435 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F \u043F\u0440\u043E\u0433\u0440\u0435\u0441\u0441\u0430 \u0432 \u0440\u0435\u0436\u0438\u043C\u0435 \u0440\u0435\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u0432\u0440\u0435\u043C\u0435\u043D\u0438. \u0412\u044B \u043C\u043E\u0436\u0435\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0435\u0433\u043E \u0438\u0437 \u0446\u0435\u043D\u0442\u0440\u0430 \u0437\u0430\u0434\u0430\u0447.",
-  "bot.wizard.subscriptionIndexInvalid": "\u274C\u0422\u0430\u043A\u043E\u0433\u043E \u043D\u043E\u043C\u0435\u0440\u0430 \u043D\u0435\u0442 \u043D\u0438 \u0432 \u043E\u0434\u043D\u043E\u0439 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0435. \u041E\u0442\u0432\u0435\u0442\u044C\u0442\u0435, \u0443\u043A\u0430\u0437\u0430\u0432 \u043D\u043E\u043C\u0435\u0440 \u0441\u043F\u0438\u0441\u043A\u0430, \u0438\u043B\u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F/\u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430 \u043A\u0430\u043D\u0430\u043B, \u0447\u0442\u043E\u0431\u044B \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0435\u0433\u043E.",
-  "bot.wizard.subscriptionInputInvalid": "\u274C \u041E\u0442\u0432\u0435\u0442\u044C\u0442\u0435 \u043D\u043E\u043C\u0435\u0440\u043E\u043C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438, \u0447\u0442\u043E\u0431\u044B \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0435\u0435, \u0438\u043B\u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F/\u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430 \u043A\u0430\u043D\u0430\u043B, \u0447\u0442\u043E\u0431\u044B \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0435\u0435, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 `@channel_username`.",
-  "bot.wizard.pathInvalid": "\u274C \u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043F\u0443\u0442\u044C: {error}.\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \u0435\u0449\u0435 \u0440\u0430\u0437 \u0438\u043B\u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u043F\u0440\u043E\u043F\u0443\u0441\u0442\u0438\u0442\u044C\xBB, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u043F\u0440\u0430\u0432\u0438\u043B\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E.",
-  "bot.wizard.subscriptionUpdated": "\u2705 \u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u043F\u0430\u043F\u043A\u0430 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438: {source}.",
-  "bot.wizard.subscriptionNotFound": "\u274C \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430",
-  "bot.wizard.subscriptionFolder": "\u{1F4C1} \u041E\u0442\u0434\u0435\u043B\u044C\u043D\u0430\u044F \u043F\u0430\u043F\u043A\u0430: {folder}.\n{preview}",
-  "bot.wizard.defaultFolder": "\u{1F4C1} \u041F\u0440\u0430\u0432\u0438\u043B\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044F",
-  "bot.wizard.subscribed": "\u2705 \u041F\u043E\u0434\u043F\u0438\u0441\u0430\u043D \u043D\u0430 {source}",
-  "bot.wizard.subscriptionFolderLabel": "\u{1F4C1} \u0414\u043B\u044F \u044D\u0442\u043E\u0439 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438 \u0432\u044B\u0434\u0435\u043B\u0435\u043D\u0430 \u043F\u0430\u043F\u043A\u0430: {folder}.\n{preview}",
-  "bot.wizard.subscriptionDefaultLabel": "\u{1F4C1} \u0412 \u044D\u0442\u043E\u0439 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u043F\u0440\u0430\u0432\u0438\u043B\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E.",
-  "bot.wizard.subscriptionStart": "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F \u043D\u0430\u0447\u0438\u043D\u0430\u0435\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0433\u043E \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F {messageId}.",
-  "bot.wizard.subscriptionFailed": "\u274C \u041E\u0448\u0438\u0431\u043A\u0430 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438: {error}.",
-  "bot.wizard.dateRangeInvalid": "\u274C {error}",
-  "bot.callback.taskCardInvalid": "\u041A\u0430\u0440\u0442\u043E\u0447\u043A\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u0430 \u0438\u043B\u0438 \u043D\u0435 \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0438\u0442 \u044D\u0442\u043E\u043C\u0443 \u0447\u0430\u0442\u0443.",
-  "bot.callback.retryCount": "\u041F\u043E\u0432\u0442\u043E\u0440\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B {count}",
-  "bot.callback.noRetry": "\u041D\u0438\u043A\u0430\u043A\u0438\u0435 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u044B\u0435 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B \u043D\u0435 \u043C\u043E\u0433\u0443\u0442 \u0431\u044B\u0442\u044C \u043F\u043E\u0432\u0442\u043E\u0440\u0435\u043D\u044B.",
-  "bot.callback.failureDetailsTitle": "\u274C **\u0421\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0441\u0431\u043E\u0435**",
-  "bot.callback.failureDetailsEmpty": "\u0417\u0430\u043F\u0438\u0441\u0438 \u043E\u0431 \u043E\u0448\u0438\u0431\u043A\u0430\u0445 \u0431\u044B\u043B\u0438 \u0443\u0434\u0430\u043B\u0435\u043D\u044B \u0438\u043B\u0438 \u0437\u0430\u0434\u0430\u0447\u0430 \u0431\u044B\u043B\u0430 \u043F\u043E\u0432\u0442\u043E\u0440\u0435\u043D\u0430.",
-  "bot.callback.failureDetailsSent": "\u0421\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0441\u0431\u043E\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u044B",
-  "bot.callback.taskUnavailable": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0430, \u0441\u0440\u043E\u043A \u0435\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u043D\u0435 \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0438\u0442 \u044D\u0442\u043E\u043C\u0443 \u0447\u0430\u0442\u0443.",
-  "bot.callback.queuePaused": "\u041E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
-  "bot.callback.noPausableTasks": "\u041D\u0435\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043C\u044B\u0445 \u0437\u0430\u0434\u0430\u0447, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u043C\u043E\u0436\u043D\u043E \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C.",
-  "bot.callback.queueResumed": "\u041E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
-  "bot.callback.noWaitingTasks": "\u041D\u0435\u0442 \u043E\u0436\u0438\u0434\u0430\u044E\u0449\u0438\u0445 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A",
-  "bot.callback.backgroundCancelled": "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u0437\u0430\u0434\u0430\u0447\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
-  "bot.callback.operationFailed": "\u041E\u043F\u0435\u0440\u0430\u0446\u0438\u044F \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C: {error}",
-  "bot.callback.sendChannel": "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043A\u0430\u043D\u0430\u043B",
-  "bot.callback.subscriptionInvalid": "\u041A\u043D\u043E\u043F\u043A\u0430 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u0430 \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
-  "bot.callback.subscriptionRefreshed": "\u0421\u043F\u0438\u0441\u043E\u043A \u043F\u043E\u0434\u043F\u0438\u0441\u043E\u043A \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D.",
-  "bot.callback.subscriptionConfirmInvalid": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043E\u0442\u043C\u0435\u043D\u044B \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u043F\u043E\u0434\u043F\u0438\u0441\u043E\u043A.",
-  "bot.callback.subscriptionCancelled": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
-  "bot.callback.subscriptionMissing": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u0438\u043B\u0438 \u0443\u0436\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
-  "bot.callback.subscriptionBack": "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u043A \u0441\u043F\u0438\u0441\u043A\u0443 \u043F\u043E\u0434\u043F\u0438\u0441\u043E\u043A",
-  "bot.callback.syncRequested": "\u0417\u0430\u043F\u0440\u043E\u0448\u0435\u043D\u0430 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F",
-  "bot.callback.subscriptionResumed": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
-  "bot.callback.subscriptionPaused": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
-  "bot.callback.cursorUpdated": "\u041A\u0443\u0440\u0441\u043E\u0440 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D \u0434\u043E \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0433\u043E \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F",
-  "bot.callback.followGlobal": "\u0422\u0435\u043F\u0435\u0440\u044C \u0441\u043B\u0435\u0434\u0443\u044F \u0433\u043B\u043E\u0431\u0430\u043B\u044C\u043D\u043E\u0439 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0435",
-  "bot.callback.fixedTarget": "\u0424\u0438\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u043A \u0442\u0435\u043A\u0443\u0449\u0435\u0439 \u0446\u0435\u043B\u0438",
-  "bot.callback.noResult": "\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442\u043E\u0432 \u0437\u0430\u043F\u0443\u0441\u043A\u0430 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442",
-  "bot.callback.retryLatest": "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u043B \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u044B\u0435 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B",
-  "bot.callback.enterBackfillDate": "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0434\u0430\u0442\u0443 \u043D\u0430\u0447\u0430\u043B\u0430 \u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u044F",
-  "bot.callback.currentFolder": "\u0412\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u0430\u044F \u043F\u0430\u043F\u043A\u0430: {folder}.",
-  "bot.callback.defaultPath": "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435 \u043C\u0435\u0441\u0442\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "bot.callback.sendFolder": "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043D\u043E\u0432\u0443\u044E \u0432\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u0443\u044E \u043F\u0430\u043F\u043A\u0443",
-  "bot.callback.folderCleared": "\u0412\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u0430\u044F \u043F\u0430\u043F\u043A\u0430 \u043E\u0447\u0438\u0449\u0435\u043D\u0430",
-  "bot.callback.confirmUnsubscribe": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435, \u0441\u0442\u043E\u0438\u0442 \u043B\u0438 \u043E\u0442\u043F\u0438\u0441\u044B\u0432\u0430\u0442\u044C\u0441\u044F",
-  "bot.callback.cleanupSuccess": "\u2705 \u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043F\u0440\u043E\u0448\u043B\u0430 \u0443\u0441\u043F\u0435\u0448\u043D\u043E",
-  "bot.callback.cleanupFailed": "\u274C \u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C",
-  "language.choose": "\u041F\u043E\u0436\u0430\u043B\u0443\u0439\u0441\u0442\u0430, \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u044F\u0437\u044B\u043A",
-  "language.title": "\u{1F310} **\u042F\u0437\u044B\u043A**",
-  "language.current": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u044F\u0437\u044B\u043A: {language}",
-  "language.changed": "\u2705 \u042F\u0437\u044B\u043A \u0438\u0437\u043C\u0435\u043D\u0451\u043D \u043D\u0430 \u0440\u0443\u0441\u0441\u043A\u0438\u0439",
-  "language.chinese": "\u0423\u043F\u0440\u043E\u0449\u0451\u043D\u043D\u044B\u0439 \u043A\u0438\u0442\u0430\u0439\u0441\u043A\u0438\u0439",
-  "language.english": "\u0410\u043D\u0433\u043B\u0438\u0439\u0441\u043A\u0438\u0439",
-  "language.russian": "\u0420\u0443\u0441\u0441\u043A\u0438\u0439",
-  "language.hint": "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u044F\u0437\u044B\u043A \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430 \u0431\u043E\u0442\u0430. \u042D\u0442\u043E \u043C\u0435\u043D\u044F\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u0438\u0435.",
-  "auth.required": "\u{1F510} \u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /start \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 PIN-\u043A\u043E\u0434.",
-  "auth.requiredUpload": "\u{1F510} \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /start \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 PIN-\u043A\u043E\u0434 \u043F\u0435\u0440\u0435\u0434 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u043E\u0439 \u0444\u0430\u0439\u043B\u043E\u0432.",
-  "auth.inputPrompt": "\u{1F510} \u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 PIN-\u043A\u043E\u0434 \u0441 \u043F\u043E\u043C\u043E\u0449\u044C\u044E \u043A\u043B\u0430\u0432\u0438\u0430\u0442\u0443\u0440\u044B \u043D\u0438\u0436\u0435:",
-  "auth.cancelled": "\u{1F6AB} \u0412\u0432\u043E\u0434 PIN-\u043A\u043E\u0434\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C/\u043D\u0430\u0447\u0430\u0442\u044C, \u0447\u0442\u043E\u0431\u044B \u043D\u0430\u0447\u0430\u0442\u044C \u0437\u0430\u043D\u043E\u0432\u043E",
-  "auth.wrong": "\u274C \u041D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u044B\u0439 \u041F\u0418\u041D-\u043A\u043E\u0434. \u041F\u043E\u0436\u0430\u043B\u0443\u0439\u0441\u0442\u0430, \u043F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0435 \u0440\u0430\u0437:",
-  "auth.success": "\u2705 PIN-\u043A\u043E\u0434 \u043F\u0440\u043E\u0432\u0435\u0440\u0435\u043D!",
-  "auth.startPrompt": "\u{1F44B} **\u0414\u043E\u0431\u0440\u043E \u043F\u043E\u0436\u0430\u043B\u043E\u0432\u0430\u0442\u044C \u0432 TG Vault Bot!**\n\n\u{1F510} \u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 PIN-\u043A\u043E\u0434 \u0441 \u043F\u043E\u043C\u043E\u0449\u044C\u044E \u043A\u043B\u0430\u0432\u0438\u0430\u0442\u0443\u0440\u044B \u043D\u0438\u0436\u0435:",
-  "auth.welcomeBack": "\u{1F44B} **\u0421 \u0432\u043E\u0437\u0432\u0440\u0430\u0449\u0435\u043D\u0438\u0435\u043C!**\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043B\u0438 \u043F\u0435\u0440\u0435\u0448\u043B\u0438\u0442\u0435 \u0444\u0430\u0439\u043B, \u0447\u0442\u043E\u0431\u044B \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0435\u0433\u043E.\n\n\u041D\u0430\u0447\u043D\u0438\u0442\u0435 \u0441 \u043E\u0434\u043D\u043E\u0433\u043E \u0438\u0437 \u0447\u0435\u0442\u044B\u0440\u0435\u0445 \u044F\u0440\u043B\u044B\u043A\u043E\u0432 \u043D\u0438\u0436\u0435 \u0438\u043B\u0438 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0434\u043B\u044F \u0432\u0441\u0435\u0433\u043E /help.",
-  "auth.successBody": "\u2705 **\u041F\u0418\u041D-\u043A\u043E\u0434 \u043F\u0440\u043E\u0432\u0435\u0440\u0435\u043D!**\n\n\u0422\u0435\u043F\u0435\u0440\u044C \u0432\u044B \u043C\u043E\u0436\u0435\u0442\u0435:\n\u{1F4E4} \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043B\u0438 \u043F\u0435\u0440\u0435\u0448\u043B\u0438\u0442\u0435 \u043B\u044E\u0431\u043E\u0439 \u0444\u0430\u0439\u043B \u0434\u043B\u044F \u0435\u0433\u043E \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 (\u0434\u043E 2 \u0413\u0411; \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0430 \u043D\u0435 \u043F\u043E\u0434\u043F\u0430\u0434\u0430\u0435\u0442 \u043F\u043E\u0434 \u044D\u0442\u043E\u0442 \u043B\u0438\u043C\u0438\u0442)\n\u{1F4CA} /storage \u2014 \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430.",
-  "auth.twoFactorPrompt": "\u{1F510} PIN-\u043A\u043E\u0434 \u043F\u0440\u043E\u0432\u0435\u0440\u0435\u043D!\n\n\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 **6-\u0437\u043D\u0430\u0447\u043D\u044B\u0439 \u043A\u043E\u0434 2FA**, \u0447\u0442\u043E\u0431\u044B \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044C \u0432\u0445\u043E\u0434:",
-  "auth.twoFactorToast": "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 \u043A\u043E\u0434 2FA",
-  "auth.twoFactorWrong": "\u274C \u041D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u044B\u0439 \u043A\u043E\u0434. \u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043D\u043E\u0432\u044B\u0439 6-\u0437\u043D\u0430\u0447\u043D\u044B\u0439 \u043A\u043E\u0434:",
-  "auth.twoFactorActivated": "\u2705 **2FA \u0443\u0441\u043F\u0435\u0448\u043D\u043E \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u0430!**\n\n\u{1F6E1}\uFE0F \u0412\u0430\u0448\u0430 \u0443\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u0442\u0435\u043F\u0435\u0440\u044C \u0437\u0430\u0449\u0438\u0449\u0435\u043D\u0430 \u0434\u0432\u0443\u0445\u0444\u0430\u043A\u0442\u043E\u0440\u043D\u043E\u0439 \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0435\u0439.",
-  "auth.twoFactorLoginOk": "\u2705 **\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043E 2FA**\n\n\u0414\u043E\u0431\u0440\u043E \u043F\u043E\u0436\u0430\u043B\u043E\u0432\u0430\u0442\u044C \u043E\u0431\u0440\u0430\u0442\u043D\u043E!",
-  "auth.twoFactorQrFail": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C QR-\u043A\u043E\u0434. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043B\u043E\u0433\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430.",
-  "common.unknownText": "\u2753 \u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043A\u043E\u043C\u0430\u043D\u0434\u0430\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /start, \u0447\u0442\u043E\u0431\u044B \u043D\u0430\u0447\u0430\u0442\u044C \u0438\u043B\u0438 /help \u0434\u043B\u044F \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u0438\u044F \u043F\u043E\u043C\u043E\u0449\u0438.",
-  "common.unsupportedMedia": "\u26A0\uFE0F \u042D\u0442\u043E\u0442 \u043C\u0435\u0434\u0438\u0430\u0444\u043E\u0440\u043C\u0430\u0442 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F.",
-  "common.emptyFiles": "\u{1F4EE} \u041F\u043E\u043A\u0430 \u043D\u0435\u0442 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A",
-  "common.emptyTasks": "\u{1F4EE} \u041D\u0435\u0442 \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0445 \u0437\u0430\u0434\u0430\u0447",
-  "common.fileCount": "{count, plural, one {{count} \u0444\u0430\u0439\u043B} other {{count} \u0444\u0430\u0439\u043B\u0430}}",
-  "common.refresh": "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C",
-  "common.confirm": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0430\u0442\u044C",
-  "common.cancel": "\u041E\u0442\u043C\u0435\u043D\u0430",
-  "common.back": "\u041D\u0430\u0437\u0430\u0434",
-  "common.failed": "\u041D\u0435\u0443\u0441\u043F\u0435\u0448\u043D\u044B\u0439",
-  "common.success": "\u0423\u0434\u0430\u043B\u043E\u0441\u044C",
-  "messages.storage.title": "\u{1F4CA} **\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430**",
-  "messages.storage.disk": "**\u{1F4BF} \u0421\u0435\u0440\u0432\u0435\u0440\u043D\u044B\u0439 \u0434\u0438\u0441\u043A**",
-  "messages.storage.total": "\u0412\u0441\u0435\u0433\u043E{value}",
-  "messages.storage.used": "\u0411/\u0443{value} ({percent}%)",
-  "messages.storage.free": "\u0411\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u043E{value}",
-  "messages.storage.indexed": "**\u{1F4C1} \u041F\u0440\u043E\u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B**",
-  "messages.storage.fileCount": "\u0424\u0430\u0439\u043B\u044B{count}",
-  "messages.storage.size": "\u0420\u0430\u0437\u043C\u0435\u0440{value}",
-  "messages.storage.local": "**\u{1F5A5}\uFE0F\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u0434\u043B\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438**",
-  "messages.storage.location": "\u041C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A/\u043A\u044D\u0448\u0430.",
-  "messages.storage.queue": "**\u{1F4E1} \u041E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438**",
-  "messages.storage.queueCounts": "\u{1F504} \u0410\u043A\u0442\u0438\u0432\u0435\u043D {active}\u23F3 \u041E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F {pending}",
-  "messages.files.title": "\u{1F4CB} **\u041D\u0435\u0434\u0430\u0432\u043D\u043E \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B** ({count} \u043D\u0430 \u044D\u0442\u043E\u0439 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435)",
-  "messages.files.unnamed": "\u0411\u0435\u0437\u044B\u043C\u044F\u043D\u043D\u044B\u0439 \u0444\u0430\u0439\u043B",
-  "messages.files.hint": "\u{1F4A1} \u0414\u043B\u044F \u043F\u043E\u0438\u0441\u043A\u0430 \u0444\u0430\u0439\u043B\u043E\u0432 \u0438\u043B\u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F \u0438\u043C\u0438 \u043E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \xAB\u041F\u043E\u0438\u0441\u043A \u0444\u0430\u0439\u043B\u043E\u0432 \u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0438\u043C\u0438\xBB.",
-  "fileBrowser.detail": "\u041F\u043E\u0434\u0440\u043E\u0431\u043D\u043E\u0441\u0442\u0438",
-  "fileBrowser.copyId": "\u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440",
-  "fileBrowser.favorite": "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435",
-  "fileBrowser.unfavorite": "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E",
-  "fileBrowser.signedLink": "\u041F\u043E\u0434\u043F\u0438\u0441\u0430\u043D\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430",
-  "fileBrowser.move": "\u0414\u0432\u0438\u0433\u0430\u0442\u044C\u0441\u044F",
-  "fileBrowser.rename": "\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C",
-  "fileBrowser.delete": "\u0423\u0434\u0430\u043B\u0438\u0442\u044C\u2026",
-  "fileBrowser.unnamed": "\u0411\u0435\u0437\u044B\u043C\u044F\u043D\u043D\u044B\u0439 \u0444\u0430\u0439\u043B",
-  "fileBrowser.other": "\u0414\u0440\u0443\u0433\u043E\u0439",
-  "fileBrowser.localStorage": "\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435",
-  "fileBrowser.rootFolder": "\u041A\u043E\u0440\u043D\u0435\u0432\u0430\u044F \u043F\u0430\u043F\u043A\u0430",
-  "fileBrowser.unknown": "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439",
-  "fileBrowser.search": "\u041F\u043E\u0438\u0441\u043A \u0444\u0430\u0439\u043B\u043E\u0432",
-  "fileBrowser.recentFiles": "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u0444\u0430\u0439\u043B\u044B",
-  "fileBrowser.noMatches": "\u041D\u0435\u0442 \u0441\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0445 \u0444\u0430\u0439\u043B\u043E\u0432.",
-  "fileBrowser.hint": "\u041A\u043E\u0441\u043D\u0438\u0442\u0435\u0441\u044C \u0444\u0430\u0439\u043B\u0430, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u044F, \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0435\u0433\u043E \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440, \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0435\u0433\u043E \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435, \u0441\u043E\u0437\u0434\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443, \u043F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C/\u043F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C \u0435\u0433\u043E \u0438\u043B\u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044C \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435.",
-  "messages.delete.success": "\u2705 **\u0424\u0430\u0439\u043B \u0443\u0434\u0430\u043B\u0435\u043D**",
-  "keyboard.upload": "\u{1F4E4} \u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0438\u043D\u0441\u0442\u0440\u0443\u043A\u0446\u0438\u044E",
-  "keyboard.tasks": "\u{1F527} \u0417\u0430\u0434\u0430\u0447\u0438",
-  "keyboard.storage": "\u{1F4CA} \u0425\u0440\u0430\u043D\u0435\u043D\u0438\u0435",
-  "keyboard.more": "\u2630 \u0415\u0449\u0435",
-  "keyboard.cancel": "\u041E\u0442\u043C\u0435\u043D\u0430",
-  "help.body": "\u{1F4D6} **\u041F\u043E\u043C\u043E\u0449\u044C**\n\n\u{1F4E4} \u041E\u0442\u043F\u0440\u0430\u0432\u043A\u0430 \u0438\u043B\u0438 \u043F\u0435\u0440\u0435\u0441\u044B\u043B\u043A\u0430 \u0444\u0430\u0439\u043B\u043E\u0432: \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043D\u0430\u043F\u0440\u044F\u043C\u0443\u044E\n\u{1F517} \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 URL-\u0430\u0434\u0440\u0435\u0441 \u0432\u0438\u0434\u0435\u043E: \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u043E\u0440\u043C\u0430\u0442 \u043F\u043E\u0441\u043B\u0435 \u0430\u043D\u0430\u043B\u0438\u0437\u0430\n\u{1F4E5} \u0417\u0430\u0434\u0430\u0447\u0438: \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u043F\u0440\u043E\u0433\u0440\u0435\u0441\u0441\u0430, \u043F\u0430\u0443\u0437\u0430 \u0438\u043B\u0438 \u043E\u0442\u043C\u0435\u043D\u0430.\n\u{1F4C1} \u041C\u0435\u0441\u0442\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \u0438 \u043C\u0435\u0441\u0442\u043E \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F.\n\u{1F4E1} \u041A\u0430\u043D\u0430\u043B\u044B: \u0441\u043A\u0430\u0447\u0438\u0432\u0430\u0439\u0442\u0435 \u043F\u043E \u0434\u0430\u0442\u0435/\u0442\u0435\u0433\u0443 \u0438\u043B\u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u044F\u0439\u0442\u0435 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0430\u043C\u0438.\n\u{1F310} /language: \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u044F\u0437\u044B\u043A \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430.\n\n\u{1F447} \u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0443\u043D\u043A\u0446\u0438\u044E \u043D\u0438\u0436\u0435.",
-  "notification.digestTitle": "\u{1F4EC} **\u0414\u0430\u0439\u0434\u0436\u0435\u0441\u0442 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439**",
-  "notification.settingsTitle": "\u{1F514} **\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439**",
-  "notification.securityImmediate": "\u041F\u0440\u0435\u0434\u0443\u043F\u0440\u0435\u0436\u0434\u0435\u043D\u0438\u044F \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438 \u0432\u0441\u0435\u0433\u0434\u0430 \u0434\u043E\u0441\u0442\u0430\u0432\u043B\u044F\u044E\u0442\u0441\u044F \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E.",
-  "notification.clickToChange": "\u{1F447} \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0443.",
-  "notifications.digestTitle": "\u{1F4EC} **\u0414\u0430\u0439\u0434\u0436\u0435\u0441\u0442 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439**",
-  "notifications.title": "\u{1F514} **\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439**",
-  "notifications.securityAlways": "\u041F\u0440\u0435\u0434\u0443\u043F\u0440\u0435\u0436\u0434\u0435\u043D\u0438\u044F \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438 \u0432\u0441\u0435\u0433\u0434\u0430 \u0434\u043E\u0441\u0442\u0430\u0432\u043B\u044F\u044E\u0442\u0441\u044F \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E.",
-  "notifications.clickToChange": "\u{1F447} \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0443.",
-  "notifications.successImmediate": "\u0423\u0441\u043F\u0435\u0445 \xB7 \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u044B\u0439",
-  "notifications.successDigest": "\u0423\u0441\u043F\u0435\u0445 \xB7 \u0434\u0430\u0439\u0434\u0436\u0435\u0441\u0442",
-  "notifications.successOff": "\u0423\u0441\u043F\u0435\u0445 \xB7 \u0432\u044B\u043A\u043B.",
-  "notifications.invalidTimezone": "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u0447\u0430\u0441\u043E\u0432\u043E\u0439 \u043F\u043E\u044F\u0441",
-  "notifications.failureImmediate": "\u041D\u0435\u0443\u0434\u0430\u0447\u0430 \xB7 \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u0430\u044F",
-  "notifications.failureDigest": "\u041D\u0435\u0443\u0434\u0430\u0447\u0430 \xB7 \u043F\u0435\u0440\u0435\u0432\u0430\u0440\u0438\u0442\u044C",
-  "notifications.subscriptionImmediate": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \xB7 \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u0430\u044F",
-  "notifications.subscriptionDigest": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \xB7 \u0434\u0430\u0439\u0434\u0436\u0435\u0441\u0442",
-  "notifications.quietPreset": "\u0422\u0438\u0445\u043E 22:00\u201307:00",
-  "notifications.quietOff": "\u041E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0442\u0438\u0445\u0438\u0435 \u0447\u0430\u0441\u044B",
-  "notifications.timezoneShanghai": "\u0427\u0430\u0441\u043E\u0432\u043E\u0439 \u043F\u043E\u044F\u0441 \xB7 \u0428\u0430\u043D\u0445\u0430\u0439",
-  "notifications.timezoneUtc": "\u0427\u0430\u0441\u043E\u0432\u043E\u0439 \u043F\u043E\u044F\u0441 \xB7 UTC",
-  "notifications.modeImmediate": "\u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u044B\u0439",
-  "notifications.modeDigest": "\u043F\u0435\u0440\u0435\u0432\u0430\u0440\u0438\u0432\u0430\u0442\u044C",
-  "notifications.modeDigestCombined": "\u043F\u0435\u0440\u0435\u0432\u0430\u0440\u0438\u0432\u0430\u0442\u044C",
-  "notifications.modeOff": "\u0432\u044B\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044B\u0439",
-  "notifications.quietDisabled": "\u0432\u044B\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044B\u0439",
-  "notifications.settingsModes": "\u041E\u0448\u0438\u0431\u043A\u0430: {failure} | \u0423\u0441\u043F\u0435\u0445: {success}",
-  "notifications.settingsSchedule": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430: {subscription} | \u0422\u0438\u0445\u043E: {quiet}",
-  "notifications.settingsTimezone": "\u0427\u0430\u0441\u043E\u0432\u043E\u0439 \u043F\u043E\u044F\u0441: {timezone}",
-  "notifications.error.timezoneRequired": "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0447\u0430\u0441\u043E\u0432\u043E\u0439 \u043F\u043E\u044F\u0441, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 \u0410\u0437\u0438\u044F/\u0428\u0430\u043D\u0445\u0430\u0439.",
-  "notifications.error.quietFormat": "\u0412 \u0442\u0438\u0445\u0438\u0435 \u0447\u0430\u0441\u044B \u043D\u0435\u043E\u0431\u0445\u043E\u0434\u0438\u043C\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0444\u043E\u0440\u043C\u0430\u0442 \u0427\u0427:\u041C\u041C-\u0427\u0427:\u041C\u041C, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 22:00\u201307:00; \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0442\u0438\u0445\u043E\u0435 \u0432\u044B\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435, \u0447\u0442\u043E\u0431\u044B \u043E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0438\u0445",
-  "notifications.error.successMode": "\u0423\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F \u043E\u0431 \u0443\u0441\u043F\u0435\u0445\u0435 \u0434\u043E\u043B\u0436\u043D\u044B \u0431\u044B\u0442\u044C \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u044B\u043C\u0438, \u043A\u0440\u0430\u0442\u043A\u0438\u043C\u0438 \u0438\u043B\u0438 \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044B\u043C\u0438.",
-  "notifications.error.deliveryMode": "\u0414\u043E\u0441\u0442\u0430\u0432\u043A\u0430 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439 \u0434\u043E\u043B\u0436\u043D\u0430 \u0431\u044B\u0442\u044C \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E\u0439 \u0438\u043B\u0438 \u0434\u0430\u0439\u0434\u0436\u0435\u0441\u0442\u043E\u0432\u043E\u0439.",
-  "notifications.error.unknownSetting": "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430. \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /\u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F, \u0447\u0442\u043E\u0431\u044B \u0443\u0432\u0438\u0434\u0435\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0435 \u0432\u0430\u0440\u0438\u0430\u043D\u0442\u044B.",
-  "channels.errors.sourceAllowlistRequired": "\u0411\u0435\u043B\u044B\u0439 \u0441\u043F\u0438\u0441\u043E\u043A \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u043E\u0432 Telegram \u043D\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D. \u0427\u0438\u0441\u043B\u043E\u0432\u044B\u0435 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u044B, \u0447\u0430\u0441\u0442\u043D\u044B\u0435 \u0447\u0430\u0442\u044B \u0438 \u0447\u0430\u0441\u0442\u043D\u044B\u0435 \u0433\u0440\u0443\u043F\u043F\u044B \u0437\u0430\u043F\u0440\u0435\u0449\u0435\u043D\u044B. \u041D\u0430\u0441\u0442\u0440\u043E\u0439\u0442\u0435 TELEGRAM_ALLOWED_SOURCES.",
-  "channels.errors.sourceNotAllowed": "\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A {source} \u043D\u0435 \u0432\u043D\u0435\u0441\u0435\u043D \u0432 \u0441\u043F\u0438\u0441\u043E\u043A \u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u043D\u044B\u0445 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A Telegram.",
-  "channels.errors.downloaderNotReady": "\u0417\u0430\u0433\u0440\u0443\u0437\u0447\u0438\u043A \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u043D\u0435 \u0433\u043E\u0442\u043E\u0432",
-  "channels.errors.sourceRequired": "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u0430\u043D\u0430\u043B",
-  "channels.errors.inviteExpired": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u044F \u043D\u0430 \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0443 \u0438\u0441\u0442\u0435\u043A. \u041F\u043E\u043B\u0443\u0447\u0438\u0442\u0435 \u043D\u043E\u0432\u043E\u0435 \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u0438\u043B\u0438 \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0438\u0442\u0435\u0441\u044C \u043A \u0442\u043E\u0439 \u0436\u0435 \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438 Telegram, \u043A\u043E\u0442\u043E\u0440\u0430\u044F \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043B\u0430\u0441\u044C \u0434\u043B\u044F \u0441\u043E\u0437\u0434\u0430\u043D\u0438\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u043E\u0433\u043E \u0441\u0435\u0430\u043D\u0441\u0430, \u0430 \u0437\u0430\u0442\u0435\u043C \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443.",
-  "channels.errors.inviteInvalid": "\u042D\u0442\u043E \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u043D\u0430 \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u0432 \u0433\u0440\u0443\u043F\u043F\u0443 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E. \u0423\u0431\u0435\u0434\u0438\u0442\u0435\u0441\u044C, \u0447\u0442\u043E \u0441\u0441\u044B\u043B\u043A\u0430 \u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u0430, \u0438\u043B\u0438 \u0441\u043E\u0437\u0434\u0430\u0439\u0442\u0435 \u043D\u043E\u0432\u043E\u0435 \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435.",
-  "channels.errors.inviteAlreadyJoined": "\u0410\u043A\u043A\u0430\u0443\u043D\u0442 \u0443\u0436\u0435 \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0438\u043B\u0441\u044F, \u043D\u043E Telegram \u0432\u0435\u0440\u043D\u0443\u043B \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u043E\u0435 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u043A\u0430\u043D\u0430\u043B \u0435\u0449\u0435 \u0440\u0430\u0437.",
-  "channels.errors.inviteResolutionFailed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u0432 \u0433\u0440\u0443\u043F\u043F\u0443: {error}.",
-  "channels.errors.inviteNotJoined": "\u0423\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u043D\u0435 \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0438\u043B\u0430\u0441\u044C \u043A \u044D\u0442\u043E\u043C\u0443 \u0447\u0430\u0441\u0442\u043D\u043E\u043C\u0443 \u043A\u0430\u043D\u0430\u043B\u0443 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0435, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u0435\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u043D\u0435\u0432\u043E\u0437\u043C\u043E\u0436\u043D\u043E \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u0438 \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0438\u0442\u0435\u0441\u044C, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044F \u0442\u0443 \u0436\u0435 \u0443\u0447\u0435\u0442\u043D\u0443\u044E \u0437\u0430\u043F\u0438\u0441\u044C, \u043A\u043E\u0442\u043E\u0440\u0430\u044F \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043B\u0430\u0441\u044C \u0434\u043B\u044F \u0441\u043E\u0437\u0434\u0430\u043D\u0438\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u043E\u0433\u043E \u0441\u0435\u0430\u043D\u0441\u0430, \u0437\u0430\u0442\u0435\u043C \u0441\u043D\u043E\u0432\u0430 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443 \u0438\u043B\u0438 \u043A\u043E\u043C\u0430\u043D\u0434\u0443 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
-  "channels.errors.inviteMissingEntity": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u0432 \u0433\u0440\u0443\u043F\u043F\u0443, \u043F\u043E\u0441\u043A\u043E\u043B\u044C\u043A\u0443 Telegram \u043D\u0435 \u0432\u0435\u0440\u043D\u0443\u043B \u0447\u0438\u0442\u0430\u0435\u043C\u044B\u0439 \u043E\u0431\u044A\u0435\u043A\u0442. \u0423\u0431\u0435\u0434\u0438\u0442\u0435\u0441\u044C, \u0447\u0442\u043E \u0443\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u0432\u0441\u0435 \u0435\u0449\u0435 \u044F\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u043E\u043C.",
-  "channels.errors.hashtagRequired": "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0445\u044D\u0448\u0442\u0435\u0433",
-  "channels.errors.hashtagInvalid": "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0445\u0435\u0448\u0442\u0435\u0433 \u0432 \u0444\u043E\u0440\u043C\u0430\u0442\u0435 #example \u0431\u0435\u0437 \u043F\u0440\u043E\u0431\u0435\u043B\u043E\u0432.",
-  "channels.errors.subscriptionNotFound": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430",
-  "channels.errors.subscriptionDisabled": "\u042D\u0442\u0430 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u0430",
-  "channels.errors.noDownloadableMessages": "\u041D\u0435\u0442 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439, \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0445 \u0434\u043B\u044F \u0441\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u044F",
-  "channels.errors.sourceMessageUnavailable": "\u0418\u0441\u0445\u043E\u0434\u043D\u043E\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u0438\u043B\u0438 \u043D\u0435 \u0438\u043C\u0435\u0435\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043C\u043E\u0433\u043E \u043D\u043E\u0441\u0438\u0442\u0435\u043B\u044F.",
-  "channels.errors.fixedTargetProviderRequired": "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043F\u043E\u0441\u0442\u0430\u0432\u0449\u0438\u043A\u0430 \u0434\u043B\u044F \u0444\u0438\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u043E\u0439 \u0446\u0435\u043B\u0438 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438",
-  "channels.storageCooldown": "\u23F8\uFE0F \u041D\u0430 Google \u0414\u0438\u0441\u043A\u0435 \u0434\u043E\u0441\u0442\u0438\u0433\u043D\u0443\u0442 \u0441\u0435\u0433\u043E\u0434\u043D\u044F\u0448\u043D\u0438\u0439 \u043B\u0438\u043C\u0438\u0442 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.\n\n\u042D\u0442\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u0431\u044B\u043B\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438. \u041E\u0441\u0442\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435 \u0431\u0443\u0434\u0443\u0442 \u043F\u043E\u0442\u0435\u0440\u044F\u043D\u044B, \u0438 \u0432\u0430\u043C \u043D\u0435 \u043D\u0443\u0436\u043D\u043E \u043D\u0430\u0436\u0438\u043C\u0430\u0442\u044C \xAB\u0412\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C\xBB. \u042D\u0442\u043E \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0441\u0431\u0440\u043E\u0441\u0430 \u043A\u0432\u043E\u0442\u044B.\n\n\u0412\u0440\u0435\u043C\u044F \u043F\u043E\u0432\u0442\u043E\u0440\u0430: {retryAt}\n\u0417\u0430\u0434\u0430\u0447\u0430: {jobId}",
-  "channels.recoveryComplete": "\u267B\uFE0F \u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0438 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 {jobId}: {successful} \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D \u0443\u0441\u043F\u0435\u0448\u043D\u043E, {skipped} \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D, {failed} \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D.",
-  "subscriptions.syncComplete": "\u2705 \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u0443\u0435\u0442 \u043D\u043E\u0432\u044B\u0435 \u0444\u0430\u0439\u043B\u044B {found}; {skipped} \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D, \u0430 {failed} \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D.",
-  "subscriptions.syncCompleteContinues": "\u2705 \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u0443\u0435\u0442 \u043D\u043E\u0432\u044B\u0435 \u0444\u0430\u0439\u043B\u044B {found}; {skipped} \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D, \u0430 {failed} \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D. \u042D\u0442\u043E \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0434\u043E\u0441\u0442\u0438\u0433\u043B\u043E \u043F\u0440\u0435\u0434\u0435\u043B\u0430 \u0438\u043B\u0438 \u0432\u043E\u0437\u043D\u0438\u043A\u043B\u0438 \u0441\u0431\u043E\u0438, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u043E\u0441\u0442\u0430\u0432\u0448\u0438\u0435\u0441\u044F \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B \u0431\u0443\u0434\u0443\u0442 \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u0430\u043D\u044B \u043F\u0440\u0438 \u0431\u043E\u043B\u0435\u0435 \u043F\u043E\u0437\u0434\u043D\u0435\u043C \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0438.",
-  "subscriptions.disabled.inviteExpired": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430: \u0441\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u044F \u043D\u0430 \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0443 \u0438\u0441\u0442\u0435\u043A, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u043A\u043E\u043D\u0442\u0435\u043D\u0442 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435\u043B\u044C\u0437\u044F \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C. \u041F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u044F\u0439\u0442\u0435\u0441\u044C \u0441\u043D\u043E\u0432\u0430 \u0438\u043B\u0438 \u043E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u0441\u044B\u043B\u043A\u0443 \u043F\u0435\u0440\u0435\u0434 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0439 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u043E\u0439.",
-  "subscriptions.disabled.inviteInvalid": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430: \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u043D\u0430 \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u0432 \u0433\u0440\u0443\u043F\u043F\u0443 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u043A\u043E\u043D\u0442\u0435\u043D\u0442 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435\u043B\u044C\u0437\u044F \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0441\u0441\u044B\u043B\u043A\u0443 \u043F\u0435\u0440\u0435\u0434 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0439 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u043E\u0439.",
-  "subscriptions.disabled.notParticipant": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430: \u0443\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u044F\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0447\u043B\u0435\u043D\u043E\u043C \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0441\u0442\u043D\u043E\u0433\u043E \u043A\u0430\u043D\u0430\u043B\u0430 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u044B. \u041F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u044F\u0439\u0442\u0435\u0441\u044C \u043A \u043D\u0435\u043C\u0443 \u0435\u0449\u0435 \u0440\u0430\u0437, \u043F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443.",
-  "subscriptions.disabled.inaccessible": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430: \u0443\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u044D\u0442\u043E\u043C\u0443 \u043A\u0430\u043D\u0430\u043B\u0443 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0435. \u0412\u043E\u0437\u043C\u043E\u0436\u043D\u043E, \u043E\u043D \u0443\u0448\u0435\u043B, \u0431\u044B\u043B \u0443\u0434\u0430\u043B\u0435\u043D, \u0438\u043B\u0438 \u043A\u0430\u043D\u0430\u043B \u0442\u0435\u043F\u0435\u0440\u044C \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u0447\u0430\u0441\u0442\u043D\u044B\u043C. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0443 \u043F\u0435\u0440\u0435\u0434 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0439 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u043E\u0439.",
-  "subscriptions.disabled.unknown": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430: \u043A \u044D\u0442\u043E\u043C\u0443 \u043A\u0430\u043D\u0430\u043B\u0443 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0435 \u043D\u0435\u0432\u043E\u0437\u043C\u043E\u0436\u043D\u043E \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C ({error}). \u041F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443, \u0443\u0431\u0435\u0434\u0438\u0442\u0435\u0441\u044C, \u0447\u0442\u043E \u0443 \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438 \u0432\u0441\u0435 \u0435\u0449\u0435 \u0435\u0441\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F.",
-  "subscriptions.paused.inviteExpired": "\u26A0\uFE0F \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u044F \u043D\u0430 \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0443 \u0438\u0441\u0442\u0435\u043A, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u043A\u043E\u043D\u0442\u0435\u043D\u0442 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435\u043B\u044C\u0437\u044F \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C.\n\n\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u043E\u043F\u043E\u0432\u0435\u0449\u0435\u043D\u0438\u0435 \u0432 /tg_subs \u0438\u043B\u0438 /tg_sub. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u0441\u044B\u043B\u043A\u0443 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438, \u043F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0441\u043D\u043E\u0432\u0430 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443.",
-  "subscriptions.paused.inviteInvalid": "\u26A0\uFE0F \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u041F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435 \u043D\u0430 \u0447\u0430\u0441\u0442\u043D\u044B\u0439 \u043A\u0430\u043D\u0430\u043B \u0438\u043B\u0438 \u0432 \u0433\u0440\u0443\u043F\u043F\u0443 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u043A\u043E\u043D\u0442\u0435\u043D\u0442 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435\u043B\u044C\u0437\u044F \u0440\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044C \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C.\n\n\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u043E\u043F\u043E\u0432\u0435\u0449\u0435\u043D\u0438\u0435 \u0432 /tg_subs \u0438\u043B\u0438 /tg_sub. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0441\u0441\u044B\u043B\u043A\u0443 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0443, \u043F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0441\u043D\u043E\u0432\u0430 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443.",
-  "subscriptions.paused.notParticipant": "\u26A0\uFE0F \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0423\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u044F\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0447\u043B\u0435\u043D\u043E\u043C \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0441\u0442\u043D\u043E\u0433\u043E \u043A\u0430\u043D\u0430\u043B\u0430 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u044B, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0435\u043D\u0430.\n\n\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u043E\u043F\u043E\u0432\u0435\u0449\u0435\u043D\u0438\u0435 \u0432 /tg_subs \u0438\u043B\u0438 /tg_sub. \u041F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u044F\u0439\u0442\u0435\u0441\u044C \u0435\u0449\u0435 \u0440\u0430\u0437 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438, \u043F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0441\u043D\u043E\u0432\u0430 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443.",
-  "subscriptions.paused.inaccessible": "\u26A0\uFE0F \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0423\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u044D\u0442\u043E\u043C\u0443 \u043A\u0430\u043D\u0430\u043B\u0443 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0435. \u0412\u043E\u0437\u043C\u043E\u0436\u043D\u043E, \u043E\u043D \u0443\u0448\u0435\u043B, \u0431\u044B\u043B \u0443\u0434\u0430\u043B\u0435\u043D, \u0438\u043B\u0438 \u043A\u0430\u043D\u0430\u043B \u0442\u0435\u043F\u0435\u0440\u044C \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u0447\u0430\u0441\u0442\u043D\u044B\u043C.\n\n\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u043E\u043F\u043E\u0432\u0435\u0449\u0435\u043D\u0438\u0435 \u0432 /tg_subs \u0438\u043B\u0438 /tg_sub. \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438, \u043F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0441\u043D\u043E\u0432\u0430 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443.",
-  "subscriptions.paused.unknown": "\u26A0\uFE0F \u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0430 {source} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u041A \u044D\u0442\u043E\u043C\u0443 \u043A\u0430\u043D\u0430\u043B\u0443 \u0438\u043B\u0438 \u0433\u0440\u0443\u043F\u043F\u0435 \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C \u0434\u043E\u0441\u0442\u0443\u043F \u0438\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C ({error}).\n\n\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u043E\u043F\u043E\u0432\u0435\u0449\u0435\u043D\u0438\u0435 \u0432 /tg_subs \u0438\u043B\u0438 /tg_sub. \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u043E\u0441\u0442\u0443\u043F \u043A \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438, \u043F\u0440\u0435\u0436\u0434\u0435 \u0447\u0435\u043C \u0441\u043D\u043E\u0432\u0430 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443.",
-  "ads.reason.allowRule": "\u0421\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u0440\u0430\u0437\u0440\u0435\u0448\u0430\u044E\u0449\u0435\u043C\u0443 \u043F\u0440\u0430\u0432\u0438\u043B\u0443",
-  "ads.reason.blockedTemplate": "\u0421\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043D\u043E\u043C\u0443 \u0440\u0435\u043A\u043B\u0430\u043C\u043D\u043E\u043C\u0443 \u0448\u0430\u0431\u043B\u043E\u043D\u0443.",
-  "ads.reason.blockRule": "\u0421\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u043F\u0440\u0430\u0432\u0438\u043B\u0443 \u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u043A\u0438",
-  "ads.reason.normalTemplate": "\u041F\u043E\u0445\u043E\u0436\u0435 \u043D\u0430 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043D\u044B\u0439 \u043D\u043E\u0440\u043C\u0430\u043B\u044C\u043D\u044B\u0439 \u043A\u043E\u043D\u0442\u0435\u043D\u0442",
-  "ads.reason.adHistoryTemplate": "\u041E\u0447\u0435\u043D\u044C \u043F\u043E\u0445\u043E\u0436\u0435 \u043D\u0430 \u043F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0438\u0439 \u0440\u0435\u043A\u043B\u0430\u043C\u043D\u044B\u0439 \u0448\u0430\u0431\u043B\u043E\u043D.",
-  "ads.reason.transactionContact": "\u0421\u043E\u0434\u0435\u0440\u0436\u0438\u0442 \u043A\u043E\u043C\u043C\u0435\u0440\u0447\u0435\u0441\u043A\u043E\u0435 \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0438 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0443\u044E \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044E \u0437\u0430 \u043F\u0440\u0435\u0434\u0435\u043B\u0430\u043C\u0438 \u043F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u044B.",
-  "ads.reason.transactionIntent": "\u0421\u043E\u0434\u0435\u0440\u0436\u0438\u0442 \u043F\u0440\u043E\u0434\u0430\u044E\u0449\u0438\u0435 \u0438\u043B\u0438 \u0440\u0435\u043A\u043B\u0430\u043C\u043D\u044B\u0435 \u0442\u0435\u043A\u0441\u0442\u044B",
-  "ads.reason.ctaLink": "\u0421\u043E\u0434\u0435\u0440\u0436\u0438\u0442 \u043F\u0440\u0438\u0437\u044B\u0432 \u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044E \u0438 \u0432\u043D\u0435\u0448\u043D\u0438\u0439 \u043F\u0443\u043D\u043A\u0442 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F.",
-  "ads.reason.callToAction": "\u0421\u043E\u0434\u0435\u0440\u0436\u0438\u0442 \u0437\u0430\u043C\u0435\u0442\u043D\u044B\u0439 \u043F\u0440\u0438\u0437\u044B\u0432 \u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044E.",
-  "ads.reason.linkDensity": "\u0421\u043E\u0434\u0435\u0440\u0436\u0438\u0442 \u043C\u043D\u043E\u0436\u0435\u0441\u0442\u0432\u043E \u0432\u043D\u0435\u0448\u043D\u0438\u0445 \u0441\u0441\u044B\u043B\u043E\u043A \u0438\u043B\u0438 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u044B\u0445 \u0434\u0430\u043D\u043D\u044B\u0445.",
-  "ads.reason.scarcity": "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442 \u044F\u0437\u044B\u043A \u0441\u0440\u043E\u0447\u043D\u043E\u0441\u0442\u0438 \u0438\u043B\u0438 \u0434\u0435\u0444\u0438\u0446\u0438\u0442\u0430",
-  "ads.reason.decorativeMarketing": "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442 \u043C\u043D\u043E\u0436\u0435\u0441\u0442\u0432\u043E \u0440\u0435\u043A\u043B\u0430\u043C\u043D\u044B\u0445 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432.",
-  "task.pause": "\u23F8 \u041F\u0430\u0443\u0437\u0430",
-  "task.resume": "\u25B6\uFE0F \u0420\u0435\u0437\u044E\u043C\u0435",
-  "task.cancel": "\u{1F6D1} \u041E\u0442\u043C\u0435\u043D\u0430",
-  "task.retryFailed": "\u{1F504} \u041D\u0435\u0443\u0434\u0430\u0447\u043D\u044B\u0435 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u044B\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0438 ({count})",
-  "task.failureDetails": "\u041F\u043E\u0434\u0440\u043E\u0431\u043D\u043E\u0441\u0442\u0438 \u0441\u0431\u043E\u044F",
-  "upload.success": "\u2705 **\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430!**",
-  "upload.failed": "\u274C **\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C**",
-  "upload.downloading": "\u23F3 **\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435**",
-  "upload.saving": "\u{1F4BE} **\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u044E...**",
-  "upload.queued": "\u23F3 **\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D \u0432 \u043E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438**",
-  "upload.retrying": "\u{1F504} **\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C; \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u0430\u044F \u043F\u043E\u043F\u044B\u0442\u043A\u0430...**",
-  "upload.duplicateSkipped": "\u23ED\uFE0F **\u0414\u0443\u0431\u043B\u0438\u043A\u0430\u0442 \u0444\u0430\u0439\u043B\u0430 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D**",
-  "upload.reason": "\u041F\u0440\u0438\u0447\u0438\u043D\u0430: {error}",
-  "upload.currentQueue": "\u{1F4CA} \u041E\u0447\u0435\u0440\u0435\u0434\u044C: \u0437\u0430\u0434\u0430\u0447\u0438 {count}",
-  "upload.wait": "\u{1F4A1} \u0411\u043E\u0442 \u0431\u0443\u0434\u0435\u0442 \u043E\u0431\u0440\u0430\u0431\u0430\u0442\u044B\u0432\u0430\u0442\u044C \u0437\u0430\u0434\u0430\u0447\u0438 \u043F\u043E \u043F\u043E\u0440\u044F\u0434\u043A\u0443. \u041F\u043E\u0436\u0430\u043B\u0443\u0439\u0441\u0442\u0430, \u043F\u043E\u0434\u043E\u0436\u0434\u0438\u0442\u0435.",
-  "upload.duplicateCopiedOutcome": "\u267B\uFE0F \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u043E\u0432: \u043A\u043E\u043F\u0438\u044F \u0441\u043E\u0437\u0434\u0430\u043D\u0430.",
-  "upload.duplicateSkippedOutcome": "\u23ED\uFE0F \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u043E\u0432: \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E.",
-  "upload.manageHint": "\u{1F447} \u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u0435 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u044D\u0442\u0438\u043C \u0444\u0430\u0439\u043B\u043E\u043C \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u041F\u043E\u0438\u0441\u043A \u0444\u0430\u0439\u043B\u043E\u0432 \u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0438\u043C\u0438\xBB.",
-  "upload.failureRetryNote": "\u{1F504} \u0411\u043E\u043B\u044C\u0448\u0438\u0435 \u0444\u0430\u0439\u043B\u044B \u043C\u043E\u0433\u0443\u0442 \u0432\u044B\u0439\u0442\u0438 \u0438\u0437 \u0441\u0442\u0440\u043E\u044F \u0438\u0437-\u0437\u0430 \u043D\u0435\u0441\u0442\u0430\u0431\u0438\u043B\u044C\u043D\u043E\u0441\u0442\u0438 \u0441\u0435\u0442\u0438, \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u0439 \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 Telegram \u0438\u043B\u0438 \u043F\u0440\u0435\u0440\u0432\u0430\u043D\u043D\u043E\u0439 \u043F\u0435\u0440\u0435\u0434\u0430\u0447\u0438. \u0411\u043E\u0442 \u0443\u0436\u0435 \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u043B \u043F\u043E\u043F\u044B\u0442\u043A\u0443.",
-  "upload.failureAdvice": "\u{1F4A1} \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0444\u0430\u0439\u043B \u0435\u0449\u0435 \u0440\u0430\u0437 \u0438\u043B\u0438 \u0443\u043C\u0435\u043D\u044C\u0448\u0438\u0442\u0435 \u043F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u0438\u0437\u043C \u0441 \u043F\u043E\u043C\u043E\u0449\u044C\u044E /download_workers \u043F\u0435\u0440\u0435\u0434 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0439 \u043F\u043E\u043F\u044B\u0442\u043A\u043E\u0439.",
-  "upload.receipt.saved": "\u2705 **\u0424\u0430\u0439\u043B \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D**",
-  "upload.receipt.partial": "\u26A0\uFE0F **\u041F\u0430\u0440\u0442\u0438\u044F \u0447\u0430\u0441\u0442\u0438\u0447\u043D\u043E \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430**",
-  "upload.receipt.failed": "\u274C **\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C**",
-  "upload.receipt.processing": "\u23F3 **\u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430**",
-  "upload.receipt.stats": "\u{1F4CA} \u0412\u0441\u0435\u0433\u043E {total} \xB7 \u0443\u0441\u043F\u0435\u0448\u043D\u043E {successful} \xB7 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u043E {failed}",
-  "upload.receipt.duplicateCopied": "\u267B\uFE0F \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u043E\u0432: \u043A\u043E\u043F\u0438\u044F \u0441\u043E\u0437\u0434\u0430\u043D\u0430.",
-  "upload.receipt.duplicateSkipped": "\u23ED\uFE0F \u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u043E\u0432: \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E.",
-  "upload.receipt.task": "\u0417\u0430\u0434\u0430\u0447\u0430: {taskId}",
-  "upload.receipt.findFolder": "\u0418\u0441\u043A\u0430\u0442\u044C \u0432 \u0442\u043E\u0439 \u0436\u0435 \u043F\u0430\u043F\u043A\u0435",
-  "upload.receipt.deleteFile": "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0444\u0430\u0439\u043B",
-  "upload.existingId": "\u{1F194} \u0421\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0439: {id}",
-  "upload.duplicateCopyAdvice": "\u0427\u0442\u043E\u0431\u044B \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0435\u0449\u0435 \u043E\u0434\u043D\u0443 \u043A\u043E\u043F\u0438\u044E, \u043E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \xAB\u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u043E\u0432 \u0444\u0430\u0439\u043B\u043E\u0432\xBB \u0438 \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \xAB\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u043A\u043E\u043F\u0438\u044E\xBB.",
-  "upload.taskCancelled.title": "\u{1F6D1} **\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u0437\u0430\u0434\u0430\u0447\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430**",
-  "upload.taskCancelled.id": "\u{1F194} \u0417\u0430\u0434\u0430\u0447\u0430: `{taskId}`",
-  "upload.taskCancelled.completed": "\u2705 \u0412\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043E: \u0444\u0430\u0439\u043B\u044B {count}.",
-  "upload.taskCancelled.failed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C: \u0444\u0430\u0439\u043B\u044B {count}.",
-  "upload.taskCancelled.stopped": "\u{1F6AB} \u041E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E/\u043E\u0447\u0438\u0449\u0435\u043D\u043E: \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 {count} \u0438\u043B\u0438 \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0435 \u0437\u0430\u0434\u0430\u0447\u0438.",
-  "upload.taskCancelled.controlsRemoved": "\u042D\u043B\u0435\u043C\u0435\u043D\u0442\u044B \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F \u043F\u0430\u0443\u0437\u043E\u0439, \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435\u043C \u0438 \u043E\u0442\u043C\u0435\u043D\u043E\u0439 \u0431\u044B\u043B\u0438 \u0443\u0434\u0430\u043B\u0435\u043D\u044B. \u0421\u0442\u0430\u0440\u044B\u0435 \u043A\u043D\u043E\u043F\u043A\u0438 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0431\u0443\u0434\u0443\u0442 \u0432\u043B\u0438\u044F\u0442\u044C \u043D\u0430 \u044D\u0442\u0443 \u0437\u0430\u0434\u0430\u0447\u0443.",
-  "upload.error.unknown": "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430",
-  "upload.failedDetail.batch": "{name}: \u0441\u0431\u043E\u0438 {count}",
-  "upload.cleanup.expired": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438 \u043E\u0447\u0438\u0441\u0442\u043A\u0438 \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442",
-  "upload.cleanup.success": "\u2705 \u0423\u0434\u0430\u043B\u0435\u043D\u044B \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u0434\u043B\u044F {fileName} ({size})",
-  "upload.cleanup.failed": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C: {error}.",
-  "taskCenter.kind.single": "\u041E\u0434\u0438\u043D \u0444\u0430\u0439\u043B",
-  "taskCenter.kind.album": "\u0410\u043B\u044C\u0431\u043E\u043C",
-  "taskCenter.kind.channel": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430",
-  "taskCenter.state.running": "\u0411\u0435\u0433",
-  "taskCenter.state.waiting": "\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 \u043D\u0430\u0447\u0430\u043B\u0430",
-  "taskCenter.state.pausing": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u0435 \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0444\u0430\u0439\u043B\u0430",
-  "taskCenter.state.paused": "\u041F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E",
-  "taskCenter.state.cooling": "\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u0435",
-  "taskCenter.state.failed": "\u041D\u0435\u0443\u0441\u043F\u0435\u0448\u043D\u044B\u0439",
-  "taskCenter.age.justNow": "\u041F\u0440\u044F\u043C\u043E \u0441\u0435\u0439\u0447\u0430\u0441",
-  "taskCenter.age.minutes": "{count} \u043C\u0438\u043D\u0443\u0442\u0443 \u043D\u0430\u0437\u0430\u0434",
-  "taskCenter.age.hours": "{count} \u0447\u0430\u0441 \u043D\u0430\u0437\u0430\u0434",
-  "taskCenter.age.days": "{count} \u0434\u043D \u043D\u0430\u0437\u0430\u0434",
-  "taskCenter.progress.active": "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 {count}",
-  "taskCenter.progress.pending": "\u041E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F {count}",
-  "taskCenter.progress.failed": "\u041E\u0448\u0438\u0431\u043A\u0430 {count}",
-  "taskCenter.progress.skipped": "\u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D {count}",
-  "taskCenter.title": "\u{1F4E5} **\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0437\u0430\u0434\u0430\u043D\u0438\u044F**",
-  "taskCenter.summary": "\u{1F7E2} \u0417\u0430\u043F\u0443\u0441\u043A {running}\u23F3 \u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 {waiting}\u23F8 \u041F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E {paused}",
-  "taskCenter.summaryCooling": "\u{1F9CA} \u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 {count}",
-  "taskCenter.total": "{count} \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0435 \u0437\u0430\u0434\u0430\u0447\u0438",
-  "taskCenter.totalPaged": "\u0410\u043A\u0442\u0438\u0432\u043D\u044B\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 {count} \xB7 \u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 {page}/{totalPages}",
-  "taskCenter.item.current": "{kind} \xB7 {progress} \xB7 \u0422\u0435\u043A\u0443\u0449\u0438\u0439: {file}",
-  "taskCenter.item.state": "{kind} \xB7 {progress} \xB7 {state}",
-  "taskCenter.openHint": "\u041A\u043E\u0441\u043D\u0438\u0442\u0435\u0441\u044C \u043D\u043E\u043C\u0435\u0440\u0430, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u043F\u043E\u0434\u0440\u043E\u0431\u043D\u043E\u0441\u0442\u0438 \u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u044F\u0442\u044C \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0435\u0439.",
-  "taskCenter.button.previous": "\u25C0\uFE0F \u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0438\u0439",
-  "taskCenter.button.refresh": "\u{1F504} \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C",
-  "taskCenter.button.next": "\u0414\u0430\u043B\u044C\u0448\u0435 \u25B6\uFE0F",
-  "taskCenter.button.start": "\u25B6\uFE0F \u0420\u0430\u0441\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043F\u0440\u0438\u043E\u0440\u0438\u0442\u0435\u0442\u044B",
-  "taskCenter.button.pause": "\u23F8 \u041F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0437\u0430\u0434\u0430\u0447\u0443",
-  "taskCenter.button.resume": "\u25B6\uFE0F \u0420\u0435\u0437\u044E\u043C\u0435",
-  "taskCenter.button.undoPause": "\u25B6\uFE0F \u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0430\u0439\u0442\u0435 \u0431\u0435\u0436\u0430\u0442\u044C",
-  "taskCenter.button.retry": "\u{1F504} \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C \u043F\u043E\u043F\u044B\u0442\u043A\u0443",
-  "taskCenter.button.cancel": "\u{1F6D1} \u041E\u0442\u043C\u0435\u043D\u0430",
-  "taskCenter.button.backList": "\u21A9\uFE0F \u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u043A \u0437\u0430\u0434\u0430\u0447\u0430\u043C",
-  "taskCenter.button.confirmCancel": "\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0443",
-  "taskCenter.button.backDetail": "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u043A \u0434\u0435\u0442\u0430\u043B\u044F\u043C",
-  "taskCenter.untitled": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0431\u0435\u0437 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044F",
-  "taskCenter.detail.type": "\u0422\u0438\u043F: {value}",
-  "taskCenter.detail.source": "\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {value}",
-  "taskCenter.detail.progress": "\u041F\u0440\u043E\u0433\u0440\u0435\u0441\u0441: {value}",
-  "taskCenter.detail.currentFile": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u0444\u0430\u0439\u043B: {value}",
-  "taskCenter.detail.targetFolder": "\u041C\u0435\u0441\u0442\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: {value}.",
-  "taskCenter.detail.reason": "\u041F\u0440\u0438\u0447\u0438\u043D\u0430: {value}",
-  "taskCenter.detail.created": "\u0421\u043E\u0437\u0434\u0430\u043D\u043E: {value}",
-  "taskCenter.detail.updated": "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u044F\u044F \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0441\u0442\u044C: {value}",
-  "taskCenter.detail.id": "\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u0437\u0430\u0434\u0430\u0447\u0438: {value}",
-  "taskCenter.protection.retryAt": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u0438\u0442 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u0443\u044E \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0443 \u043F\u043E\u0441\u043B\u0435 {value} \u0438 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442 \u0440\u0430\u0431\u043E\u0442\u0443.",
-  "taskCenter.protection.recheck": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u0440\u043E\u0432\u0435\u0440\u044F\u0435\u0442 \u043A\u0430\u0436\u0434\u044B\u0435 {count} \u0441\u0435\u043A\u0443\u043D\u0434 \u0438 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u044F\u0435\u0442 \u0440\u0430\u0431\u043E\u0442\u0443, \u043A\u043E\u0433\u0434\u0430 \u043F\u043E\u0437\u0432\u043E\u043B\u044F\u044E\u0442 \u0443\u0441\u043B\u043E\u0432\u0438\u044F.",
-  "taskCenter.protection.autoResume": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0443 \u0438 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442 \u0440\u0430\u0431\u043E\u0442\u0443, \u043A\u043E\u0433\u0434\u0430 \u043F\u043E\u0437\u0432\u043E\u043B\u044F\u0442 \u0443\u0441\u043B\u043E\u0432\u0438\u044F.",
-  "taskCenter.protection.manual": "\u042D\u0442\u043E \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u043D\u0435 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438. \u0423\u0441\u0442\u0440\u0430\u043D\u0438\u0442\u0435 \u043F\u0440\u0438\u0447\u0438\u043D\u0443 \u0438 \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443.",
-  "taskCenter.protection.paused": "\u0417\u0430\u0449\u0438\u0442\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u044B \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438; {recovery}",
-  "taskCenter.note.pausing": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u044F \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0444\u0430\u0439\u043B\u0430.",
-  "taskCenter.note.failed": "\u042D\u0442\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F. \u041A\u0430\u043A \u0442\u043E\u043B\u044C\u043A\u043E \u0432\u043D\u0435\u0448\u043D\u0438\u0435 \u0437\u0430\u043F\u0438\u0441\u0438 \u0431\u0443\u0434\u0443\u0442 \u0441\u043E\u0433\u043B\u0430\u0441\u043E\u0432\u0430\u043D\u044B, \u0432\u044B \u0441\u043C\u043E\u0436\u0435\u0442\u0435 \u0441\u043D\u043E\u0432\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0443.",
-  "taskCenter.note.start": "\xAB\u041F\u0440\u0438\u043E\u0440\u0438\u0442\u0435\u0442\xBB \u043F\u0435\u0440\u0435\u043C\u0435\u0449\u0430\u0435\u0442 \u044D\u0442\u0443 \u0437\u0430\u0434\u0430\u0447\u0443 \u0432 \u043D\u0430\u0447\u0430\u043B\u043E \u043E\u0447\u0435\u0440\u0435\u0434\u0438 \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u044F, \u043D\u0435 \u043F\u0440\u0435\u0440\u044B\u0432\u0430\u044F \u0442\u0435\u043A\u0443\u0449\u0443\u044E \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0443.",
-  "taskCenter.note.pause": "\u041F\u0440\u0438 \u043F\u0430\u0443\u0437\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0430\u0435\u0442\u0441\u044F \u0442\u0435\u043A\u0443\u0449\u0438\u0439 \u0444\u0430\u0439\u043B, \u0430 \u0437\u0430\u0442\u0435\u043C \u043F\u0440\u0435\u043A\u0440\u0430\u0449\u0430\u0435\u0442\u0441\u044F \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u043F\u043E\u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0445 \u0444\u0430\u0439\u043B\u043E\u0432 \u0432 \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0435.",
-  "taskCenter.cancel.title": "\u26A0\uFE0F **\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u044D\u0442\u043E \u0437\u0430\u0434\u0430\u043D\u0438\u0435?**",
-  "taskCenter.cancel.activeWarning": "\u0410\u043A\u0442\u0438\u0432\u043D\u0430\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0431\u0443\u0434\u0435\u0442 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430, \u0430 \u0435\u0435 \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0439 \u0444\u0430\u0439\u043B \u0431\u0443\u0434\u0435\u0442 \u0443\u0434\u0430\u043B\u0435\u043D. \u041E\u0436\u0438\u0434\u0430\u044E\u0449\u0438\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E \u043F\u043E\u043A\u0438\u043D\u0443\u0442 \u043E\u0447\u0435\u0440\u0435\u0434\u044C.",
-  "taskCenter.cancel.waitingWarning": "\u041E\u0436\u0438\u0434\u0430\u044E\u0449\u0438\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E \u043F\u043E\u043A\u0438\u043D\u0443\u0442 \u043E\u0447\u0435\u0440\u0435\u0434\u044C.",
-  "taskCenter.cancel.unaffected": "\u0414\u0440\u0443\u0433\u0438\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0431\u0443\u0434\u0443\u0442 \u0437\u0430\u0442\u0440\u043E\u043D\u0443\u0442\u044B.",
-  "taskCenter.stage.waiting": "\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 \u043D\u0430\u0447\u0430\u043B\u0430",
-  "taskCenter.stage.recovering": "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u043E\u0441\u043B\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438",
-  "taskCenter.stage.downloading": "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0438\u0441\u0445\u043E\u0434\u043D\u043E\u0433\u043E \u0444\u0430\u0439\u043B\u0430",
-  "taskCenter.stage.uploading": "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0432 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435",
-  "taskCenter.stage.processing": "\u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435",
-  "taskCenter.defaultAccount": "\u0423\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "taskCenter.cooldown.storageLimit": "\u0414\u043E\u0441\u0442\u0438\u0433\u043D\u0443\u0442 \u0434\u043D\u0435\u0432\u043D\u043E\u0439 \u043B\u0438\u043C\u0438\u0442 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u043D\u0430 Google \u0414\u0438\u0441\u043A",
-  "taskCenter.cooldown.floodWait": "\u041E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0430 \u0447\u0430\u0441\u0442\u043E\u0442\u0430 \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432 Telegram (FloodWait)",
-  "taskCenter.cooldown.autoResume": "{cause}; \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0443 \u0438 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442 \u0440\u0430\u0431\u043E\u0442\u0443",
-  "taskCenter.cooldown.autoResumeAt": "{cause}; \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u043E\u0435 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u043E\u0441\u043B\u0435 {time}",
-  "taskCenter.cooldown.system": "\u0412\u0440\u0435\u043C\u044F \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F \u0441\u0438\u0441\u0442\u0435\u043C\u044B",
-  "taskCenter.reason.userPaused": "\u041F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u043C",
-  "status.none": "\u041D\u0438\u043A\u0442\u043E",
-  "status.redacted": "[\u043E\u0442\u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u043E]",
-  "status.state.healthy": "\u0417\u0434\u043E\u0440\u043E\u0432\u044B\u0439",
-  "status.state.running": "\u0411\u0435\u0433",
-  "status.state.connected": "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043E",
-  "status.state.disabled": "\u041D\u0435\u043F\u043E\u043B\u043D\u043E\u0446\u0435\u043D\u043D\u044B\u0439",
-  "status.state.expired": "\u0421\u0440\u043E\u043A \u0441\u0435\u0430\u043D\u0441\u0430 \u0438\u0441\u0442\u0435\u043A",
-  "status.state.failed": "\u041E\u0448\u0438\u0431\u043A\u0430",
-  "status.state.unknown": "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439",
-  "status.state.cooldown": "\u041E\u0445\u043B\u0430\u0436\u0434\u0435\u043D\u0438\u0435",
-  "status.title": "\u{1FA7A} **\u0414\u0438\u0430\u0433\u043D\u043E\u0441\u0442\u0438\u043A\u0430 TG Vault**",
-  "status.requestId": "\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u0437\u0430\u043F\u0440\u043E\u0441\u0430: {requestId}",
-  "status.degraded": "(\u0434\u0435\u0433\u0440\u0430\u0434\u0438\u0440\u043E\u0432\u0430\u043B)",
-  "status.bot": "\u0411\u043E\u0442: {status}{degraded} \xB7 \u041F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0435 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435: {reconnectCount}",
-  "status.userClient": "\u0417\u0430\u0433\u0440\u0443\u0437\u0447\u0438\u043A \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0430: {status}{username}",
-  "status.accountRecovery": "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0430: {action}",
-  "status.storage": "\u0422\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435: {provider} \xB7 {accountName}",
-  "status.probe": "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0441\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u044F: {status}",
-  "status.recoveryTime": "\u0412\u0440\u0435\u043C\u044F \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F: {time}",
-  "status.storageError": "\u041E\u0448\u0438\u0431\u043A\u0430 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: {error}.",
-  "status.disk": "\u0412\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0439 \u0434\u0438\u0441\u043A: {free} \u0441\u0432\u043E\u0431\u043E\u0434\u0435\u043D / {total} \xB7 {usedPercent}% \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D.",
-  "status.queue": "\u041E\u0447\u0435\u0440\u0435\u0434\u044C: {active} \u0430\u043A\u0442\u0438\u0432\u0435\u043D \xB7 \u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 {pending} \xB7 \u041E\u0448\u0438\u0431\u043A\u0430 {failed}{paused}",
-  "status.queuePaused": "\xB7 \u043F\u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D \u043D\u0430 \u043F\u0430\u0443\u0437\u0443",
-  "status.subscriptions": "\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0438: {enabled} \u0432\u043A\u043B\u044E\u0447\u0435\u043D \xB7 \u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0435 \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435: {lastScan}",
-  "status.subscriptionError": "\u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438: {error}.",
-  "status.reconciliation": "\u0421\u043E\u0433\u043B\u0430\u0441\u043E\u0432\u0430\u043D\u0438\u0435: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F {pending} \xB7 \u0414\u043B\u044F {operatorRequired} \u0442\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u043E\u043F\u0435\u0440\u0430\u0442\u043E\u0440",
-  "status.advice": "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0430\u0446\u0438\u044F: {action}",
-  "status.defaultAdvice": "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0430\u0446\u0438\u044F: \u0435\u0441\u043B\u0438 \u043A\u043E\u043C\u043F\u043E\u043D\u0435\u043D\u0442 \u043D\u0435\u0440\u0430\u0431\u043E\u0442\u043E\u0441\u043F\u043E\u0441\u043E\u0431\u0435\u043D, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u0437\u0430\u043F\u0440\u043E\u0441\u0430, \u0447\u0442\u043E\u0431\u044B \u043D\u0430\u0439\u0442\u0438 \u0435\u0433\u043E \u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u0436\u0443\u0440\u043D\u0430\u043B\u044B.",
-  "path.preview": "\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u0435\u0442\u0441\u044F \u0432: {folder}/\u0438\u043C\u044F_\u0444\u0430\u0439\u043B\u0430 (\u043F\u0430\u043F\u043A\u0430 \u0441 \u0438\u043C\u0435\u043D\u0435\u043C \u043A\u0430\u043D\u0430\u043B\u0430 \u0438\u043B\u0438 \u0442\u0438\u043F\u043E\u043C \u0444\u0430\u0439\u043B\u0430 \u043D\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0435\u0442\u0441\u044F)",
-  "path.prompt.onceTitle": "\u{1F4CC} **\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u0430\u043F\u043A\u0443 \u0434\u043B\u044F \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438**",
-  "path.prompt.sessionTitle": "\u{1F4CD} **\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u0430\u043F\u043A\u0443 \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430**",
-  "path.prompt.sendFolder": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u0430\u043F\u043A\u0438:",
-  "path.prompt.onceExample": "\u041F\u0440\u0438\u043C\u0435\u0440: `PIXIV/DailyTop50`",
-  "path.prompt.sessionExample": "\u041F\u0440\u0438\u043C\u0435\u0440: `\u0410\u043B\u044C\u0431\u043E\u043C\u044B/2026-07`",
-  "path.prompt.recent": "\u041D\u0435\u0434\u0430\u0432\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u043F\u0430\u043F\u043A\u0438:",
-  "path.prompt.onceNote": "\u041F\u0440\u0438\u043C\u0435\u0447\u0430\u043D\u0438\u0435. \u042D\u0442\u043E \u043E\u0442\u043D\u043E\u0441\u0438\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043A \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u043C\u0443 \u0444\u0430\u0439\u043B\u0443, \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u0432\u0445\u043E\u0434\u0438\u0442 \u0432 \u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u043F\u0440\u043E\u0446\u0435\u0441\u0441 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
-  "path.prompt.sessionNote": "\u041F\u0440\u0438\u043C\u0435\u0447\u0430\u043D\u0438\u0435. \u042D\u0442\u043E \u043E\u0442\u043D\u043E\u0441\u0438\u0442\u0441\u044F \u043A \u043F\u043E\u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u043C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430\u043C \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435, \u043F\u043E\u043A\u0430 \u0432\u044B \u043D\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u0435 `/pc` \u0438\u043B\u0438 \u043D\u0435 \u043D\u0430\u0436\u043C\u0435\u0442\u0435 \xAB\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C\xBB.",
-  "path.prompt.cancel": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438 \u0431\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043A.",
-  "path.state.current": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u043F\u0443\u043D\u043A\u0442 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F: {value}.",
-  "path.state.custom": "{folder} (\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u0430\u044F \u043F\u0430\u043F\u043A\u0430)",
-  "path.state.automatic": "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044F",
-  "path.state.defaultExample": "\u041F\u0440\u0438\u043C\u0435\u0440 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E: `telegram/resources/images`",
-  "path.state.once": "\u{1F4CC} \u041F\u0430\u043F\u043A\u0430 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438: {value}.",
-  "path.state.session": "\u{1F4CD} \u041F\u0430\u043F\u043A\u0430 \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430: {value}",
-  "path.state.unset": "\u041D\u0435 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E",
-  "path.button.setOnce": "\u{1F4CC} \u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0443\u044E \u043F\u0430\u043F\u043A\u0443",
-  "path.button.setSession": "\u{1F4CD} \u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u0430\u043F\u043A\u0443 \u0447\u0430\u0442\u0430",
-  "path.button.recent": "\u{1F558} \u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u043F\u0430\u043F\u043A\u0438",
-  "path.button.clear": "\u{1F9F9} \u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u0443\u044E \u043F\u0430\u043F\u043A\u0443",
-  "path.settings.title": "\u{1F4C1} **\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435**",
-  "path.settings.defaultLogicTitle": "**\u041F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u0435 \u043F\u0440\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0438 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E**",
-  "path.settings.defaultLogic": "\u0411\u0435\u0437 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u043E\u0439 \u043F\u0430\u043F\u043A\u0438 \u0444\u0430\u0439\u043B\u044B \u0441\u043E\u0440\u0442\u0438\u0440\u0443\u044E\u0442\u0441\u044F \u043F\u043E \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u0443/\u043A\u0430\u043D\u0430\u043B\u0443 \u0438 \u0442\u0438\u043F\u0443 \u0444\u0430\u0439\u043B\u0430.",
-  "path.settings.examples": "\u041F\u0440\u0438\u043C\u0435\u0440\u044B: \xABtelegram/resources/images\xBB, \xABtelegram/resources/videos\xBB.",
-  "path.settings.customLogic": "\u0412 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u043E\u0439 \u043F\u0430\u043F\u043A\u0435 \u0444\u0430\u0439\u043B\u044B \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u044E\u0442\u0441\u044F \u043D\u0435\u043F\u043E\u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0435\u043D\u043D\u043E \u0432 \u043D\u0435\u0439 \u0431\u0435\u0437 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0438\u044F \u043F\u0430\u043F\u043E\u043A \u0441 \u0438\u043C\u0435\u043D\u0435\u043C \u043A\u0430\u043D\u0430\u043B\u0430 \u0438\u043B\u0438 \u0442\u0438\u043F\u0430\u043C\u0438 \u0444\u0430\u0439\u043B\u043E\u0432.",
-  "path.settings.currentTitle": "**\u0422\u0435\u043A\u0443\u0449\u0438\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u0443\u0442\u0438**",
-  "path.settings.choose": "\u{1F447} \u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043C\u0435\u0441\u0442\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F.",
-  "path.recent.title": "\u{1F558} **\u041D\u0435\u0434\u0430\u0432\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u043F\u0430\u043F\u043A\u0438**",
-  "path.recent.hint": "\u0427\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u043F\u0430\u043F\u043A\u0443, \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u0443\u044E \u043F\u0430\u043F\u043A\u0443 \u0438\u043B\u0438 \u043F\u0430\u043F\u043A\u0443 \u0447\u0430\u0442\u0430 \u0432 \xAB\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB, \u0430 \u0437\u0430\u0442\u0435\u043C \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0435\u0435 \u0438\u043C\u044F.",
-  "path.recent.empty": "\u{1F558} \u041D\u0435\u0442 \u043D\u0435\u0434\u0430\u0432\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0445 \u043F\u0430\u043F\u043E\u043A. \u041F\u0430\u043F\u043A\u0438 \u0437\u0430\u043F\u0438\u0441\u044B\u0432\u0430\u044E\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0442\u043E\u0433\u043E, \u043A\u0430\u043A \u0432\u044B \u0438\u0445 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435.",
-  "path.toast.recentSent": "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043D\u044B\u0435 \u043F\u0430\u043F\u043A\u0438",
-  "path.toast.sendFolder": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u0430\u043F\u043A\u0438 \u0438\u043B\u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438.",
-  "path.toast.updated": "\u041C\u0435\u0441\u0442\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u043E.",
-  "path.toast.cancelled": "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430 \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u044F \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.",
-  "bot.home.category.main": "\u042F\u0440\u043B\u044B\u043A\u0438",
-  "bot.home.category.files": "\u0424\u0430\u0439\u043B\u044B \u0438 \u043C\u0435\u0441\u0442\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F",
-  "bot.home.category.channels": "\u041A\u0430\u043D\u0430\u043B\u044B \u0438 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438",
-  "bot.home.category.settings": "\u0417\u0430\u0434\u0430\u0447\u0438 \u0438 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0438\u0441\u0442\u0435\u043C\u044B",
-  "bot.home.category.security": "\u0411\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C",
-  "bot.home.page": "\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 {page}/{totalPages}",
-  "bot.home.hint": "\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u044D\u0442\u0443 \u0444\u0443\u043D\u043A\u0446\u0438\u044E.",
-  "bot.home.uploadHint": "\u{1F4E4} \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043B\u0438 \u043F\u0435\u0440\u0435\u0448\u043B\u0438\u0442\u0435 \u0444\u0430\u0439\u043B \u0434\u043B\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.\n\n\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0438 \u043D\u0438\u0436\u0435 \u0434\u043B\u044F \u0437\u0430\u0434\u0430\u0447 \u0438\u043B\u0438 \u0434\u043E\u043F\u043E\u043B\u043D\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u0445 \u0444\u0443\u043D\u043A\u0446\u0438\u0439.",
-  "bot.home.logoutHint": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /logout, \u0447\u0442\u043E\u0431\u044B \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E \u043E\u0442\u043E\u0437\u0432\u0430\u0442\u044C \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044E \u0431\u043E\u0442\u0430 \u044D\u0442\u043E\u0433\u043E \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram.",
-  "bot.home.twoFactorHint": "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \xAB\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C \u0434\u0432\u0443\u0445\u0444\u0430\u043A\u0442\u043E\u0440\u043D\u0443\u044E \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044E\xBB \u0432 \u043A\u043E\u043C\u0430\u043D\u0434\u043D\u043E\u043C \u043C\u0435\u043D\u044E Telegram.",
-  "bot.home.prompt.oncePath": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0435\u0435 \u0434\u043B\u044F \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
-  "bot.home.prompt.sessionPath": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0430\u0442\u044C \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0435\u0435 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435.",
-  "bot.home.prompt.delete": "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0430\u0439\u043B \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u041F\u043E\u0438\u0441\u043A \u0444\u0430\u0439\u043B\u043E\u0432 \u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0438\u043C\u0438\xBB, \u0437\u0430\u0442\u0435\u043C \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u0423\u0434\u0430\u043B\u0438\u0442\u044C\xBB.",
-  "bot.home.prompt.cancelTask": "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0437\u0430\u0434\u0430\u0447\u0443, \u043A\u043E\u0442\u043E\u0440\u0443\u044E \u043D\u0443\u0436\u043D\u043E \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C, \u0432 \u0446\u0435\u043D\u0442\u0440\u0435 \u0437\u0430\u0434\u0430\u0447.",
-  "bot.home.prompt.unsubscribe": "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443, \u043A\u043E\u0442\u043E\u0440\u0443\u044E \u0445\u043E\u0442\u0438\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C, \u043D\u0430 \u043F\u0430\u043D\u0435\u043B\u0438 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0438 \u043D\u0430 \u043A\u0430\u043D\u0430\u043B.",
-  "bot.home.followPrompt": "{description}\n\n\u0421\u043B\u0435\u0434\u0443\u0439\u0442\u0435 \u0438\u043D\u0441\u0442\u0440\u0443\u043A\u0446\u0438\u044F\u043C \u0438\u043B\u0438 \u0432\u0435\u0440\u043D\u0438\u0442\u0435\u0441\u044C \u043A \u0440\u0430\u0437\u0434\u0435\u043B\u0443 \xAB\u0414\u043E\u043F\u043E\u043B\u043D\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u0435 \u0444\u0443\u043D\u043A\u0446\u0438\u0438\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0431\u0440\u0430\u0442\u044C \u0434\u0440\u0443\u0433\u043E\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435.",
-  "bot.home.unavailable": "\u042D\u0442\u043E\u0442 \u044F\u0440\u043B\u044B\u043A \u0432 \u043D\u0430\u0441\u0442\u043E\u044F\u0449\u0435\u0435 \u0432\u0440\u0435\u043C\u044F \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D.",
-  "bot.button.dateMode": "\u{1F5D3}\uFE0F \u0421\u043A\u0430\u0447\u0430\u0442\u044C \u043F\u043E \u0434\u0430\u0442\u0435",
-  "bot.button.tagMode": "\u{1F3F7}\uFE0F \u0421\u043A\u0430\u0447\u0430\u0442\u044C \u043F\u043E \u0442\u0435\u0433\u0443",
-  "bot.button.channelOnly": "\u0422\u043E\u043B\u044C\u043A\u043E \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0438 \u043D\u0430 \u043A\u0430\u043D\u0430\u043B\u0435",
-  "bot.button.channelComments": "\u041A\u0430\u043D\u0430\u043B + \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438",
-  "bot.button.editFolder": "\u270F\uFE0F \u0421\u043C\u0435\u043D\u0438\u0442\u044C \u043F\u0430\u043F\u043A\u0443",
-  "bot.button.clearFolder": "\u{1F9F9} \u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u043F\u0430\u043F\u043A\u0443",
-  "bot.button.unsubscribe": "\u041E\u0442\u043F\u0438\u0441\u0430\u0442\u044C\u0441\u044F",
-  "bot.button.previous": "\u25C0\uFE0F \u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0438\u0439",
-  "bot.button.next": "\u0414\u0430\u043B\u044C\u0448\u0435 \u25B6\uFE0F",
-  "bot.button.addSubscription": "\u2795 \u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0443",
-  "bot.button.bestVideo": "\u041B\u0443\u0447\u0448\u0435\u0435 \u0432\u0438\u0434\u0435\u043E",
-  "bot.button.audioOnly": "\u0422\u043E\u043B\u044C\u043A\u043E \u0430\u0443\u0434\u0438\u043E",
-  "bot.wizard.title.subscription": "\u{1F4E1} **\u0423\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0430\u043C\u0438 \u043D\u0430 \u043A\u0430\u043D\u0430\u043B\u044B**",
-  "bot.wizard.title.tag": "\u{1F3F7}\uFE0F **\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u0435 \u0444\u0430\u0439\u043B\u043E\u0432 \u043A\u0430\u043D\u0430\u043B\u0430 \u043F\u043E \u0442\u0435\u0433\u0443**",
-  "bot.wizard.title.date": "\u{1F5D3}\uFE0F **\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0444\u0430\u0439\u043B\u044B \u043A\u0430\u043D\u0430\u043B\u043E\u0432 \u043F\u043E \u0434\u0430\u0442\u0435**",
-  "bot.wizard.title.download": "\u{1F4E6} **\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0444\u0430\u0439\u043B\u044B \u043A\u0430\u043D\u0430\u043B\u043E\u0432**",
-  "bot.wizard.mode": "{title}\n\n\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0440\u0435\u0436\u0438\u043C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438:\n\u2022 \u041F\u043E \u0434\u0430\u0442\u0435: \u0444\u0430\u0439\u043B\u044B \u0432 \u0434\u0438\u0430\u043F\u0430\u0437\u043E\u043D\u0435 \u0434\u0430\u0442.\n\u2022 \u041F\u043E \u0442\u0435\u0433\u0443: \u0444\u0430\u0439\u043B\u044B \u0441 \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0435\u043D\u043D\u044B\u043C \u0442\u0435\u0433\u043E\u043C.\n\n\u{1F447} \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C.",
-  "bot.wizard.source": "{title}\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u043A\u0430\u043D\u0430\u043B\u0430 \u0438\u043B\u0438 \u0441\u0441\u044B\u043B\u043A\u0443.\n\u041F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u044E\u0442\u0441\u044F \u043E\u0431\u0449\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0435 \u043A\u0430\u043D\u0430\u043B\u044B, \u0447\u0430\u0441\u0442\u043D\u044B\u0435 \u0441\u0441\u044B\u043B\u043A\u0438 \u0434\u043B\u044F \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0439 \u0438 \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u043D\u044B\u0435 \u043A\u0430\u043D\u0430\u043B\u044B.\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB \u0434\u043B\u044F \u0432\u044B\u0445\u043E\u0434\u0430.",
-  "bot.wizard.path": "{title}\n\u{1F4CD} \u041A\u0430\u043D\u0430\u043B: {source}\n\n\u0425\u043E\u0442\u0438\u0442\u0435 \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u0443\u044E \u043F\u0430\u043F\u043A\u0443 \u0434\u043B\u044F \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0434\u043B\u044F {scope}?\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 \xABchannel-backup/wallpapers\xBB.\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 `skip`, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u043F\u0440\u0430\u0432\u0438\u043B\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E.\n\n\u042D\u0442\u0430 \u043F\u0430\u043F\u043A\u0430 \u043F\u0440\u0438\u043C\u0435\u043D\u0438\u043C\u0430 \u0442\u043E\u043B\u044C\u043A\u043E \u043A {scope}; \u044D\u0442\u043E \u043D\u0435 \u043C\u0435\u043D\u044F\u0435\u0442 /path_rules \u0438\u043B\u0438 \u0434\u0440\u0443\u0433\u0438\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB \u0434\u043B\u044F \u0432\u044B\u0445\u043E\u0434\u0430.",
-  "bot.wizard.scope.subscription": "\u044D\u0442\u0430 \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0430",
-  "bot.wizard.scope.newSubscription": "\u044D\u0442\u0430 \u043D\u043E\u0432\u0430\u044F \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0430",
-  "bot.wizard.scope.download": "\u044D\u0442\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438",
-  "bot.wizard.comments": "{title}\n\u{1F4CD} \u041A\u0430\u043D\u0430\u043B: {source}\n{folder}\n\n\u0422\u0430\u043A\u0436\u0435 \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0444\u0430\u0439\u043B\u044B \u0432 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u044F\u0445 \u043F\u043E\u0434 \u043F\u043E\u0441\u0442\u0430\u043C\u0438 \u043A\u0430\u043D\u0430\u043B\u0430?\n\n\u041F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u044D\u0442\u043E \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043E. \u0415\u0441\u043B\u0438 \u044D\u0442\u043E\u0442 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u0432\u043A\u043B\u044E\u0447\u0435\u043D, \u0434\u043B\u044F \u043A\u0430\u0436\u0434\u043E\u0433\u043E \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u0441\u043A\u0430\u043D\u0438\u0440\u0443\u0435\u0442\u0441\u044F \u0434\u043E \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0435\u0432 {count}.\n\u0422\u0435\u043A\u0441\u0442\u043E\u0432\u044B\u0435 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438, \u043E\u0431\u044B\u0447\u043D\u044B\u0435 \u0441\u0441\u044B\u043B\u043A\u0438 \u0438 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u0431\u0435\u0437 \u0444\u0430\u0439\u043B\u043E\u0432 \u0438\u0433\u043D\u043E\u0440\u0438\u0440\u0443\u044E\u0442\u0441\u044F.\n\n\u{1F447} \u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435, \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043B\u0438 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438.",
-  "bot.wizard.folder.custom": "\u{1F4C1} \u041F\u0430\u043F\u043A\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: {folder}.",
-  "bot.wizard.folder.default": "\u{1F4C1} \u041F\u0440\u0430\u0432\u0438\u043B\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044F",
-  "bot.wizard.tag": "{title}\n\u{1F4CD} \u041A\u0430\u043D\u0430\u043B: {source}\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0442\u0435\u0433 \u0434\u043B\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 #wallpaper \u0438\u043B\u0438 Wallpaper.\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB \u0434\u043B\u044F \u0432\u044B\u0445\u043E\u0434\u0430.",
-  "bot.wizard.startDate": "{title}\n\u{1F4CD} \u041A\u0430\u043D\u0430\u043B: {source}\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0434\u0430\u0442\u0443 \u043D\u0430\u0447\u0430\u043B\u0430 \u0432 \u0444\u043E\u0440\u043C\u0430\u0442\u0435 \xAB\u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414\xBB, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 \xAB01.06.2026\xBB.\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB \u0434\u043B\u044F \u0432\u044B\u0445\u043E\u0434\u0430.",
-  "bot.wizard.endDate": "{title}\n\u{1F4CD} \u041A\u0430\u043D\u0430\u043B: {source}\n\u{1F5D3}\uFE0F \u0414\u0430\u0442\u0430 \u043D\u0430\u0447\u0430\u043B\u0430: {startDate}.\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0434\u0430\u0442\u0443 \u043E\u043A\u043E\u043D\u0447\u0430\u043D\u0438\u044F \u0432 \u0444\u043E\u0440\u043C\u0430\u0442\u0435 \xAB\u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414\xBB, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 \xAB27 \u0438\u044E\u043D\u044F 2026 \u0433.\xBB.\n\n\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB \u0434\u043B\u044F \u0432\u044B\u0445\u043E\u0434\u0430.",
-  "bot.wizard.expired": "\u231B \u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u043C\u0430\u0441\u0442\u0435\u0440\u0430 \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0435\u0433\u043E \u0441\u043D\u043E\u0432\u0430.",
-  "bot.wizard.cancelled": "\u041C\u0430\u0441\u0442\u0435\u0440 \u043A\u0430\u043D\u0430\u043B\u043E\u0432 Telegram \u043E\u0442\u043C\u0435\u043D\u0435\u043D.",
-  "bot.wizard.invalidMode": "\u274C \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u0434\u0430\u0442\u0443\xBB \u0438\u043B\u0438 \xAB\u0442\u0435\u0433\xBB \u0438\u043B\u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438.",
-  "bot.wizard.invalidComments": "\u274C \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xAB\u0432\u043A\u043B\xBB \u0438\u043B\u0438 \xAB\u0432\u044B\u043A\u043B\xBB \u0438\u043B\u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0431\u0440\u0430\u0442\u044C, \u0432\u043A\u043B\u044E\u0447\u0430\u0442\u044C \u043B\u0438 \u0444\u0430\u0439\u043B\u044B \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0435\u0432.",
-  "bot.wizard.confirmInput": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \xABconfirm\xBB, \u0447\u0442\u043E\u0431\u044B \u043D\u0430\u0447\u0430\u0442\u044C, \u0438\u043B\u0438 \xABCancel\xBB, \u0447\u0442\u043E\u0431\u044B \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C.",
-  "bot.wizard.invalidDate": "\u274C \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 {example}.",
-  "bot.wizard.invalidRange": "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u0434\u0438\u0430\u043F\u0430\u0437\u043E\u043D \u0434\u0430\u0442.",
-  "bot.wizard.callbackExpired": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u043C\u0430\u0441\u0442\u0435\u0440\u0430 \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0435\u0433\u043E \u0441\u043D\u043E\u0432\u0430.",
-  "bot.wizard.downloadCancelled": "\u041C\u0430\u0441\u0442\u0435\u0440 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u043A\u0430\u043D\u0430\u043B\u043E\u0432 \u043E\u0442\u043C\u0435\u043D\u0435\u043D.",
-  "bot.wizard.modeDate": "\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u043F\u043E \u0434\u0430\u0442\u0435",
-  "bot.wizard.modeTag": "\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u043F\u043E \u0442\u0435\u0433\u0443",
-  "bot.wizard.commentsOn": "\u0424\u0430\u0439\u043B\u044B \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0435\u0432 \u0431\u0443\u0434\u0443\u0442 \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u044B",
-  "bot.wizard.commentsOff": "\u0411\u0443\u0434\u0443\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u044B \u0442\u043E\u043B\u044C\u043A\u043E \u0444\u0430\u0439\u043B\u044B \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0439 \u043A\u0430\u043D\u0430\u043B\u0430.",
-  "bot.subscription.confirmTitle": "\u26A0\uFE0F **\u041E\u0442\u043F\u0438\u0441\u0430\u0442\u044C\u0441\u044F \u043E\u0442 \u044D\u0442\u043E\u0433\u043E \u043A\u0430\u043D\u0430\u043B\u0430?**",
-  "bot.subscription.source": "\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {source}",
-  "bot.subscription.folder": "\u0412\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u0430\u044F \u043F\u0430\u043F\u043A\u0430: {folder}.",
-  "bot.subscription.defaultFolder": "\u041F\u0440\u0430\u0432\u0438\u043B\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044F",
-  "bot.subscription.position": "\u041F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0438: \u043F\u043E\u0441\u043B\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F {messageId}",
-  "bot.subscription.panelTitle": "\u{1F4E1} **\u041F\u043E\u0434\u043F\u0438\u0441\u043A\u0438 \u043D\u0430 \u043A\u0430\u043D\u0430\u043B\u044B**",
-  "bot.subscription.page": "\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 {page}/{totalPages} \xB7 \u0412\u0441\u0435\u0433\u043E {count}",
-  "bot.subscription.empty": "\u041D\u0438\u043A\u0430\u043A\u0438\u0445 \u043F\u043E\u0434\u043F\u0438\u0441\u043E\u043A.",
-  "bot.subscription.manageHint": "\u{1F447} \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0443\u043F\u0440\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u043E\u0439 \u0438\u043B\u0438 \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0435\u0435.",
-  "bot.subscription.action.sync": "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0435\u0439\u0447\u0430\u0441",
-  "bot.subscription.action.pause": "\u041F\u0430\u0443\u0437\u0430",
-  "bot.subscription.action.resume": "\u0420\u0435\u0437\u044E\u043C\u0435",
-  "bot.subscription.action.target": "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u0446\u0435\u043B\u044C",
-  "bot.subscription.action.fromNow": "\u0421 \u044D\u0442\u043E\u0433\u043E \u043C\u043E\u043C\u0435\u043D\u0442\u0430",
-  "bot.subscription.action.backfill": "\u0417\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 \u043F\u043E \u0434\u0430\u0442\u0435",
-  "bot.subscription.action.result": "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442",
-  "bot.subscription.action.retry": "\u041F\u043E\u0432\u0442\u043E\u0440\u043D\u0430\u044F \u043F\u043E\u043F\u044B\u0442\u043A\u0430 \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C",
-  "bot.subscription.followSystemDefault": "\u0421\u043B\u0435\u0434\u043E\u0432\u0430\u0442\u044C \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u043C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u043C \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "bot.subscription.target": "\u{1F3AF} \u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435: {target}.",
-  "bot.subscription.lastScan": "\u{1F50E} \u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0435 \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435: {time}",
-  "bot.subscription.nextScan": "\u23ED\uFE0F \u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0441\u043A\u0430\u043D: \u043E {time}",
-  "bot.subscription.notScanned": "\u{1F50E} \u0415\u0449\u0435 \u043D\u0435 \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u043E",
-  "bot.subscription.lastResult": "\u{1F4CA} \u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442: {status}, \u043D\u0430\u0439\u0434\u0435\u043D {found}, \u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C {failed}.",
-  "bot.subscription.disabledReason": "\u26A0\uFE0F {reason}",
-  "bot.subscription.error": "\u26A0\uFE0F \u041E\u0448\u0438\u0431\u043A\u0430: {error}.",
-  "bot.subscription.result.recorded": "\u0417\u0430\u043F\u0438\u0441\u0430\u043D\u043E",
-  "bot.subscription.result.completed": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043D\u044B\u0439",
-  "bot.subscription.result.partial": "\u0427\u0430\u0441\u0442\u0438\u0447\u043D\u043E \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E",
-  "bot.subscription.result.running": "\u0411\u0435\u0433",
-  "bot.subscription.result.paused": "\u041F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E",
-  "bot.subscription.confirmBody": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043E\u0441\u0442\u0430\u043D\u0430\u0432\u043B\u0438\u0432\u0430\u0435\u0442 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0443\u044E \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044E \u0438 \u0443\u0434\u0430\u043B\u044F\u0435\u0442 \u044D\u0442\u043E\u0442 \u044D\u043B\u0435\u043C\u0435\u043D\u0442 \u0438\u0437 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u043E\u0439. \u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435 \u0443\u0434\u0430\u043B\u044F\u044E\u0442\u0441\u044F.",
-  "bot.subscription.confirmButton": "\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u043E\u0442\u043F\u0438\u0441\u043A\u0443",
-  "bot.subscription.backButton": "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u043A \u043F\u043E\u0434\u043F\u0438\u0441\u043A\u0430\u043C",
-  "bot.callback.cancelled": "\u041E\u0442\u043C\u0435\u043D\u0435\u043D\u043E",
-  "bot.callback.expired": "\u0418\u0441\u0442\u0435\u043A\u0448\u0438\u0439",
-  "bot.callback.submitted": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430",
-  "bot.callback.failed": "\u041E\u043F\u0435\u0440\u0430\u0446\u0438\u044F \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C: {error}",
-  "bot.legacy.pausedTitle": "\u23F8\uFE0F **\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430**",
-  "bot.legacy.floodWaitTitle": "\u23F3 **\u0412\u0440\u0435\u043C\u044F \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F Telegram FloodWait**",
-  "bot.legacy.storageCooldownTitle": "\u23F8\uFE0F **\u0412\u0440\u0435\u043C\u044F \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F \u0437\u0430\u0449\u0438\u0442\u044B \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430**",
-  "bot.legacy.cancelledTitle": "\u{1F6D1} **\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430**",
-  "bot.legacy.completedTitle": "\u2705 **\u0417\u0430\u0434\u0430\u043D\u0438\u0435 \u043A\u0430\u043D\u0430\u043B\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043E**",
-  "bot.legacy.runningTitle": "\u{1F50E} **\u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F**",
-  "bot.legacy.controlsPaused": "\u0412\u044B \u043C\u043E\u0436\u0435\u0442\u0435 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0438\u043B\u0438 \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0435\u0433\u043E \u0432 \u0446\u0435\u043D\u0442\u0440\u0435 \u0437\u0430\u0434\u0430\u0447.",
-  "bot.legacy.controlsActive": "\u0412\u044B \u043C\u043E\u0436\u0435\u0442\u0435 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0438\u043B\u0438 \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0435\u0433\u043E \u0432 \u0446\u0435\u043D\u0442\u0440\u0435 \u0437\u0430\u0434\u0430\u0447.",
-  "bot.legacy.job": "\u{1F194} \u0420\u0430\u0431\u043E\u0442\u0430: {jobId}",
-  "bot.legacy.source": "\u{1F4CD} \u041A\u0430\u043D\u0430\u043B: {source}",
-  "bot.legacy.scan": "\u{1F50E} \u0421\u043A\u0430\u043D: {status}",
-  "bot.legacy.channelScan": "\u{1F4C4} \u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u043D\u0430 \u043A\u0430\u043D\u0430\u043B\u0435: \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u043E {scanned}, \u043D\u0430\u0439\u0434\u0435\u043D\u044B \u0444\u0430\u0439\u043B\u044B {found}.",
-  "bot.legacy.commentScan": "\u{1F4AC} \u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438: \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043B {scanned}, \u043D\u0430\u0448\u0435\u043B \u0444\u0430\u0439\u043B\u044B {found}.",
-  "bot.legacy.download": "\u2B07\uFE0F \u0421\u043A\u0430\u0447\u0430\u0442\u044C: {status}",
-  "bot.legacy.counts": "\u2705 \u0423\u0441\u043F\u0435\u0448\u043D\u043E \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D {completed}\u23F3 \u041E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F {pending}\u{1F504} \u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 {downloading}\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C {failed}\u23ED \u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D {skipped}",
-  "bot.legacy.floodWait": "\u23F3 Telegram Flood\u041F\u043E\u0434\u043E\u0436\u0434\u0438\u0442\u0435, \u043F\u043E\u043A\u0430: {until}",
-  "bot.legacy.storageCooldown": "\u23F8\uFE0F \u0417\u0430\u0449\u0438\u0442\u0430 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0434\u043E: {until}",
-  "bot.legacy.scanComplete": "\u{1F50E} **\u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E; \u043D\u0430\u0447\u0430\u043B\u043E \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438**",
-  "bot.legacy.channelScanned": "\u{1F4C4} \u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u043D\u0430 \u043A\u0430\u043D\u0430\u043B\u0435: \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u043E {scanned}, \u043D\u0430\u0439\u0434\u0435\u043D\u044B \u0444\u0430\u0439\u043B\u044B {found}.",
-  "bot.legacy.commentsScanned": "\u{1F4AC} \u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438: \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043B {scanned}, \u043D\u0430\u0448\u0435\u043B \u0444\u0430\u0439\u043B\u044B {found} (\u0434\u043E {max} \u0437\u0430 \u043F\u043E\u0441\u0442)",
-  "bot.legacy.commentsDisabled": "\u{1F4AC} \u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438: \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u044B",
-  "bot.legacy.pending": "\u{1F4E6} \u041E\u0436\u0438\u0434\u0430\u0435\u043C\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438: \u0444\u0430\u0439\u043B\u044B {count}.",
-  "bot.legacy.queueing": "\u23F3 \u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0444\u0430\u0439\u043B\u043E\u0432 \u0432 \u043E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438. \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 /tasks \u0434\u043B\u044F \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430 \u0444\u043E\u043D\u043E\u0432\u044B\u0445 \u0437\u0430\u0434\u0430\u0447.",
-  "bot.legacy.commentLine": "\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438: \u043F\u0440\u043E\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043B {scanned}, \u043D\u0430\u0448\u0435\u043B \u0444\u0430\u0439\u043B\u044B {found}.",
-  "bot.legacy.cancelledResult": "\u{1F6D1} \u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 {mode} \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.\n\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440: {jobId}\n\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E: {successful}\n\u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E: {skipped}{commentLine}",
-  "bot.legacy.tagResult": "\u2705 \u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u043E \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0435 \u0442\u0435\u0433\u043E\u0432 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0430.\n\u0422\u0435\u0433: {tag}\n\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440: {jobId}\n\u0412 \u043E\u0447\u0435\u0440\u0435\u0434\u0438: {found}\n\u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E: {skipped}\n\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C: {failed}{commentLine}",
-  "bot.legacy.dateResult": "\u2705 \u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u043E \u0434\u0438\u0430\u043F\u0430\u0437\u043E\u043D\u0443 \u0434\u0430\u0442 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0430.\n\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440: {jobId}\n\u0412 \u043E\u0447\u0435\u0440\u0435\u0434\u0438: {found}\n\u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E: {skipped}\n\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C: {failed}{commentLine}",
-  "bot.legacy.failed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C {mode}: {error}.",
-  "bot.link.empty": "\u0412 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0438 \u043D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0433\u043E \u0434\u043B\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0444\u0430\u0439\u043B\u0430. \u0412\u043E\u0437\u043C\u043E\u0436\u043D\u043E, \u043E\u043D\u043E \u0443\u0434\u0430\u043B\u0435\u043D\u043E \u0438\u043B\u0438 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0443.",
-  "bot.link.failed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u043F\u043E \u0441\u0441\u044B\u043B\u043A\u0435: {error}",
-  "bot.legacy.confirmTag": "\u23F3 \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043E. \u0417\u0430\u043F\u0443\u0441\u043A\u0430\u0435\u043C \u0444\u043E\u043D\u043E\u0432\u043E\u0435 \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 {source} \u043D\u0430 \u043D\u0430\u043B\u0438\u0447\u0438\u0435 \u043C\u0443\u043B\u044C\u0442\u0438\u043C\u0435\u0434\u0438\u0439\u043D\u044B\u0445 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439 \u0441 \u043F\u043E\u043C\u043E\u0449\u044C\u044E {tag}\u2026",
-  "bot.legacy.confirmDate": "\u23F3 \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043E. \u0417\u0430\u043F\u0443\u0441\u043A \u0444\u043E\u043D\u043E\u0432\u043E\u0433\u043E \u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u044F {source}: {startDate} \u2192 {endDate}\u2026",
-  "bot.legacy.submitFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0437\u0430\u0434\u0430\u0447\u0443: {error}.",
-  "bot.legacy.usageDate": "\u274C \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435: /tg_date @channel \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414 \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414",
-  "bot.legacy.usageTag": "\u274C \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435: /tg_tag @channel #tag",
-  "bot.auth.rateLimited": "\u23F3 \u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u0447\u0435\u0440\u0435\u0437 {seconds} \u0441\u0435\u043A\u0443\u043D\u0434.",
-  "bot.auth.pinLocked": "\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u043F\u043E\u043F\u044B\u0442\u043E\u043A \u043D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u043E\u0433\u043E \u0432\u0432\u043E\u0434\u0430 PIN-\u043A\u043E\u0434\u0430. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u0447\u0435\u0440\u0435\u0437 {seconds} \u0441\u0435\u043A\u0443\u043D\u0434.",
-  "bot.auth.pinLockedBody": "\u274C \u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u043F\u043E\u043F\u044B\u0442\u043E\u043A \u0432\u0432\u043E\u0434\u0430 \u043D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u043E\u0433\u043E PIN-\u043A\u043E\u0434\u0430. \u0417\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u043D\u0430 {seconds} \u0441\u0435\u043A\u0443\u043D\u0434.",
-  "bot.auth.pinLockedShort": "\u0412\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u0437\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043D\u043E",
-  "bot.auth.pinWrongShort": "\u041D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u044B\u0439 PIN-\u043A\u043E\u0434",
-  "bot.auth.notAllowed": "\u26D4 \u042D\u0442\u043E\u0442 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C Telegram \u043D\u0435 \u0430\u0432\u0442\u043E\u0440\u0438\u0437\u043E\u0432\u0430\u043D. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u0432 TELEGRAM_ALLOWED_USER_IDS \u0438\u043B\u0438 \u0431\u0435\u043B\u044B\u0439 \u0441\u043F\u0438\u0441\u043E\u043A \u0432 \u0432\u0435\u0431-\u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0435.",
-  "bot.auth.notAllowedShort": "\u041D\u0435\u0442 \u0432 \u0431\u0435\u043B\u043E\u043C \u0441\u043F\u0438\u0441\u043A\u0435",
-  "bot.auth.twoFactorEnabled": "\u{1F510} \u0414\u0432\u0443\u0445\u0444\u0430\u043A\u0442\u043E\u0440\u043D\u0430\u044F \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044F \u0443\u0436\u0435 \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u0430. \u0411\u043E\u0442 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0431\u0443\u0434\u0435\u0442 \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0442\u044C QR-\u043A\u043E\u0434, \u043F\u043E\u0441\u043A\u043E\u043B\u044C\u043A\u0443 \u043E\u043D \u0441\u043E\u0434\u0435\u0440\u0436\u0438\u0442 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0439 \u0441\u0435\u043A\u0440\u0435\u0442.",
-  "bot.auth.loggedOut": "\u2705 \u0410\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044F \u0431\u043E\u0442\u0430 \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F Telegram \u043E\u0442\u043E\u0437\u0432\u0430\u043D\u0430. \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /start \u0434\u043B\u044F \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0439 \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438.",
-  "bot.auth.logoutFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0432\u044B\u0439\u0442\u0438. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u043F\u043E\u0437\u0436\u0435.\n\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438: {operationId}",
-  "bot.notification.securityLogin": "\u{1F514} **\u0423\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0435 \u043E \u0432\u0445\u043E\u0434\u0435 \u0432 \u0441\u0438\u0441\u0442\u0435\u043C\u0443 \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438**",
-  "bot.notification.passthrough": "{message}",
-  "menu.start": "\u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C/\u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044C \u043B\u0438\u0447\u043D\u043E\u0441\u0442\u044C",
-  "menu.tasks": "\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0442\u0435\u043A\u0443\u0449\u0438\u0445 \u0437\u0430\u0434\u0430\u0447",
-  "menu.storage": "\u0421\u0442\u0430\u0442\u0443\u0441 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430/\u0443\u0434\u0430\u043B\u0438\u0442\u044C \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B",
-  "menu.path_rules": "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435 / \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u0443\u044E \u043F\u0430\u043F\u043A\u0443",
-  "menu.tg_download": "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0444\u0430\u0439\u043B\u043E\u0432 \u043A\u0430\u043D\u0430\u043B\u043E\u0432 \u043F\u043E \u0434\u0430\u0442\u0435/\u0442\u0435\u0433\u0443",
-  "menu.list": "\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0445 \u0444\u0430\u0439\u043B\u043E\u0432",
-  "menu.find": "\u041F\u043E\u0438\u0441\u043A \u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0444\u0430\u0439\u043B\u0430\u043C\u0438",
-  "menu.tg_sub": "\u0423\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u043E\u0439 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0435\u0439 \u043A\u0430\u043D\u0430\u043B\u043E\u0432",
-  "menu.storage_switch": "\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "menu.target": "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 \u0446\u0435\u043B\u0435\u0432\u043E\u0439 \u043E\u0431\u044A\u0435\u043C \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430 \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430",
-  "menu.help": "\u041F\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u043F\u043E\u043B\u043D\u0443\u044E \u0441\u043F\u0440\u0430\u0432\u043A\u0443",
-  "menu.status": "\u0414\u0438\u0430\u0433\u043D\u043E\u0441\u0442\u0438\u043A\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u044B",
-  "menu.notifications": "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439",
-  "menu.language": "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u044F\u0437\u044B\u043A \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430 \u0431\u043E\u0442\u0430",
-  "commands.auto001": "\u2699\uFE0F **\u041F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u0438\u0437\u043C \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442\u043E\u0432 Telegram**",
-  "commands.auto002": "\u0422\u0435\u043A\u0443\u0449\u0435\u0435 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E \u0447\u0430\u043D\u043A\u043E\u0432: **{value0}**",
-  "commands.auto003": "\u041A\u043E\u043D\u0442\u0440\u043E\u043B\u0438\u0440\u0443\u0435\u0442, \u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442\u043E\u0432 \u043E\u0434\u043D\u043E\u0433\u043E \u0444\u0430\u0439\u043B\u0430 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u0442\u0441\u044F \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E; \u0431\u043E\u043B\u0435\u0435 \u0432\u044B\u0441\u043E\u043A\u0438\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F \u0431\u044B\u0441\u0442\u0440\u0435\u0435, \u043D\u043E \u0441 \u0431\u043E\u043B\u044C\u0448\u0435\u0439 \u0432\u0435\u0440\u043E\u044F\u0442\u043D\u043E\u0441\u0442\u044C\u044E \u043F\u0440\u0438\u0432\u0435\u0434\u0443\u0442 \u043A \u0441\u0440\u0430\u0431\u0430\u0442\u044B\u0432\u0430\u043D\u0438\u044E \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u0439 \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438.",
-  "commands.auto004": "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F: 4 \u0437\u0430 \u0441\u0442\u0430\u0431\u0438\u043B\u044C\u043D\u043E\u0441\u0442\u044C, 8 \u0437\u0430 \u0431\u0430\u043B\u0430\u043D\u0441 \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 \u0438 \u0443\u0441\u0442\u043E\u0439\u0447\u0438\u0432\u043E\u0441\u0442\u0438; 12 \u0438\u043B\u0438 16 \u0430\u0433\u0440\u0435\u0441\u0441\u0438\u0432\u043D\u044B \u0438 \u0442\u0440\u0435\u0431\u0443\u044E\u0442 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F.",
-  "commands.auto005": "\u{1F4E6} **\u041F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u0438\u0437\u043C \u0444\u0430\u0439\u043B\u043E\u0432 Telegram**",
-  "commands.auto006": "\u041E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u0430\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0444\u0430\u0439\u043B\u043E\u0432: **{value0}**",
-  "commands.auto007": "\u0422\u0435\u043A\u0443\u0449\u0430\u044F \u043E\u0447\u0435\u0440\u0435\u0434\u044C: {value0} \u0430\u043A\u0442\u0438\u0432\u0435\u043D, {value1} \u043E\u0436\u0438\u0434\u0430\u0435\u0442.",
-  "commands.auto008": "\u041A\u043E\u043D\u0442\u0440\u043E\u043B\u0438\u0440\u0443\u0435\u0442 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E \u0444\u0430\u0439\u043B\u043E\u0432, \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043C\u044B\u0445 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E.",
-  "commands.auto009": "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F: 1 \u0434\u043B\u044F \u043C\u0430\u043A\u0441\u0438\u043C\u0430\u043B\u044C\u043D\u043E\u0439 \u0441\u0442\u0430\u0431\u0438\u043B\u044C\u043D\u043E\u0441\u0442\u0438, 2 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E, 3 \u0434\u043B\u044F \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438; 4 \u0430\u0433\u0440\u0435\u0441\u0441\u0438\u0432\u0435\u043D \u0438 \u0442\u0440\u0435\u0431\u0443\u0435\u0442 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F.",
-  "commands.auto010": "\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u043F\u0440\u0438\u043C\u0435\u043D\u044F\u044E\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043A \u0432\u043D\u043E\u0432\u044C \u0437\u0430\u043F\u0443\u0449\u0435\u043D\u043D\u044B\u043C \u0444\u0430\u0439\u043B\u0430\u043C; \u0443\u0436\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043C\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435 \u0431\u0443\u0434\u0443\u0442 \u043F\u0440\u0435\u0440\u0432\u0430\u043D\u044B.",
-  "commands.auto011": "{value0} \u041F\u0440\u043E\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u044B",
-  "commands.auto012": "{value0} \u0421\u043E\u0437\u0434\u0430\u043D\u0438\u0435 \u043A\u043E\u043F\u0438\u0439",
-  "commands.auto013": "\u{1F9EC} **\u041E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0430 \u043F\u043E\u0432\u0442\u043E\u0440\u044F\u044E\u0449\u0438\u0445\u0441\u044F \u0444\u0430\u0439\u043B\u043E\u0432**",
-  "commands.auto014": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u0440\u0435\u0436\u0438\u043C: {value0}",
-  "commands.auto015": "\u2022 \u041F\u0440\u043E\u043F\u0443\u0441\u043A\u0430\u0442\u044C \u0434\u0443\u0431\u043B\u0438\u043A\u0430\u0442\u044B: \u043D\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u0442\u044C, \u0435\u0441\u043B\u0438 \u0438\u043C\u044F, \u043F\u0430\u043F\u043A\u0430 \u0438 \u0440\u0430\u0437\u043C\u0435\u0440 \u0441\u043E\u0432\u043F\u0430\u0434\u0430\u044E\u0442.",
-  "commands.auto016": "\u2022 \u0421\u043E\u0437\u0434\u0430\u0432\u0430\u0439\u0442\u0435 \u043A\u043E\u043F\u0438\u0438: \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u043F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u044B\u0432\u0430\u0439\u0442\u0435 \u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u0439\u0442\u0435 \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u0443\u044E \u043A\u043E\u043F\u0438\u044E.",
-  "commands.auto017": "\u0412\u043B\u0438\u044F\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u0444\u0430\u0439\u043B\u044B, \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043D\u044B\u0435 \u0441 \u044D\u0442\u043E\u0433\u043E \u043C\u043E\u043C\u0435\u043D\u0442\u0430.",
-  "commands.auto018": "{value0} \u041E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0443\u044E \u043E\u0447\u0438\u0441\u0442\u043A\u0443",
-  "commands.auto019": "{value0} \u0412\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0443\u044E \u043E\u0447\u0438\u0441\u0442\u043A\u0443",
-  "commands.auto020": "\u{1F9F9} **\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0447\u0438\u0441\u0442\u043A\u0430 \u043D\u0435\u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0445 \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0445 \u0444\u0430\u0439\u043B\u043E\u0432**",
-  "commands.auto021": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u0441\u0442\u0430\u0442\u0443\u0441: {value0}",
-  "commands.auto022": "\u0415\u0441\u043B\u0438 \u044D\u0442\u043E\u0442 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u0432\u043A\u043B\u044E\u0447\u0435\u043D, \u0435\u0436\u0435\u0447\u0430\u0441\u043D\u043E \u043F\u0440\u043E\u0432\u0435\u0440\u044F\u0435\u0442 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0438 \u0443\u0434\u0430\u043B\u044F\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u0441\u0442\u0430\u0440\u0448\u0435 10 \u043C\u0438\u043D\u0443\u0442, \u043A\u043E\u0442\u043E\u0440\u044B\u0445 \u043D\u0435\u0442 \u0432 \u0441\u043F\u0438\u0441\u043A\u0435 \u0444\u0430\u0439\u043B\u043E\u0432.",
-  "commands.auto023": "\u0417\u0430\u043F\u0438\u0441\u0438 \u0437\u0430\u0434\u0430\u0447, \u0438\u043D\u0434\u0435\u043A\u0441\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u043E\u0431\u043B\u0430\u0447\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435 \u0443\u0434\u0430\u043B\u044F\u044E\u0442\u0441\u044F.",
-  "commands.auto024": "\u041E\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u044D\u0442\u043E \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044B\u043C, \u0435\u0441\u043B\u0438 \u0432\u044B \u0437\u0430\u043F\u0438\u0441\u044B\u0432\u0430\u0435\u0442\u0435 \u043D\u0435\u043F\u043E\u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0435\u043D\u043D\u043E \u0432 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0437\u0430 \u043F\u0440\u0435\u0434\u0435\u043B\u0430\u043C\u0438 TG Vault.",
-  "commands.auto025": "\u{1F4CC} \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0442\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u043E\u0434\u0438\u043D \u0440\u0430\u0437",
-  "commands.auto026": "\u{1F4CD} \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0442\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430",
-  "commands.auto027": "\u{1F9F9} \u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0438\u0441\u0442\u0435\u043C\u044B \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "commands.auto028": "\u{1F3AF} **\u041E\u0431\u044A\u0435\u043A\u0442 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430**",
-  "commands.auto029": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "commands.auto031": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "commands.auto033": "\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E: {value0}.",
-  "commands.auto034": "\u{1F447} \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u0443\u044E \u0446\u0435\u043B\u044C, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044F \u0442\u0435\u043A\u0443\u0449\u0443\u044E \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u0443\u044E \u043F\u0430\u043C\u044F\u0442\u044C.",
-  "commands.auto035": "\u2705 \u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 \u0446\u0435\u043B\u044C {value0}: {value1} / {value2}.\n\u042D\u0442\u043E \u043D\u0435 \u043C\u0435\u043D\u044F\u0435\u0442 \u043E\u0431\u0449\u0435\u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E.",
-  "commands.auto036": "\u{1F3AF} **\u041E\u0431\u044A\u0435\u043A\u0442 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430**",
-  "commands.auto037": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "commands.auto039": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "commands.auto041": "\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E: {value0}.",
-  "commands.auto042": "\u{1F447} \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u0443\u044E \u0446\u0435\u043B\u044C, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044F \u0442\u0435\u043A\u0443\u0449\u0443\u044E \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u0443\u044E \u043F\u0430\u043C\u044F\u0442\u044C.",
-  "commands.auto043": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043E\u0447\u0438\u0441\u0442\u043A\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
-  "commands.auto044": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430. \u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0445 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043D\u044B\u0445 \u0444\u0430\u0439\u043B\u043E\u0432 \u043D\u0435\u0442.",
-  "commands.auto045": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430. \u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B: {value0}; \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u043C\u043E\u0435 \u043F\u0440\u043E\u0441\u0442\u0440\u0430\u043D\u0441\u0442\u0432\u043E: {value1}.",
-  "commands.auto046": "\u26A0\uFE0F **\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430?**",
-  "commands.auto047": "\u042D\u0442\u043E \u043F\u0440\u0438\u0432\u0435\u0434\u0435\u0442 \u043A \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044E \u0444\u0430\u0439\u043B\u043E\u0432 **{value0}** \u0432 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u043C \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A \u0441 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435\u043C **{value1}**.",
-  "commands.auto048": "\u041F\u0440\u0438 \u044D\u0442\u043E\u043C \u0431\u0443\u0434\u0443\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u044B \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u0438\u0445 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0438\u043D\u0434\u0435\u043A\u0441\u044B; \u0438\u0441\u0442\u043E\u0440\u0438\u044F \u0437\u0430\u0434\u0430\u0447 \u0438 \u0441\u0442\u043E\u0440\u043E\u043D\u043D\u0438\u0435 \u043E\u0431\u043B\u0430\u0447\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u043D\u0435 \u0443\u0434\u0430\u043B\u044F\u044E\u0442\u0441\u044F.",
-  "commands.auto049": "\u0415\u0441\u043B\u0438 \u0432\u044B \u0443\u0432\u0435\u0440\u0435\u043D\u044B, \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u0440\u0430\u0441\u043D\u0443\u044E \u043A\u043D\u043E\u043F\u043A\u0443 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F \u043D\u0438\u0436\u0435.",
-  "commands.auto050": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043E\u0447\u0438\u0441\u0442\u043A\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E, \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D.",
-  "commands.auto051": "\u2705 **\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u043E\u0447\u0438\u0449\u0435\u043D\u044B**",
-  "commands.auto052": "\u0423\u0434\u0430\u043B\u0435\u043D\u044B: \u0444\u0430\u0439\u043B\u044B {value0}.",
-  "commands.auto053": "\u041E\u0441\u0432\u043E\u0431\u043E\u0436\u0434\u0435\u043D\u043E \u043C\u0435\u0441\u0442\u043E: {value0}",
-  "commands.auto054": "\u041E\u0441\u0442\u0430\u043B\u0438\u0441\u044C \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B: {value0}.",
-  "commands.auto055": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441\u0442\u0430\u0440\u043E\u0439 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u0447\u0438\u0441\u0442\u043A\u0438 \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C/\u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0435\u0449\u0435 \u0440\u0430\u0437.",
-  "commands.auto056": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C: {value0}.",
-  "commands.auto057": "\u042D\u0442\u0430 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u044F \u0443\u0434\u0430\u043B\u044F\u0435\u0442 \u0444\u0438\u0437\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u0444\u0430\u0439\u043B \u0438 \u0435\u0433\u043E \u0438\u043D\u0434\u0435\u043A\u0441.",
-  "commands.auto058": "\u26A0\uFE0F **\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u044D\u0442\u043E\u0442 \u0444\u0430\u0439\u043B?**",
-  "commands.auto059": "\u274C \u041D\u0438 \u043E\u0434\u0438\u043D \u0444\u0430\u0439\u043B \u043D\u0435 \u043D\u0430\u0447\u0438\u043D\u0430\u0435\u0442\u0441\u044F \u0441 \u043F\u0440\u0435\u0444\u0438\u043A\u0441\u0430 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \xAB{value0}\xBB.",
-  "commands.auto060": "\u274C \u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \xAB{value0}\xBB \u0441\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u0438\u043C \u0444\u0430\u0439\u043B\u0430\u043C. \u0421\u043A\u043E\u043F\u0438\u0440\u0443\u0439\u0442\u0435 \u0431\u043E\u043B\u0435\u0435 \u0434\u043B\u0438\u043D\u043D\u044B\u0439 \u043F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438 \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443.",
-  "commands.auto061": "\u26A0\uFE0F **\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u044D\u0442\u043E\u0442 \u0444\u0430\u0439\u043B?**",
-  "commands.auto062": "\u041F\u0440\u0438 \u044D\u0442\u043E\u043C \u0431\u0443\u0434\u0435\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u0430 \u0437\u0430\u043F\u0438\u0441\u044C \u0431\u0430\u0437\u044B \u0434\u0430\u043D\u043D\u044B\u0445 \u0438 \u043F\u0440\u0435\u0434\u043F\u0440\u0438\u043D\u044F\u0442\u0430 \u043F\u043E\u043F\u044B\u0442\u043A\u0430 \u0443\u0434\u0430\u043B\u0438\u0442\u044C \u0444\u0438\u0437\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u0444\u0430\u0439\u043B. \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0430\u0439\u0442\u0435, \u0442\u043E\u043B\u044C\u043A\u043E \u0435\u0441\u043B\u0438 \u044D\u0442\u043E \u043F\u0440\u0435\u0434\u0443\u0441\u043C\u043E\u0442\u0440\u0435\u043D\u043E.",
-  "commands.auto063": "\u0423\u0434\u0430\u043B\u0435\u043D\u0438\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u043E: {value0}",
-  "commands.auto064": "\u274C \u0424\u0430\u0439\u043B \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u0438\u043B\u0438 \u043D\u0430\u0445\u043E\u0434\u0438\u0442\u0441\u044F \u0437\u0430 \u043F\u0440\u0435\u0434\u0435\u043B\u0430\u043C\u0438 \u0442\u0435\u043A\u0443\u0449\u0435\u0439 \u043E\u0431\u043B\u0430\u0441\u0442\u0438 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F.",
-  "commands.auto065": "\u274C \u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 OpenList \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439.",
-  "commands.auto066": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0443\u0434\u0430\u043B\u0438\u0442\u044C: {value0}.",
-  "commands.auto067": "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0443\u044E \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0439 \u043F\u043E\u043F\u044B\u0442\u043A\u0438 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438 \u0434\u043B\u044F \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438 \u043A\u0430\u043D\u0430\u043B\u0430.",
-  "commands.auto068": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0443\u043D\u0438\u043A\u0430\u043B\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u0437\u0430\u0434\u0430\u0447.",
-  "commands.auto069": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0432 \u0434\u0430\u043D\u043D\u044B\u0439 \u043C\u043E\u043C\u0435\u043D\u0442 \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F.",
-  "commands.auto070": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u0438\u043B\u0438 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
-  "commands.auto071": "\u041D\u0435\u0442 \u043E\u0436\u0438\u0434\u0430\u044E\u0449\u0438\u0445 \u0444\u0430\u0439\u043B\u043E\u0432, \u043A\u043E\u0442\u043E\u0440\u044B\u043C \u043C\u043E\u0436\u043D\u043E \u043F\u0440\u0438\u043E\u0440\u0438\u0442\u0435\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C.",
-  "commands.auto072": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043D\u0430\u0445\u043E\u0434\u0438\u0442\u0441\u044F \u0432 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0438 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F.",
-  "commands.auto073": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u0438\u043B\u0438 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.",
-  "commands.auto074": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0443\u043D\u0438\u043A\u0430\u043B\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u0437\u0430\u0434\u0430\u0447.",
-  "commands.auto075": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u0438\u043B\u0438 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.",
-  "commands.auto076": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u0438\u043B\u0438 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.",
-  "commands.auto077": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0443\u043D\u0438\u043A\u0430\u043B\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u0437\u0430\u0434\u0430\u0447.",
-  "commands.auto078": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0443\u043D\u0438\u043A\u0430\u043B\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u0437\u0430\u0434\u0430\u0447.",
-  "commands.auto079": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0438\u043C\u0435\u0435\u0442 \u043D\u0435\u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043D\u0443\u044E \u0441\u0432\u0435\u0440\u043A\u0443 \u0438\u043B\u0438 \u0432 \u043D\u0430\u0441\u0442\u043E\u044F\u0449\u0435\u0435 \u0432\u0440\u0435\u043C\u044F \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u043F\u043E\u0432\u0442\u043E\u0440\u0435\u043D\u0430.",
-  "commands.auto080": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u0435 \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0444\u0430\u0439\u043B\u0430, \u0437\u0430\u0442\u0435\u043C \u043F\u0430\u0443\u0437\u0430.",
-  "commands.auto081": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u043C.",
-  "commands.auto082": "\u26A0\uFE0F **\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0432\u0441\u0435 \u0437\u0430\u0434\u0430\u043D\u0438\u044F \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435?**",
-  "commands.auto083": "\u0420\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438: \u0437\u0430\u0434\u0430\u0447\u0438 {value0} (\u0444\u0430\u0439\u043B\u044B {value1} \u0430\u043A\u0442\u0438\u0432\u043D\u044B, {value2} \u043E\u0436\u0438\u0434\u0430\u0435\u0442)",
-  "commands.auto084": "\u0417\u0430\u0434\u0430\u0447\u0438 \u043A\u0430\u043D\u0430\u043B\u0430: {value0}",
-  "commands.auto085": "\u0412\u0441\u0435\u0433\u043E \u0437\u0430\u0434\u0430\u0447: {value0}",
-  "commands.auto086": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 \u0437\u0430\u0434\u0430\u0447 \u0438 \u043E\u0447\u0438\u0441\u0442\u0438\u0442 \u0438\u0445 \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B. \u0417\u0430\u0434\u0430\u0447\u0438 \u0432 \u0434\u0440\u0443\u0433\u0438\u0445 \u0447\u0430\u0442\u0430\u0445 \u0438 \u0434\u0440\u0443\u0433\u0438\u0445 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439 \u043D\u0435 \u0437\u0430\u0442\u0440\u0430\u0433\u0438\u0432\u0430\u044E\u0442\u0441\u044F.",
-  "commands.auto087": "\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u043B \u043E\u0442\u043C\u0435\u043D\u0443 \u0432\u0441\u0435\u0445 \u0437\u0430\u0434\u0430\u0447 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435",
-  "commands.auto088": "\u{1F6D1} **\u0417\u0430\u0434\u0430\u0447\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u044B**",
-  "commands.auto089": "\u0420\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438: \u0437\u0430\u0434\u0430\u0447\u0438 {value0} (\u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B {value1} / \u0444\u0430\u0439\u043B\u044B \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u044F {value2})",
-  "commands.auto090": "\u0417\u0430\u0434\u0430\u0447\u0438 \u043A\u0430\u043D\u0430\u043B\u0430: {value0}",
-  "commands.auto091": "\u0412\u0441\u0435\u0433\u043E \u0437\u0430\u0434\u0430\u0447: {value0}",
-  "commands.auto092": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u043C.",
-  "commands.auto093": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u0435 \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0444\u0430\u0439\u043B\u0430, \u0437\u0430\u0442\u0435\u043C \u043F\u0430\u0443\u0437\u0430.",
-  "commands.auto094": "\u23F8\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
-  "commands.auto095": "\u23F8\uFE0F \u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0443 \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438 \u043F\u043E\u0441\u043B\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u044F \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0444\u0430\u0439\u043B\u0430.",
-  "commands.auto096": "\u23F8\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 {value0} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {value1}",
-  "commands.auto097": "\u{1F4EE} \u0417\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430: {value0}. \u0422\u0435\u043A\u0443\u0449\u0430\u044F \u043E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0447\u0430\u0442\u0430 \u043D\u0435 \u0431\u044B\u043B\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
-  "commands.auto098": "\u{1F4EE} \u0417\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430: {value0}. \u041D\u0438 \u043E\u0434\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u0431\u044B\u043B\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
-  "commands.auto099": "\u23F8\uFE0F \u0420\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u044B\n\n\u0410\u043A\u0442\u0438\u0432\u0435\u043D: {value0}\n\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435: {value1}\n\n\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u0444\u0430\u0439\u043B \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u0441\u044F; \u043D\u043E\u0432\u044B\u0435 \u043E\u0436\u0438\u0434\u0430\u044E\u0449\u0438\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0437\u0430\u043F\u0443\u0441\u0442\u044F\u0442\u0441\u044F.",
-  "commands.auto100": "\u25B6\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
-  "commands.auto101": "\u25B6\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 {value0} \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {value1}",
-  "commands.auto102": "\u{1F4EE} \u0417\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430: {value0}. \u0422\u0435\u043A\u0443\u0449\u0430\u044F \u043E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0447\u0430\u0442\u0430 \u043D\u0435 \u0431\u044B\u043B\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
-  "commands.auto103": "\u{1F4EE} \u0417\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430: {value0}. \u041D\u0438 \u043E\u0434\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u0431\u044B\u043B\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
-  "commands.auto104": "\u25B6\uFE0F \u0412\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u044B \u0440\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435\n\n\u0410\u043A\u0442\u0438\u0432\u0435\u043D: {value0}\n\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435: {value1}",
-  "commands.auto105": "\u{1F6D1} \u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
-  "commands.auto106": "\u{1F6D1} \u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 {value0} \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.\n\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {value1}",
-  "commands.auto107": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043F\u043E\u0434\u0445\u043E\u0434\u044F\u0449\u0435\u0439 \u0437\u0430\u0434\u0430\u0447\u0438: {value0}",
-  "commands.auto108": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441\u0442\u0430\u0440\u043E\u0439 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u0442\u043C\u0435\u043D\u044B \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 /tasks \u0435\u0449\u0435 \u0440\u0430\u0437 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435, \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0432 \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0437\u0430\u0434\u0430\u0447\u0435.",
-  "commands.auto109": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043F\u043E\u0434\u0445\u043E\u0434\u044F\u0449\u0435\u0439 \u0437\u0430\u0434\u0430\u0447\u0438: {value0}",
-  "commands.auto110": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441\u0442\u0430\u0440\u043E\u0439 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u0442\u043C\u0435\u043D\u044B \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 /tasks \u0435\u0449\u0435 \u0440\u0430\u0437 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435, \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0432 \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0437\u0430\u0434\u0430\u0447\u0435.",
-  "commands.auto111": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0443\u043D\u0438\u043A\u0430\u043B\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C/\u0437\u0430\u0434\u0430\u0447\u0438.",
-  "commands.auto112": "\u{1F4EE} \u041D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u0443\u043D\u0438\u043A\u0430\u043B\u044C\u043D\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438 \u043A\u0430\u043D\u0430\u043B\u0430; \u043D\u0438\u043A\u0430\u043A\u0430\u044F \u0434\u0440\u0443\u0433\u0430\u044F \u0437\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043F\u043E\u0432\u0442\u043E\u0440\u044F\u043B\u0430\u0441\u044C.",
-  "commands.auto113": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0435 \u043A\u0430\u043D\u0430\u043B\u0430 \u043D\u0435\u0442 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u044B\u0445 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u043E\u0432, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u043C\u043E\u0436\u043D\u043E \u0431\u044B\u043B\u043E \u0431\u044B \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C.",
-  "commands.auto114": "\u{1F504} \u0417\u0430\u043F\u0440\u043E\u0448\u0435\u043D\u044B \u043D\u0435\u0443\u0434\u0430\u0432\u0448\u0438\u0435\u0441\u044F \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u044B {value0} \u0432 \u0437\u0430\u0434\u0430\u0447\u0435 \u043A\u0430\u043D\u0430\u043B\u0430.\n\u0417\u0430\u0434\u0430\u0447\u0430: {value1}",
-  "commands.auto115": "\u{1F4EE} \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0438\u0442\u044C \u0442\u0435\u043A\u0443\u0449\u0438\u0439 \u0447\u0430\u0442; \u043D\u0435\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u043F\u043E\u0432\u0442\u043E\u0440\u044F\u043B\u0438\u0441\u044C.",
-  "commands.auto116": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043D\u0435\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0445 \u0437\u0430\u0434\u0430\u0447: {value0}",
-  "commands.auto117": "\u{1F4EE} \u041D\u0435\u043B\u044C\u0437\u044F \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C \u043D\u0435\u0434\u0430\u0432\u043D\u043E \u043D\u0435\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0435 \u0437\u0430\u0434\u0430\u0447\u0438.",
-  "commands.auto119": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u043E\u0434\u043D\u043E\u0444\u0430\u0439\u043B\u043E\u0432\u044B\u0439 \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u043F\u043E\u0437\u0436\u0435.",
-  "commands.auto120": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u044C\u043D\u043E\u0433\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u0444\u0430\u0439\u043B\u0430\u043C. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u043F\u043E\u0437\u0436\u0435.",
-  "commands.auto121": "\u{1F4CC} \u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D \u043D\u0430 `{value0}`.\n{value1}\n\n\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u0430 \u0438\u0441\u0442\u0435\u043A\u0430\u0435\u0442 \u043F\u043E\u0441\u043B\u0435 \u0443\u0441\u043F\u0435\u0448\u043D\u043E\u0433\u043E \u0437\u0430\u043F\u0443\u0441\u043A\u0430 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0433\u043E \u043F\u043E\u0442\u043E\u043A\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
-  "commands.auto122": "\u{1F4CD} \u0414\u043B\u044F \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 `{value0}`.\n{value1}\n\n\u0411\u0443\u0434\u0443\u0449\u0438\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u0431\u0443\u0434\u0443\u0442 \u043E\u0442\u0434\u0430\u0432\u0430\u0442\u044C \u043F\u0440\u0435\u0434\u043F\u043E\u0447\u0442\u0435\u043D\u0438\u0435 \u044D\u0442\u043E\u043C\u0443 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0443. \u0423\u0434\u0430\u043B\u0438\u0442\u0435 \u0435\u0433\u043E \u0438\u0437 \xAB\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB.",
-  "commands.auto123": "\u0427\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u043A\u0430\u0442\u0430\u043B\u043E\u0433, \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u044B\u0439 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0438\u043B\u0438 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0447\u0430\u0442\u0430 \u0432 \xAB\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB, \u0437\u0430\u0442\u0435\u043C \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430.",
-  "commands.auto124": "\u{1F558} **\u041D\u0435\u0434\u0430\u0432\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0438**",
-  "commands.auto125": "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 {value0}.",
-  "commands.auto126": "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0447\u0438\u0441\u0442\u043A\u0430 \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u0430",
-  "commands.auto127": "\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043E\u0447\u0438\u0441\u0442\u043A\u0430 \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u0430",
-  "commands.auto128": "\u26A0\uFE0F **\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0447\u0430\u043D\u043A\u0438 {value0}?**",
-  "commands.auto129": "\u042D\u0442\u043E \u0430\u0433\u0440\u0435\u0441\u0441\u0438\u0432\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C \u043F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u0438\u0437\u043C\u0430 \u0431\u043B\u043E\u043A\u043E\u0432, \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u043C\u043E\u0436\u0435\u0442 \u043F\u0440\u0438\u0432\u0435\u0441\u0442\u0438 \u043A:",
-  "commands.auto130": "- \u041E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 Telegram \u0438\u043B\u0438 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u043F\u043E \u0431\u043E\u0440\u044C\u0431\u0435 \u0441\u043E \u0437\u043B\u043E\u0443\u043F\u043E\u0442\u0440\u0435\u0431\u043B\u0435\u043D\u0438\u044F\u043C\u0438",
-  "commands.auto131": "- \u041F\u0440\u0435\u0440\u0432\u0430\u043D\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0438 \u0431\u043E\u043B\u044C\u0448\u0435\u0435 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u044B\u0445 \u043F\u043E\u043F\u044B\u0442\u043E\u043A.",
-  "commands.auto132": "- \u041E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 \u0434\u043B\u044F \u0443\u0447\u0435\u0442\u043D\u044B\u0445 \u0437\u0430\u043F\u0438\u0441\u0435\u0439 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439 Telegram; \u0432 \u043A\u0440\u0430\u0439\u043D\u0438\u0445 \u0441\u043B\u0443\u0447\u0430\u044F\u0445 \u0432\u043B\u0438\u044F\u043D\u0438\u0435 \u043D\u0430 \u0430\u043A\u043A\u0430\u0443\u043D\u0442",
-  "commands.auto133": "\u0414\u043B\u044F \u0440\u0443\u0442\u0438\u043D\u043D\u044B\u0445 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A \u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F 4 \u0438\u043B\u0438 8.",
-  "commands.auto134": "{value0}\n\n\u2705 \u041F\u0435\u0440\u0435\u0448\u0451\u043B \u043D\u0430 \u0447\u0430\u043D\u043A\u0438 {value1}; \u043D\u043E\u0432\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044E\u0442 \u044D\u0442\u043E \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E.",
-  "commands.auto135": "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 {value0}.",
-  "commands.auto136": "{value0}\n\n\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043E \u0438 \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u043D\u0430 \u0447\u0430\u043D\u043A\u0438 {value1}. \u0415\u0441\u043B\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043F\u0440\u0435\u0440\u044B\u0432\u0430\u0435\u0442\u0441\u044F, \u0437\u0430\u043C\u0435\u0434\u043B\u044F\u0435\u0442\u0441\u044F \u0438\u043B\u0438 \u0432\u044B\u0437\u044B\u0432\u0430\u0435\u0442 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F, \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E \u0432\u0435\u0440\u043D\u0438\u0442\u0435\u0441\u044C \u043A 4 \u0438\u043B\u0438 8.",
-  "commands.auto137": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043D\u044B\u0435 \u0440\u0430\u0431\u043E\u0447\u0438\u0435 {value0}",
-  "commands.auto138": "\u26A0\uFE0F **\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C 4 \u0444\u0430\u0439\u043B\u0430 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E?**",
-  "commands.auto139": "\u042D\u0442\u043E \u0430\u0433\u0440\u0435\u0441\u0441\u0438\u0432\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E\u0433\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u0444\u0430\u0439\u043B\u0430\u043C, \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u043C\u043E\u0436\u0435\u0442 \u043F\u0440\u0438\u0432\u0435\u0441\u0442\u0438 \u043A:",
-  "commands.auto140": "- \u041E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 Telegram \u0438\u043B\u0438 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u043F\u043E \u0431\u043E\u0440\u044C\u0431\u0435 \u0441\u043E \u0437\u043B\u043E\u0443\u043F\u043E\u0442\u0440\u0435\u0431\u043B\u0435\u043D\u0438\u044F\u043C\u0438",
-  "commands.auto141": "- \u0420\u0435\u0433\u0443\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432 \u043E\u0431\u043B\u0430\u043A\u043E \u0438 \u0443\u0432\u0435\u043B\u0438\u0447\u0435\u043D\u0438\u0435 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u0430 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u044B\u0445 \u043F\u043E\u043F\u044B\u0442\u043E\u043A.",
-  "commands.auto142": "- \u0417\u043D\u0430\u0447\u0438\u0442\u0435\u043B\u044C\u043D\u0430\u044F \u043D\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u043D\u044B\u0439 \u0434\u0438\u0441\u043A \u0438 \u0441\u0435\u0442\u044C.",
-  "commands.auto143": "\u0414\u043B\u044F \u0440\u0443\u0442\u0438\u043D\u043D\u044B\u0445 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A \u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F 2 \u0438\u043B\u0438 3.",
-  "commands.auto144": "{value0}\n\n\u2705 \u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u043B\u0441\u044F \u043D\u0430 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u0443\u044E \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0443 \u0444\u0430\u0439\u043B\u043E\u0432 {value1}.",
-  "commands.auto145": "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 {value0}.",
-  "commands.auto146": "{value0}\n\n\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u043B \u0438 \u043F\u0435\u0440\u0435\u0448\u0451\u043B \u043D\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0443 4-\u0445 \u0444\u0430\u0439\u043B\u043E\u0432 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E. \u0415\u0441\u043B\u0438 \u0432\u043E\u0437\u043D\u0438\u043A\u0430\u044E\u0442 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438, \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F \u0438\u043B\u0438 \u0441\u0431\u043E\u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438, \u043D\u0435\u043C\u0435\u0434\u043B\u0435\u043D\u043D\u043E \u0432\u0435\u0440\u043D\u0438\u0442\u0435\u0441\u044C \u043A 2 \u0438\u043B\u0438 3.",
-  "commands.auto147": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u043D\u044B\u0439 \u043F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u044C\u043D\u044B\u0439 \u0434\u043E\u0441\u0442\u0443\u043F \u043A 4 \u0444\u0430\u0439\u043B\u0430\u043C",
-  "commands.authRequired": "\u{1F510} \u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /start \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 PIN-\u043A\u043E\u0434.",
-  "commands.helpUnavailable": "\u274C\u041F\u043E\u043C\u043E\u0449\u044C \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430.",
-  "commands.settingsSaved": "\u2705\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u044B.",
-  "commands.settingsFailed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438: {error}.",
-  "commands.notificationsHint": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /\u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F, \u0447\u0442\u043E\u0431\u044B \u0441\u043D\u043E\u0432\u0430 \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u0440\u0443\u043A\u043E\u0432\u043E\u0434\u0441\u0442\u0432\u043E \u0438 \u043A\u043D\u043E\u043F\u043A\u0438 \u0431\u044B\u0441\u0442\u0440\u043E\u0433\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u0430.",
-  "commands.alreadyCurrent": "\u0423\u0436\u0435 \u0432\u044B\u0431\u0440\u0430\u043D\u043E",
-  "commands.notificationsUpdated": "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u044B.",
-  "commands.settingFailedRetry": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0443. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u043F\u043E\u0437\u0436\u0435.",
-  "commands.statusFailed": "\u274C\u041D\u0435 \u0441\u043C\u043E\u0433 \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u0434\u0438\u0430\u0433\u043D\u043E\u0441\u0442\u0438\u043A\u0443. \u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u0437\u0430\u043F\u0440\u043E\u0441\u0430: {requestId}",
-  "commands.localAccount": "\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 \u0441\u0435\u0440\u0432\u0435\u0440\u0430",
-  "commands.defaultAccount": "\u0423\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "commands.unnamedAccount": "\u0411\u0435\u0437\u044B\u043C\u044F\u043D\u043D\u044B\u0439 \u0430\u043A\u043A\u0430\u0443\u043D\u0442",
-  "commands.localStorage": "\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435",
-  "commands.refreshList": "\u{1F504} \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A",
-  "commands.storageSwitchTitle": "\u{1F5C4}\uFE0F **\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F**",
-  "commands.storageSwitchCurrent": "\u0422\u0435\u043A\u0443\u0449\u0438\u0439: {value}",
-  "commands.storageSwitchHint": "\u041A\u043E\u0441\u043D\u0438\u0442\u0435\u0441\u044C \u0443\u0447\u0435\u0442\u043D\u043E\u0439 \u0437\u0430\u043F\u0438\u0441\u0438, \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u043E\u0439 \u0432 \u0432\u0435\u0431-\u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0438, \u0447\u0442\u043E\u0431\u044B \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u044C\u0441\u044F \u043D\u0430 \u043D\u0435\u0435 \u0437\u0434\u0435\u0441\u044C.",
-  "commands.storageSwitchOptions": "**\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435:**",
-  "commands.storageSwitchNote": "\u0417\u0434\u0435\u0441\u044C \u043C\u043E\u0436\u043D\u043E \u0432\u044B\u0431\u0440\u0430\u0442\u044C \u0442\u043E\u043B\u044C\u043A\u043E \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0435 \u0443\u0447\u0435\u0442\u043D\u044B\u0435 \u0437\u0430\u043F\u0438\u0441\u0438. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u0443\u0447\u0435\u0442\u043D\u044B\u0435 \u0437\u0430\u043F\u0438\u0441\u0438 OAuth \u0438\u043B\u0438 \u0443\u0447\u0435\u0442\u043D\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u043D\u0430 \u043E\u0441\u043D\u043E\u0432\u0435 \u0443\u0447\u0435\u0442\u043D\u044B\u0445 \u0434\u0430\u043D\u043D\u044B\u0445 \u0432 \u0432\u0435\u0431-\u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435.",
-  "commands.accountUnnamed": "\u0411\u0435\u0437\u044B\u043C\u044F\u043D\u043D\u044B\u0439 \u0430\u043A\u043A\u0430\u0443\u043D\u0442",
-  "commands.storageSwitchFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u0438 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430: {error}.",
-  "commands.storageRefreshed": "\u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044B\u0439",
-  "commands.storageInvalid": "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u0432\u044B\u0431\u043E\u0440 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430",
-  "commands.storageAlreadyLocal": "\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u0443\u0436\u0435 \u0430\u043A\u0442\u0438\u0432\u043D\u043E",
-  "commands.storageSwitchedLocal": "\u041F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u043D\u0430 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435",
-  "commands.storageMissing": "\u042D\u0442\u0430 \u0443\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442.",
-  "commands.storageAlreadyAccount": "\u042D\u0442\u043E\u0442 \u0430\u043A\u043A\u0430\u0443\u043D\u0442 \u0443\u0436\u0435 \u0430\u043A\u0442\u0438\u0432\u0435\u043D",
-  "commands.storageSwitched": "\u041F\u0435\u0440\u0435\u0448\u0435\u043B \u043D\u0430 {name}",
-  "commands.storageSwitchError": "\u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F: {error}",
-  "commands.deleteConfirm": "\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435",
-  "commands.bulkConfirm": "\u26A0\uFE0F \u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0432\u0441\u0435",
-  "commands.confirmCancelAll": "\u26A0\uFE0F \u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0432\u0441\u0435 \u0437\u0430\u0434\u0430\u0447\u0438",
-  "commands.confirmUse": "\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 {count}.",
-  "commands.confirmFiles": "\u26A0\uFE0F \u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0444\u0430\u0439\u043B\u044B {count}.",
-  "commands.clearLocalConfirm": "\u26A0\uFE0F \u0423\u0434\u0430\u043B\u0438\u0442\u0435 \u0432\u0441\u0435 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B.",
-  "commands.clearLocalButton": "\u{1F9F9} \u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B ({count})",
-  "commands.secondConfirm": "\u0422\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435",
-  "commands.cancelled": "\u041E\u0442\u043C\u0435\u043D\u0435\u043D\u043E",
-  "commands.returned": "\u041D\u0430\u0437\u0430\u0434",
-  "commands.deleted": "\u0423\u0434\u0430\u043B\u0435\u043D\u043E",
-  "commands.deletedCount": "\u0423\u0434\u0430\u043B\u0435\u043D\u044B \u0444\u0430\u0439\u043B\u044B {count}.",
-  "commands.targetNextButton": "\u{1F4CC} \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0442\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u043E\u0434\u0438\u043D \u0440\u0430\u0437",
-  "commands.targetSessionButton": "\u{1F4CD} \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0442\u0435\u043A\u0443\u0449\u0435\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430",
-  "commands.targetClearButton": "\u{1F9F9} \u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0438\u0441\u0442\u0435\u043C\u044B \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "commands.targetTitle": "\u{1F3AF} **\u041E\u0431\u044A\u0435\u043A\u0442 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430**",
-  "commands.targetNext": "\u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0430\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430: {value}",
-  "commands.targetSession": "\u042D\u0442\u043E\u0442 \u0447\u0430\u0442: {value}",
-  "commands.targetSystem": "\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E: {value}.",
-  "commands.targetSet": "{value} (\u043D\u0430\u0431\u043E\u0440)",
-  "commands.targetDefault": "\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E",
-  "commands.targetHint": "\u{1F447} \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0438, \u0447\u0442\u043E\u0431\u044B \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u0432\u044B\u0431\u0440\u0430\u0442\u044C \u0442\u0435\u043A\u0443\u0449\u0443\u044E \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u0443\u044E \u043F\u0430\u043C\u044F\u0442\u044C.",
-  "commands.targetCleared": "\u2705 \u0423\u0431\u0440\u0430\u043D\u043E \u043F\u0435\u0440\u0435\u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0435\u043D\u0438\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430 \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430. \u0411\u0443\u0434\u0443\u0449\u0438\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044E\u0442 \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E.",
-  "commands.targetRestored": "\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u044B",
-  "commands.targetInvalid": "\u274C \u042D\u0442\u043E\u0442 \u0446\u0435\u043B\u0435\u0432\u043E\u0439 \u043E\u0431\u044A\u0435\u043A\u0442 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043D\u0435 \u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u043D. \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u043A\u043D\u043E\u043F\u043A\u0443 \u043D\u0438\u0436\u0435.",
-  "commands.targetAccountMissing": "\u274C \u0423\u0447\u0435\u0442\u043D\u0430\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430. \u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u0432\u0441\u0435 \u0443\u0447\u0435\u0442\u043D\u044B\u0435 \u0437\u0430\u043F\u0438\u0441\u0438 \u0441 /storage_switch.",
-  "commands.targetSaved": "\u2705 \u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 \u0446\u0435\u043B\u044C {scope} \u043D\u0430 {provider} / {account}.\n\u041E\u0431\u0449\u0435\u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u043D\u0435 \u0431\u044B\u043B\u0438 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u044B.",
-  "commands.targetScopeNext": "\u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0430\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430",
-  "commands.targetScopeSession": "\u0447\u0430\u0442-\u0441\u0435\u0441\u0441\u0438\u044F",
-  "commands.targetNextSet": "\u041D\u0430\u0431\u043E\u0440 \u043F\u0430\u043C\u044F\u0442\u0438 \u0434\u043B\u044F \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438",
-  "commands.targetSessionSet": "\u041D\u0430\u0431\u043E\u0440 \u0434\u043B\u044F \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430",
-  "commands.fileSearchFailed": "\u274C \u041F\u043E\u0438\u0441\u043A \u043D\u0435 \u0443\u0434\u0430\u043B\u0441\u044F: {error}.",
-  "commands.fileUnavailable": "\u0424\u0430\u0439\u043B \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u0438\u043B\u0438 \u043D\u0430\u0445\u043E\u0434\u0438\u0442\u0441\u044F \u0437\u0430 \u043F\u0440\u0435\u0434\u0435\u043B\u0430\u043C\u0438 \u0442\u0435\u043A\u0443\u0449\u0435\u0439 \u043E\u0431\u043B\u0430\u0441\u0442\u0438 \u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F.",
-  "commands.fileDetail": "\u0414\u0435\u0442\u0430\u043B\u0438 \u0444\u0430\u0439\u043B\u0430",
-  "commands.confirmRequired": "\u0422\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u0432\u0442\u043E\u0440\u043E\u0435 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435",
-  "commands.fileFavorited": "\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435",
-  "commands.fileUnfavorited": "\u0423\u0434\u0430\u043B\u0435\u043D\u043E \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E",
-  "commands.fileShareUnsupported": "\u042D\u0442\u043E\u0442 \u043F\u0440\u043E\u0432\u0430\u0439\u0434\u0435\u0440 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0441\u043E\u0437\u0434\u0430\u0432\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0438 \u0434\u043B\u044F \u043E\u0431\u0449\u0435\u0433\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u0430. \u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 \u0435\u0433\u043E \u0432 \u0432\u0435\u0431-\u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435.",
-  "commands.fileSignedLink": "\u{1F517} \u041F\u043E\u0434\u043F\u0438\u0441\u0430\u043D\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430 (\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u0430 1 \u0447\u0430\u0441):\n{link}",
-  "commands.fileLinkCreated": "\u041F\u043E\u0434\u043F\u0438\u0441\u0430\u043D\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430 \u0441\u043E\u0437\u0434\u0430\u043D\u0430",
-  "commands.fileMovePrompt": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F \u0438\u043B\u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438.",
-  "commands.fileRenamePrompt": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043D\u043E\u0432\u043E\u0435 \u0438\u043C\u044F \u0444\u0430\u0439\u043B\u0430 (\u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u0435 \u0438\u0441\u0445\u043E\u0434\u043D\u043E\u0435 \u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u0438\u0435) \u0438\u043B\u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438.",
-  "commands.fileAwaitFolder": "\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 \u043F\u0430\u043F\u043A\u0438 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F",
-  "commands.fileAwaitName": "\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 \u043D\u043E\u0432\u043E\u0433\u043E \u0438\u043C\u0435\u043D\u0438 \u0444\u0430\u0439\u043B\u0430",
-  "commands.fileDeleteTitle": "\u26A0\uFE0F **\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u044D\u0442\u043E\u0442 \u0444\u0430\u0439\u043B?**",
-  "commands.fileDeleteImpact": "\u041F\u0440\u0438 \u044D\u0442\u043E\u043C \u0431\u0443\u0434\u0435\u0442 \u0443\u0434\u0430\u043B\u0435\u043D \u0444\u0438\u0437\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u0444\u0430\u0439\u043B \u0438 \u0435\u0433\u043E \u0438\u043D\u0434\u0435\u043A\u0441.",
-  "commands.fileMutationExpired": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0439 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438 \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0444\u0430\u0439\u043B\u0435 \u0435\u0449\u0435 \u0440\u0430\u0437.",
-  "commands.fileMutationCancelled": "\u041E\u043F\u0435\u0440\u0430\u0446\u0438\u044F \u0441 \u0444\u0430\u0439\u043B\u043E\u043C \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.",
-  "commands.fileMoved": "\u2705 \u041F\u0435\u0440\u0435\u043C\u0435\u0449\u0435\u043D\u043E: {folder}",
-  "commands.fileRenamed": "\u2705 \u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u043D\u043E \u0432: {name}.",
-  "commands.fileDeleteChoose": "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0430\u0439\u043B \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u041F\u043E\u0438\u0441\u043A \u0444\u0430\u0439\u043B\u043E\u0432 \u0438 \u0443\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0438\u043C\u0438\xBB, \u0437\u0430\u0442\u0435\u043C \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u0423\u0434\u0430\u043B\u0438\u0442\u044C\xBB.",
-  "commands.fileDeleteNoIndex": "\u274C \u0412\u043E \u0438\u0437\u0431\u0435\u0436\u0430\u043D\u0438\u0435 \u043E\u0448\u0438\u0431\u043E\u043A Telegram-\u0431\u043E\u0442 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0443\u0434\u0430\u043B\u044F\u0442\u044C \u043F\u043E \u043D\u043E\u043C\u0435\u0440\u0443 \u0441\u043F\u0438\u0441\u043A\u0430. \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /list \u0438 \u0441\u043A\u043E\u043F\u0438\u0440\u0443\u0439\u0442\u0435 \u0445\u043E\u0442\u044F \u0431\u044B \u043F\u0435\u0440\u0432\u044B\u0435 8 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0444\u0430\u0439\u043B\u0430.",
-  "commands.fileIdTooShort": "\u274C \u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0434\u043E\u043B\u0436\u0435\u043D \u0431\u044B\u0442\u044C \u043D\u0435 \u043C\u0435\u043D\u0435\u0435 8 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432. \u0421\u043A\u043E\u043F\u0438\u0440\u0443\u0439\u0442\u0435 \u0431\u043E\u043B\u0435\u0435 \u0434\u043B\u0438\u043D\u043D\u044B\u0439 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u0444\u0430\u0439\u043B\u0430 \u0438\u0437 \u0432\u0435\u0431-\u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F.",
-  "commands.fileNotFound": "\u274C \u041D\u0438 \u043E\u0434\u0438\u043D \u0444\u0430\u0439\u043B \u043D\u0435 \u0438\u043C\u0435\u0435\u0442 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430, \u043D\u0430\u0447\u0438\u043D\u0430\u044E\u0449\u0435\u0433\u043E\u0441\u044F \u0441 \xAB{selector}\xBB.",
-  "commands.fileAmbiguous": "\u274C \u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \xAB{selector}\xBB \u0441\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u0438\u043C \u0444\u0430\u0439\u043B\u0430\u043C. \u0421\u043A\u043E\u043F\u0438\u0440\u0443\u0439\u0442\u0435 \u0431\u043E\u043B\u0435\u0435 \u0434\u043B\u0438\u043D\u043D\u044B\u0439 \u043F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438 \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443.",
-  "commands.fileOpenListDeleteUnsupported": "\u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 OpenList \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439.",
-  "commands.fileDeleteHint": "\u041F\u0440\u0438 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0438 \u0443\u0434\u0430\u043B\u044F\u0435\u0442\u0441\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u0431\u0430\u0437\u044B \u0434\u0430\u043D\u043D\u044B\u0445 \u0438 \u043F\u0440\u0435\u0434\u043F\u0440\u0438\u043D\u0438\u043C\u0430\u0435\u0442\u0441\u044F \u043F\u043E\u043F\u044B\u0442\u043A\u0430 \u0443\u0434\u0430\u043B\u0438\u0442\u044C \u0444\u0438\u0437\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u0444\u0430\u0439\u043B. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0434\u0435\u0442\u0430\u043B\u0438, \u0437\u0430\u0442\u0435\u043C \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435.",
-  "commands.deleteExpired": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044F \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
-  "commands.deleteNotOwner": "\u042D\u0442\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044F \u043D\u0435 \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0438\u0442 \u0432\u0430\u043C \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
-  "commands.deleteInvalid": "\u042D\u0442\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u044F \u043D\u0435 \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0438\u0442 \u0432\u0430\u043C, \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D.",
-  "commands.deleteCancelled": "\u0423\u0434\u0430\u043B\u0435\u043D\u0438\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u043E: {name}",
-  "commands.fileMissingShort": "\u0424\u0430\u0439\u043B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D",
-  "commands.fileDeleteUnsupportedShort": "\u042D\u0442\u043E \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439.",
-  "commands.deleteFailed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0443\u0434\u0430\u043B\u0438\u0442\u044C: {error}.",
-  "commands.pathOncePrompt": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0435\u0435 \u0434\u043B\u044F \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
-  "commands.pathSessionPrompt": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \u0434\u043B\u044F \u0441\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u044F \u0432 \u044D\u0442\u043E\u0442 \u0447\u0430\u0442.",
-  "commands.pathOnceSaved": "\u{1F4CC} \u0414\u043B\u044F \u043F\u0430\u043F\u043A\u0438 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \xAB{folder}\xBB.\n{preview}\n\n\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u0430 \u0438\u0441\u0442\u0435\u043A\u0430\u0435\u0442 \u043F\u043E\u0441\u043B\u0435 \u0442\u043E\u0433\u043E, \u043A\u0430\u043A \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0444\u0430\u0439\u043B \u0443\u0441\u043F\u0435\u0448\u043D\u043E \u0432\u043E\u0439\u0434\u0435\u0442 \u0432 \u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u043F\u0440\u043E\u0446\u0435\u0441\u0441 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
-  "commands.pathSessionSaved": "\u{1F4CD} \u0414\u043B\u044F \u043F\u0430\u043F\u043A\u0438 \u0441\u0435\u0430\u043D\u0441\u0430 \u0447\u0430\u0442\u0430 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \xAB{folder}\xBB.\n{preview}\n\n\u0411\u0443\u0434\u0443\u0449\u0438\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u0431\u0443\u0434\u0443\u0442 \u043F\u0440\u0435\u0434\u043F\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u044D\u0442\u0443 \u043F\u0430\u043F\u043A\u0443. \u0423\u0434\u0430\u043B\u0438\u0442\u0435 \u0435\u0433\u043E \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB.",
-  "commands.pathInvalid": "\u274C \u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043F\u0443\u0442\u044C: {error}.",
-  "commands.pathCleared": "\u{1F9F9} \u041E\u0447\u0438\u0449\u0435\u043D\u044B \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u0438\u0435 \u043F\u0430\u043F\u043A\u0438 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0438 \u0441\u0435\u0430\u043D\u0441\u0430 \u0447\u0430\u0442\u0430. \u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044F \u0441\u043D\u043E\u0432\u0430 \u0430\u043A\u0442\u0438\u0432\u043D\u0430.",
-  "commands.pathRecentTitle": "\u{1F558} **\u041D\u0435\u0434\u0430\u0432\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u043F\u0430\u043F\u043A\u0438**",
-  "commands.pathRecentHint": "\u0427\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0435\u0433\u043E \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E, \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \xAB\u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0430\u044F \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0430\xBB \u0438\u043B\u0438 \xAB\u042D\u0442\u043E\u0442 \u0447\u0430\u0442\xBB \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB, \u0430 \u0437\u0430\u0442\u0435\u043C \u043E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u0430\u043F\u043A\u0438.",
-  "commands.pathRecentEmpty": "\u{1F558} \u041D\u0435\u0442 \u043D\u0435\u0434\u0430\u0432\u043D\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0445 \u043F\u0430\u043F\u043E\u043A. \u041F\u0430\u043F\u043A\u0438 \u0437\u0430\u043F\u0438\u0441\u044B\u0432\u0430\u044E\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0442\u043E\u0433\u043E, \u043A\u0430\u043A \u0432\u044B \u0438\u0445 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435.",
-  "commands.pathRecentSent": "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043D\u044B\u0435 \u043F\u0430\u043F\u043A\u0438",
-  "commands.pathInputToast": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \u0438\u043B\u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u041E\u0442\u043C\u0435\u043D\u0430\xBB, \u0447\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438.",
-  "commands.pathUpdated": "\u041C\u0435\u0441\u0442\u043E \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u043E.",
-  "commands.taskInvalidButton": "\u042D\u0442\u0430 \u043A\u043D\u043E\u043F\u043A\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u0430 \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
-  "commands.taskOldCard": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0439 \u043A\u0430\u0440\u0442\u044B \u0437\u0430\u0434\u0430\u0447 \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 /tasks \u0435\u0449\u0435 \u0440\u0430\u0437.",
-  "commands.taskWrongOwner": "\u042D\u0442\u0430 \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0432\u0430\u0448\u0430 \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A",
-  "commands.taskRefreshed": "\u0421\u043F\u0438\u0441\u043E\u043A \u0437\u0430\u0434\u0430\u0447 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D.",
-  "commands.taskEnded": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u0438\u043B\u0438 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430",
-  "commands.taskConfirmCancel": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044C \u043E\u0442\u043C\u0435\u043D\u0443",
-  "commands.taskCancelExpired": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F \u043E\u0442\u043C\u0435\u043D\u044B \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0437\u0430\u0434\u0430\u0447\u0435 \u0435\u0449\u0435 \u0440\u0430\u0437.",
-  "commands.taskRetryUnsupported": "\u042D\u0442\u043E\u0442 \u0442\u0438\u043F \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442 \u044D\u0442\u0443 \u043A\u043D\u043E\u043F\u043A\u0443 \u043F\u043E\u0432\u0442\u043E\u0440\u0430.",
-  "commands.taskPrioritized": "\u041F\u0435\u0440\u0435\u043C\u0435\u0449\u0435\u043D \u0432 \u043D\u0430\u0447\u0430\u043B\u043E \u043E\u0447\u0435\u0440\u0435\u0434\u0438 \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u044F",
-  "commands.taskPausing": "\u041F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0438\u044F \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0444\u0430\u0439\u043B\u0430",
-  "commands.taskPaused": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
-  "commands.taskResumed": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
-  "commands.taskCancelled": "\u0417\u0430\u0434\u0430\u0447\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
-  "commands.taskProtected": "\u0417\u0430\u0449\u0438\u0442\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u044B \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438; \u043F\u043E\u0434\u043E\u0436\u0434\u0438\u0442\u0435, \u043F\u043E\u043A\u0430 \u0443\u0441\u043B\u043E\u0432\u0438\u044F \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u044F\u0442\u0441\u044F",
-  "commands.taskForbidden": "\u042D\u0442\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0438\u0442 \u0442\u0435\u043A\u0443\u0449\u0435\u043C\u0443 \u0447\u0430\u0442\u0443",
-  "commands.taskOperationFailed": "\u041E\u043F\u0435\u0440\u0430\u0446\u0438\u044F \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C: {error}",
-  "commands.taskPrefixAmbiguous": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435\u043E\u0434\u043D\u043E\u0437\u043D\u0430\u0447\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u0437\u0430\u0434\u0430\u0447.",
-  "commands.bulkInvalidChat": "\u{1F4EE} \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u044D\u0442\u043E\u0442 \u0447\u0430\u0442. \u041D\u0438 \u043E\u0434\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u0431\u044B\u043B\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.",
-  "commands.bulkEmpty": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435\u0442 \u043E\u0442\u043C\u0435\u043D\u044F\u0435\u043C\u044B\u0445 \u0437\u0430\u0434\u0430\u0447.",
-  "commands.bulkTitle": "\u26A0\uFE0F **\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u0432\u0441\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435?**",
-  "commands.bulkOrdinary": "\u0420\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u044B\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438: \u0437\u0430\u0434\u0430\u0447\u0438 {tasks} (\u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B {active}, \u0444\u0430\u0439\u043B\u044B \u043E\u0436\u0438\u0434\u0430\u043D\u0438\u044F {pending})",
-  "commands.bulkChannels": "\u0417\u0430\u0434\u0430\u0447\u0438 \u043A\u0430\u043D\u0430\u043B\u0430: {count}",
-  "commands.bulkWarning": "\u0412\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 \u0437\u0430\u0434\u0430\u0447 \u0431\u0443\u0434\u0435\u0442 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E, \u0430 \u0438\u0445 \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u0431\u0443\u0434\u0443\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u044B. \u0417\u0430\u0434\u0430\u0447\u0438 \u0432 \u0434\u0440\u0443\u0433\u0438\u0445 \u0447\u0430\u0442\u0430\u0445 \u0438 \u0437\u0430\u0434\u0430\u0447\u0438, \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0430\u0449\u0438\u0435 \u0434\u0440\u0443\u0433\u0438\u043C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F\u043C, \u043D\u0435 \u0437\u0430\u0442\u0440\u0430\u0433\u0438\u0432\u0430\u044E\u0442\u0441\u044F.",
-  "commands.bulkInvalid": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043C\u0430\u0441\u0441\u043E\u0432\u043E\u0439 \u043E\u0442\u043C\u0435\u043D\u044B \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
-  "commands.confirmWrongOwner": "\u042D\u0442\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043D\u0435 \u0432\u0430\u0448\u0435 \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A",
-  "commands.confirmInvalid": "\u042D\u0442\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043D\u0435 \u0432\u0430\u0448\u0435, \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D.",
-  "commands.bulkReturned": "\u0412\u0435\u0440\u043D\u0443\u043B\u0441\u044F \u0431\u0435\u0437 \u043E\u0442\u043C\u0435\u043D\u044B \u0437\u0430\u0434\u0430\u0447 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435.",
-  "commands.bulkDoneTitle": "\u{1F6D1} **\u0417\u0430\u0434\u0430\u0447\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u044B**",
-  "commands.bulkDone": "\u0417\u0430\u0434\u0430\u0447\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u044B",
-  "commands.bulkFailed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C: {error}.",
-  "commands.stopFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u0438\u043D\u0443\u0434\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0437\u0430\u0434\u0430\u0447\u0438: {error}.",
-  "commands.cleanupCancelledSummary": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430. \u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B: {count}, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044F {size}.",
-  "commands.cleanupCancelledEmpty": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430. \u041D\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0445 \u0444\u0430\u0439\u043B\u043E\u0432 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
-  "commands.cleanupConfirmTitle": "\u26A0\uFE0F **\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u0444\u0430\u0439\u043B\u044B \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430?**",
-  "commands.cleanupConfirmSummary": "\u041F\u0440\u0438 \u044D\u0442\u043E\u043C \u0444\u0430\u0439\u043B\u044B **{count}** \u0431\u0443\u0434\u0443\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u044B \u0438\u0437 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043E\u043A \u0441 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u0435\u043C **{size}**.",
-  "commands.cleanupConfirmImpact": "\u041F\u0440\u0438 \u044D\u0442\u043E\u043C \u0431\u0443\u0434\u0443\u0442 \u0443\u0434\u0430\u043B\u0435\u043D\u044B \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B \u0438 \u0438\u0445 \u0438\u043D\u0434\u0435\u043A\u0441\u044B, \u043D\u043E \u043D\u0435 \u0438\u0441\u0442\u043E\u0440\u0438\u044F \u0437\u0430\u0434\u0430\u0447 \u0438\u043B\u0438 \u043E\u0431\u043B\u0430\u0447\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B.",
-  "commands.cleanupConfirmHint": "\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u0440\u0430\u0441\u043D\u0443\u044E \u043A\u043D\u043E\u043F\u043A\u0443 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F \u043D\u0438\u0436\u0435, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C.",
-  "commands.cleanupConfirmRequired": "\u0422\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435",
-  "commands.cleanupConfirmInvalid": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043E\u0447\u0438\u0441\u0442\u043A\u0438 \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E, \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D.",
-  "commands.cleanupDoneTitle": "\u2705 **\u0424\u0430\u0439\u043B\u044B \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0443\u0434\u0430\u043B\u0435\u043D\u044B**",
-  "commands.cleanupDoneSummary": "\u0423\u0434\u0430\u043B\u0435\u043D\u044B: \u0444\u0430\u0439\u043B\u044B {count}.\n\u041E\u0441\u0432\u043E\u0431\u043E\u0436\u0434\u0435\u043D\u043E \u043C\u0435\u0441\u0442\u043E: {size}\n\u041E\u0441\u0442\u0430\u043B\u044C\u043D\u044B\u0435 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0444\u0430\u0439\u043B\u044B: {remaining}.",
-  "commands.cleanupDeleted": "\u0423\u0434\u0430\u043B\u0435\u043D\u044B \u0444\u0430\u0439\u043B\u044B {count}.",
-  "commands.cleanupOldButton": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441\u0442\u0430\u0440\u043E\u0439 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u0447\u0438\u0441\u0442\u043A\u0438 \u0438\u0441\u0442\u0435\u043A. \u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C/\u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0435\u0449\u0435 \u0440\u0430\u0437.",
-  "commands.cleanupFailed": "\u041E\u0447\u0438\u0441\u0442\u043A\u0430 \u043D\u0435 \u0443\u0434\u0430\u043B\u0430\u0441\u044C: {error}.",
-  "commands.bulkInvalidConfirm": "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043C\u0430\u0441\u0441\u043E\u0432\u043E\u0439 \u043E\u0442\u043C\u0435\u043D\u044B \u043D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A.",
-  "commands.bulkNotOwner": "\u042D\u0442\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043D\u0435 \u0432\u0430\u0448\u0435 \u0438\u043B\u0438 \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A",
-  "commands.bulkReturnedToast": "\u0412\u0435\u0440\u043D\u0443\u043B\u0441\u044F",
-  "commands.bulkInvalidUsed": "\u042D\u0442\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u043D\u0435 \u0432\u0430\u0448\u0435, \u0441\u0440\u043E\u043A \u0435\u0433\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0438\u0441\u0442\u0435\u043A \u0438\u043B\u0438 \u0443\u0436\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D.",
-  "commands.bulkDoneMessage": "\u0412\u0435\u0440\u043D\u0443\u043B\u0441\u044F \u0431\u0435\u0437 \u043E\u0442\u043C\u0435\u043D\u044B \u0437\u0430\u0434\u0430\u0447 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435.",
-  "commands.bulkCancelledToast": "\u0417\u0430\u0434\u0430\u0447\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u044B",
-  "commands.bulkCancelFailed": "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C: {error}.",
-  "commands.taskStopFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u0438\u043D\u0443\u0434\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0437\u0430\u0434\u0430\u0447\u0438: {error}.",
-  "commands.taskPausedChannel": "\u23F8\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 {task} \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {source}",
-  "commands.taskNotFoundPause": "\u{1F4EE} \u0417\u0430\u0434\u0430\u0447\u0430 {task} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430. \u042D\u0442\u0430 \u043E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0447\u0430\u0442\u0430 \u043D\u0435 \u0431\u044B\u043B\u0430 \u043F\u0440\u0438\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
-  "commands.taskResumedSingle": "\u25B6\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430",
-  "commands.taskResumedChannel": "\u25B6\uFE0F \u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 {task} \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430.\n\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {source}",
-  "commands.taskNotFoundResume": "\u{1F4EE} \u0417\u0430\u0434\u0430\u0447\u0430 {task} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430. \u042D\u0442\u0430 \u043E\u0447\u0435\u0440\u0435\u0434\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0447\u0430\u0442\u0430 \u043D\u0435 \u0431\u044B\u043B\u0430 \u0432\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430.",
-  "commands.taskCancelledSingle": "\u{1F6D1} \u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430",
-  "commands.taskCancelledChannel": "\u{1F6D1} \u0417\u0430\u0434\u0430\u0447\u0430 \u043A\u0430\u043D\u0430\u043B\u0430 {task} \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u0430.\n\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: {source}",
-  "commands.taskNotFound": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043F\u043E\u0434\u0445\u043E\u0434\u044F\u0449\u0435\u0439 \u0437\u0430\u0434\u0430\u0447\u0438: {task}.",
-  "commands.taskLegacyCancel": "\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441\u0442\u0430\u0440\u043E\u0439 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u0442\u043C\u0435\u043D\u044B \u0438\u0441\u0442\u0435\u043A. \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 /tasks, \u0447\u0442\u043E\u0431\u044B \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0437\u0430\u0434\u0430\u0447\u0435 \u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044C \u0435\u0435.",
-  "commands.taskLegacyAmbiguous": "\u041F\u0440\u0435\u0444\u0438\u043A\u0441 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435 \u0443\u043D\u0438\u043A\u0430\u043B\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C/\u0437\u0430\u0434\u0430\u0447\u0438.",
-  "commands.taskLegacyEnded": "\u0417\u0430\u0434\u0430\u0447\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430 \u0438\u043B\u0438 \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430",
-  "commands.retryNoUniqueChannel": "\u{1F4EE} \u041D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u0443\u043D\u0438\u043A\u0430\u043B\u044C\u043D\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0438 \u043A\u0430\u043D\u0430\u043B\u0430; \u043D\u0438\u043A\u0430\u043A\u0430\u044F \u0434\u0440\u0443\u0433\u0430\u044F \u0437\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u043F\u043E\u0432\u0442\u043E\u0440\u044F\u043B\u0430\u0441\u044C.",
-  "commands.retryChannelDone": "\u{1F504} \u0412\u043E\u0437\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0443\u0447\u0430\u0441\u0442\u0438\u0435 \u0432 {count} \u043D\u0435\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0445 \u0437\u0430\u0434\u0430\u0447 \u043A\u0430\u043D\u0430\u043B\u0430.\n\u0417\u0430\u0434\u0430\u0447\u0430: {task}",
-  "commands.retryChannelEmpty": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u0439 \u0437\u0430\u0434\u0430\u0447\u0435 \u043A\u0430\u043D\u0430\u043B\u0430 \u043D\u0435\u0442 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u044B\u0445 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u043E\u0432, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u043C\u043E\u0436\u043D\u043E \u0431\u044B\u043B\u043E \u0431\u044B \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C.",
-  "commands.retryInvalidChat": "\u{1F4EE} \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u044D\u0442\u043E\u0442 \u0447\u0430\u0442; \u043D\u0438 \u043E\u0434\u043D\u0430 \u043D\u0435\u0443\u0434\u0430\u0447\u043D\u0430\u044F \u0437\u0430\u0434\u0430\u0447\u0430 \u043D\u0435 \u0431\u044B\u043B\u0430 \u043F\u043E\u0432\u0442\u043E\u0440\u0435\u043D\u0430.",
-  "commands.retryTaskMissing": "\u{1F4EE} \u0412 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043D\u0435\u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0445 \u0437\u0430\u0434\u0430\u0447: {task}",
-  "commands.workerReadFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u043E\u0434\u043D\u043E\u0444\u0430\u0439\u043B\u043E\u0432\u044B\u0439 \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u043F\u043E\u0437\u0436\u0435.",
-  "commands.concurrencyReadFailed": "\u274C \u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u0430\u0440\u0430\u043B\u043B\u0435\u043B\u044C\u043D\u043E\u0433\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u0444\u0430\u0439\u043B\u0430\u043C. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443 \u043F\u043E\u0437\u0436\u0435.",
-  "commands.pathOncePromptDirect": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u0430\u043F\u043A\u0438 \u0434\u043B\u044F \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
-  "commands.pathOnceSavedDirect": "\u{1F4CC} \u0414\u043B\u044F \u043F\u0430\u043F\u043A\u0438 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \xAB{folder}\xBB.\n{preview}\n\n\u0421\u0440\u043E\u043A \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u044D\u0442\u043E\u0433\u043E \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u0430 \u0438\u0441\u0442\u0435\u043A\u0430\u0435\u0442 \u043F\u043E\u0441\u043B\u0435 \u0442\u043E\u0433\u043E, \u043A\u0430\u043A \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0444\u0430\u0439\u043B \u0432\u043E\u0439\u0434\u0435\u0442 \u0432 \u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u043F\u0440\u043E\u0446\u0435\u0441\u0441 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438.",
-  "commands.pathSessionPromptDirect": "\u041E\u0442\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043C\u044F \u043F\u0430\u043F\u043A\u0438, \u043A\u043E\u0442\u043E\u0440\u0430\u044F \u0431\u0443\u0434\u0435\u0442 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C\u0441\u044F \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430.",
-  "commands.pathSessionSavedDirect": "\u{1F4CD} \u0414\u043B\u044F \u043F\u0430\u043F\u043A\u0438 \u0441\u0435\u0430\u043D\u0441\u0430 \u0447\u0430\u0442\u0430 \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \xAB{folder}\xBB.\n{preview}\n\n\u0411\u0443\u0434\u0443\u0449\u0438\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0432 \u044D\u0442\u043E\u043C \u0447\u0430\u0442\u0435 \u0431\u0443\u0434\u0443\u0442 \u043F\u0440\u0435\u0434\u043F\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u044D\u0442\u0443 \u043F\u0430\u043F\u043A\u0443. \u0423\u0434\u0430\u043B\u0438\u0442\u0435 \u0435\u0433\u043E \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043C\u0435\u0441\u0442\u043E\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB.",
-  "commands.pathInvalidDirect": "\u274C \u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043F\u0443\u0442\u044C: {error}.",
-  "commands.pathClearedDirect": "\u{1F9F9} \u041E\u0447\u0438\u0449\u0435\u043D\u044B \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u0438\u0435 \u043F\u0430\u043F\u043A\u0438 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0438 \u0441\u0435\u0430\u043D\u0441\u0430 \u0447\u0430\u0442\u0430. \u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0437\u0430\u0446\u0438\u044F \u0441\u043D\u043E\u0432\u0430 \u0430\u043A\u0442\u0438\u0432\u043D\u0430."
-};
-
-// src/i18n/telegram.ts
-var DEFAULT_LOCALE = "zh-CN";
-var FALLBACK_LOCALE = "zh-CN";
-var TELEGRAM_LOCALES = {
-  "zh-CN": { code: "zh-CN", nativeName: "\u7B80\u4F53\u4E2D\u6587", aliases: ["zh", "zh-cn", "zh-hans", "cn"], direction: "ltr", intlLocale: "zh-CN", telegramLanguageCode: "zh" },
-  en: { code: "en", nativeName: "English", aliases: ["en", "en-us", "en-gb"], direction: "ltr", intlLocale: "en", telegramLanguageCode: "en" },
-  ru: { code: "ru", nativeName: "\u0420\u0443\u0441\u0441\u043A\u0438\u0439", aliases: ["ru", "ru-ru"], direction: "ltr", intlLocale: "ru-RU", telegramLanguageCode: "ru" }
-};
-var resources = {
-  "zh-CN": {
-    "language.choose": "\u8BF7\u9009\u62E9\u8BED\u8A00 / Please choose your language",
-    "language.title": "\u{1F310} **\u8BED\u8A00\u8BBE\u7F6E**",
-    "language.current": "\u5F53\u524D\u8BED\u8A00\uFF1A{language}",
-    "language.changed": "\u2705 \u8BED\u8A00\u5DF2\u5207\u6362\u4E3A\u7B80\u4F53\u4E2D\u6587",
-    "language.chinese": "\u7B80\u4F53\u4E2D\u6587",
-    "language.english": "English",
-    "language.russian": "\u0420\u0443\u0441\u0441\u043A\u0438\u0439",
-    "language.hint": "\u8BF7\u9009\u62E9 Bot \u754C\u9762\u8BED\u8A00\u3002\u6B64\u64CD\u4F5C\u53EA\u66F4\u6539\u663E\u793A\u8BED\u8A00\u3002",
-    "auth.required": "\u{1F510} \u8BF7\u5148\u53D1\u9001 /start \u9A8C\u8BC1\u5BC6\u7801",
-    "auth.requiredUpload": "\u{1F510} \u8BF7\u5148\u53D1\u9001 /start \u9A8C\u8BC1\u5BC6\u7801\u540E\u518D\u4E0A\u4F20\u6587\u4EF6",
-    "auth.inputPrompt": "\u{1F510} \u8BF7\u4F7F\u7528\u4E0B\u65B9\u952E\u76D8\u8F93\u5165\u5BC6\u7801\uFF1A",
-    "auth.cancelled": "\u{1F6AB} \u5DF2\u53D6\u6D88\u5BC6\u7801\u8F93\u5165\n\n\u53D1\u9001 /start \u91CD\u65B0\u5F00\u59CB",
-    "auth.wrong": "\u274C \u5BC6\u7801\u9519\u8BEF\uFF0C\u8BF7\u91CD\u65B0\u8F93\u5165\uFF1A",
-    "auth.success": "\u2705 \u5BC6\u7801\u9A8C\u8BC1\u6210\u529F!",
-    "auth.startPrompt": "\u{1F44B} **\u6B22\u8FCE\u4F7F\u7528 TG Vault Bot\uFF01**\n\n\u{1F510} \u8BF7\u4F7F\u7528\u4E0B\u65B9\u952E\u76D8\u8F93\u5165\u5BC6\u7801\uFF1A",
-    "auth.welcomeBack": "\u{1F44B} **\u6B22\u8FCE\u56DE\u6765\uFF01**\n\n\u53D1\u9001\u6216\u8F6C\u53D1\u6587\u4EF6\u5373\u53EF\u4E0A\u4F20\u3002\n\n\u8BF7\u4ECE\u4E0B\u65B9\u56DB\u4E2A\u4E3B\u5165\u53E3\u5F00\u59CB\uFF1B\u5B8C\u6574\u80FD\u529B\u53EF\u4F7F\u7528 /help \u67E5\u770B\u3002",
-    "auth.successBody": "\u2705 **\u5BC6\u7801\u9A8C\u8BC1\u6210\u529F\uFF01**\n\n\u73B0\u5728\u60A8\u53EF\u4EE5\uFF1A\n\u{1F4E4}  \u53D1\u9001/\u8F6C\u53D1\u4EFB\u610F\u6587\u4EF6\u4E0A\u4F20 (\u6700\u5927 2GB\uFF0C\u8D26\u53F7\u7EA7\u4E0B\u8F7D\u5668\u4E0D\u53D7\u6B64\u9650\u5236)\n\u{1F4CA}  /storage \u2014 \u67E5\u770B\u5B58\u50A8\u7A7A\u95F4",
-    "auth.twoFactorPrompt": "\u{1F510} \u5BC6\u7801\u9A8C\u8BC1\u901A\u8FC7\uFF01\n\n\u8BF7\u8F93\u5165\u60A8\u7684 **2FA 6 \u4F4D\u9A8C\u8BC1\u7801** \u4EE5\u5B8C\u6210\u767B\u5F55\uFF1A",
-    "auth.twoFactorToast": "\u8BF7\u8F93\u5165 2FA \u9A8C\u8BC1\u7801",
-    "auth.twoFactorWrong": "\u274C \u9A8C\u8BC1\u7801\u9519\u8BEF\uFF0C\u8BF7\u91CD\u65B0\u8F93\u5165 6 \u4F4D\u6570\u5B57\uFF1A",
-    "auth.twoFactorActivated": "\u2705 **2FA \u5DF2\u6210\u529F\u6FC0\u6D3B\uFF01**\n\n\u{1F6E1}\uFE0F \u60A8\u7684\u8D26\u6237\u73B0\u5728\u53D7\u5230\u53CC\u91CD\u4FDD\u62A4\u3002",
-    "auth.twoFactorLoginOk": "\u2705 **2FA \u9A8C\u8BC1\u6210\u529F**\n\n\u6B22\u8FCE\u56DE\u6765\uFF01",
-    "auth.twoFactorQrFail": "\u274C \u751F\u6210\u4E8C\u7EF4\u7801\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u63A7\u5236\u53F0\u65E5\u5FD7\u3002",
-    "common.unknownText": "\u2753 \u672A\u8BC6\u522B\u7684\u6307\u4EE4\n\n\u53D1\u9001 /start \u5F00\u59CB\u4F7F\u7528\uFF0C\u6216 /help \u67E5\u770B\u5E2E\u52A9",
-    "common.unsupportedMedia": "\u26A0\uFE0F \u6682\u4E0D\u652F\u6301\u6B64\u7C7B\u5A92\u4F53\u683C\u5F0F",
-    "common.emptyFiles": "\u{1F4EE} \u6682\u65E0\u4E0A\u4F20\u8BB0\u5F55",
-    "common.emptyTasks": "\u{1F4EE} \u5F53\u524D\u6CA1\u6709\u8FDB\u884C\u4E2D\u7684\u4EFB\u52A1",
-    "common.fileCount": "{count} \u4E2A\u6587\u4EF6",
-    "common.cancel": "\u53D6\u6D88",
-    "common.back": "\u8FD4\u56DE",
-    "common.refresh": "\u5237\u65B0",
-    "common.confirm": "\u786E\u8BA4",
-    "common.failed": "\u5931\u8D25",
-    "common.success": "\u6210\u529F",
-    "messages.storage.title": "\u{1F4CA} **\u5B58\u50A8\u7A7A\u95F4\u7EDF\u8BA1**",
-    "messages.storage.disk": "**\u{1F4BF} \u670D\u52A1\u5668\u78C1\u76D8**",
-    "messages.storage.total": "  \u603B\u5BB9\u91CF\u3000{value}",
-    "messages.storage.used": "  \u5DF2\u4F7F\u7528\u3000{value} ({percent}%)",
-    "messages.storage.free": "  \u53EF\u3000\u7528\u3000{value}",
-    "messages.storage.indexed": "**\u{1F4C1} \u5B58\u50A8\u6E90\u6587\u4EF6**",
-    "messages.storage.fileCount": "  \u6587\u4EF6\u6570\u3000{count} \u4E2A",
-    "messages.storage.size": "  \u5360\u3000\u7528\u3000{value}",
-    "messages.storage.local": "**\u{1F5A5}\uFE0F \u672C\u5730\u670D\u52A1\u5668\u4E0B\u8F7D\u6587\u4EF6**",
-    "messages.storage.location": "  \u4F4D\u7F6E\u3000uploads \u672C\u5730\u7F13\u5B58/\u4E0B\u8F7D\u76EE\u5F55",
-    "messages.storage.queue": "**\u{1F4E1} \u4E0B\u8F7D\u961F\u5217**",
-    "messages.storage.queueCounts": "  \u{1F504} \u5904\u7406\u4E2D {active}\u3000\u23F3 \u7B49\u5F85\u4E2D {pending}",
-    "messages.files.title": "\u{1F4CB} **\u6700\u8FD1\u4E0A\u4F20\u7684\u6587\u4EF6**\uFF08\u672C\u9875 {count} \u6761\uFF09",
-    "messages.files.unnamed": "\u672A\u547D\u540D\u6587\u4EF6",
-    "messages.files.hint": "\u{1F4A1} \u9700\u8981\u641C\u7D22\u6216\u64CD\u4F5C\u6587\u4EF6\uFF0C\u8BF7\u6253\u5F00\u201C\u641C\u7D22\u548C\u64CD\u4F5C\u6587\u4EF6\u201D\u3002",
-    "fileBrowser.detail": "\u8BE6\u60C5",
-    "fileBrowser.copyId": "\u590D\u5236 ID",
-    "fileBrowser.favorite": "\u6536\u85CF",
-    "fileBrowser.unfavorite": "\u53D6\u6D88\u6536\u85CF",
-    "fileBrowser.signedLink": "\u7B7E\u540D\u94FE\u63A5",
-    "fileBrowser.move": "\u79FB\u52A8",
-    "fileBrowser.rename": "\u91CD\u547D\u540D",
-    "fileBrowser.delete": "\u5220\u9664\u2026",
-    "fileBrowser.unnamed": "\u672A\u547D\u540D\u6587\u4EF6",
-    "fileBrowser.other": "\u5176\u4ED6",
-    "fileBrowser.localStorage": "\u672C\u5730\u5B58\u50A8",
-    "fileBrowser.rootFolder": "\u6839\u76EE\u5F55",
-    "fileBrowser.unknown": "\u672A\u77E5",
-    "fileBrowser.search": "\u6587\u4EF6\u641C\u7D22",
-    "fileBrowser.recentFiles": "\u6700\u8FD1\u6587\u4EF6",
-    "fileBrowser.noMatches": "\u6CA1\u6709\u5339\u914D\u6587\u4EF6\u3002",
-    "fileBrowser.hint": "\u70B9\u51FB\u6587\u4EF6\u53EF\u67E5\u770B\u8BE6\u60C5\u3001\u590D\u5236 ID\u3001\u6536\u85CF\u3001\u751F\u6210\u94FE\u63A5\u3001\u79FB\u52A8/\u91CD\u547D\u540D\u6216\u8FDB\u5165\u5220\u9664\u786E\u8BA4\u3002",
-    "messages.delete.success": "\u2705 **\u6587\u4EF6\u5DF2\u5220\u9664**",
-    "keyboard.upload": "\u{1F4E4} \u4E0A\u4F20\u8BF4\u660E",
-    "keyboard.tasks": "\u{1F527} \u4EFB\u52A1",
-    "keyboard.storage": "\u{1F4CA} \u5B58\u50A8",
-    "keyboard.more": "\u2630 \u66F4\u591A",
-    "keyboard.cancel": "\u53D6\u6D88",
-    "help.body": "\u{1F4D6} **\u4F7F\u7528\u5E2E\u52A9**\n\n\u{1F4E4} \u53D1\u9001\u6216\u8F6C\u53D1\u6587\u4EF6\uFF1A\u76F4\u63A5\u4E0A\u4F20\n\u{1F517} \u53D1\u9001\u89C6\u9891\u94FE\u63A5\uFF1A\u89E3\u6790\u540E\u9009\u62E9\u683C\u5F0F\n\u{1F4E5} \u4EFB\u52A1\uFF1A\u67E5\u770B\u8FDB\u5EA6\u3001\u6682\u505C\u6216\u53D6\u6D88\n\u{1F4C1} \u4FDD\u5B58\u4F4D\u7F6E\uFF1A\u8BBE\u7F6E\u76EE\u5F55\u548C\u5B58\u50A8\u76EE\u6807\n\u{1F4E1} \u9891\u9053\uFF1A\u6309\u65E5\u671F/\u6807\u7B7E\u4E0B\u8F7D\u6216\u7BA1\u7406\u8BA2\u9605\n\u{1F310} /language\uFF1A\u66F4\u6539\u754C\u9762\u8BED\u8A00\n\n\u{1F447} \u70B9\u51FB\u4E0B\u65B9\u6309\u94AE\u9009\u62E9\u529F\u80FD\u3002",
-    "notification.digestTitle": "\u{1F4EC} **\u901A\u77E5\u6458\u8981**",
-    "notification.settingsTitle": "\u{1F514} **\u901A\u77E5\u8BBE\u7F6E**",
-    "notification.securityImmediate": "\u5B89\u5168\u544A\u8B66\u59CB\u7EC8\u7ACB\u5373\u901A\u77E5\u3002",
-    "notification.clickToChange": "\u{1F447} \u70B9\u51FB\u6309\u94AE\u4FEE\u6539",
-    "notifications.digestTitle": "\u{1F4EC} **\u901A\u77E5\u6458\u8981**",
-    "notifications.title": "\u{1F514} **\u901A\u77E5\u8BBE\u7F6E**",
-    "notifications.securityAlways": "\u5B89\u5168\u544A\u8B66\u59CB\u7EC8\u7ACB\u5373\u901A\u77E5\u3002",
-    "notifications.clickToChange": "\u{1F447} \u70B9\u51FB\u6309\u94AE\u4FEE\u6539",
-    "notifications.successImmediate": "\u6210\u529F\xB7\u7ACB\u5373",
-    "notifications.successDigest": "\u6210\u529F\xB7\u6458\u8981",
-    "notifications.successOff": "\u6210\u529F\xB7\u5173\u95ED",
-    "notifications.invalidTimezone": "\u65E0\u6548\u65F6\u533A",
-    "notifications.failureImmediate": "\u5931\u8D25\xB7\u7ACB\u5373",
-    "notifications.failureDigest": "\u5931\u8D25\xB7\u6458\u8981",
-    "notifications.subscriptionImmediate": "\u8BA2\u9605\xB7\u7ACB\u5373",
-    "notifications.subscriptionDigest": "\u8BA2\u9605\xB7\u6458\u8981",
-    "notifications.quietPreset": "\u5B89\u9759 22:00\u201307:00",
-    "notifications.quietOff": "\u5173\u95ED\u5B89\u9759\u65F6\u6BB5",
-    "notifications.timezoneShanghai": "\u65F6\u533A\xB7\u4E0A\u6D77",
-    "notifications.timezoneUtc": "\u65F6\u533A\xB7UTC",
-    "notifications.modeImmediate": "\u7ACB\u5373",
-    "notifications.modeDigest": "\u6458\u8981",
-    "notifications.modeDigestCombined": "\u5408\u5E76\u6458\u8981",
-    "notifications.modeOff": "\u4E0D\u901A\u77E5",
-    "notifications.quietDisabled": "\u672A\u5F00\u542F",
-    "notifications.settingsModes": "\u5931\u8D25\uFF1A{failure} \uFF5C \u6210\u529F\uFF1A{success}",
-    "notifications.settingsSchedule": "\u8BA2\u9605\uFF1A{subscription} \uFF5C \u5B89\u9759\uFF1A{quiet}",
-    "notifications.settingsTimezone": "\u65F6\u533A\uFF1A{timezone}",
-    "notifications.error.timezoneRequired": "\u8BF7\u63D0\u4F9B\u65F6\u533A\uFF0C\u4F8B\u5982 Asia/Shanghai",
-    "notifications.error.quietFormat": "\u5B89\u9759\u65F6\u6BB5\u683C\u5F0F\u5E94\u4E3A HH:MM-HH:MM\uFF0C\u4F8B\u5982 22:00-07:00\uFF1B\u5173\u95ED\u8BF7\u4F7F\u7528 quiet off",
-    "notifications.error.successMode": "\u6210\u529F\u901A\u77E5\u53EF\u9009\u503C\uFF1Aimmediate\uFF08\u7ACB\u5373\uFF09\u3001digest\uFF08\u6458\u8981\uFF09\u3001off\uFF08\u5173\u95ED\uFF09",
-    "notifications.error.deliveryMode": "\u901A\u77E5\u53EF\u9009\u503C\uFF1Aimmediate\uFF08\u7ACB\u5373\uFF09\u6216 digest\uFF08\u6458\u8981\uFF09",
-    "notifications.error.unknownSetting": "\u672A\u77E5\u8BBE\u7F6E\u3002\u8BF7\u76F4\u63A5\u53D1\u9001 /notifications \u67E5\u770B\u53EF\u7528\u9009\u9879",
-    "channels.errors.sourceAllowlistRequired": "\u672A\u914D\u7F6E Telegram \u6765\u6E90\u767D\u540D\u5355\uFF0C\u7981\u6B62\u4F7F\u7528\u6570\u5B57 ID/\u79C1\u804A/\u79C1\u5BC6\u7FA4\u7EC4\u6765\u6E90\u3002\u8BF7\u914D\u7F6E TELEGRAM_ALLOWED_SOURCES\u3002",
-    "channels.errors.sourceNotAllowed": "\u6765\u6E90 {source} \u4E0D\u5728 Telegram \u4E0B\u8F7D\u767D\u540D\u5355\u4E2D",
-    "channels.errors.downloaderNotReady": "Telegram \u7528\u6237\u8D26\u53F7\u4E0B\u8F7D\u5668\u672A\u5C31\u7EEA",
-    "channels.errors.sourceRequired": "\u9891\u9053\u4E0D\u80FD\u4E3A\u7A7A",
-    "channels.errors.inviteExpired": "\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u5DF2\u8FC7\u671F\uFF0C\u65E0\u6CD5\u89E3\u6790\u3002\u8BF7\u83B7\u53D6\u65B0\u7684\u9080\u8BF7\u94FE\u63A5\uFF0C\u6216\u5148\u7528\u751F\u6210\u7528\u6237 Session \u7684\u540C\u4E00\u4E2A Telegram \u8D26\u53F7\u52A0\u5165\u540E\u518D\u91CD\u8BD5\u3002",
-    "channels.errors.inviteInvalid": "\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u65E0\u6548\uFF0C\u65E0\u6CD5\u89E3\u6790\u3002\u8BF7\u68C0\u67E5\u94FE\u63A5\u662F\u5426\u5B8C\u6574\uFF0C\u6216\u91CD\u65B0\u751F\u6210\u9080\u8BF7\u94FE\u63A5\u3002",
-    "channels.errors.inviteAlreadyJoined": "\u5F53\u524D\u8D26\u53F7\u5DF2\u52A0\u5165\uFF0C\u4F46 Telegram \u8FD4\u56DE\u4E86\u5F02\u5E38\u72B6\u6001\uFF0C\u8BF7\u91CD\u65B0\u5C1D\u8BD5\u89E3\u6790\u3002",
-    "channels.errors.inviteResolutionFailed": "\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u89E3\u6790\u5931\u8D25\uFF1A{error}",
-    "channels.errors.inviteNotJoined": "\u5F53\u524D Telegram \u7528\u6237\u8D26\u53F7\u5C1A\u672A\u52A0\u5165\u8FD9\u4E2A\u79C1\u5BC6\u9891\u9053/\u7FA4\uFF0C\u65E0\u6CD5\u8BFB\u53D6\u6D88\u606F\u3002\u8BF7\u5148\u4F7F\u7528\u751F\u6210\u7528\u6237 Session \u7684\u540C\u4E00\u4E2A Telegram \u8D26\u53F7\u6253\u5F00\u9080\u8BF7\u94FE\u63A5\u5E76\u52A0\u5165\uFF0C\u7136\u540E\u91CD\u65B0\u6267\u884C\u8BA2\u9605\u6216\u4E0B\u8F7D\u547D\u4EE4\u3002",
-    "channels.errors.inviteMissingEntity": "\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u89E3\u6790\u5931\u8D25\uFF1ATelegram \u672A\u8FD4\u56DE\u53EF\u8BFB\u53D6\u7684\u9891\u9053\u5B9E\u4F53\u3002\u8BF7\u68C0\u67E5\u8D26\u53F7\u662F\u5426\u4ECD\u5728\u8BE5\u9891\u9053/\u7FA4\u5185\u3002",
-    "channels.errors.hashtagRequired": "\u6807\u7B7E\u4E0D\u80FD\u4E3A\u7A7A",
-    "channels.errors.hashtagInvalid": "\u6807\u7B7E\u683C\u5F0F\u5E94\u4E3A #xxx\uFF0C\u4E0D\u80FD\u5305\u542B\u7A7A\u683C",
-    "channels.errors.subscriptionNotFound": "\u8BA2\u9605\u4E0D\u5B58\u5728",
-    "channels.errors.subscriptionDisabled": "\u8BA2\u9605\u5DF2\u505C\u7528",
-    "channels.errors.noDownloadableMessages": "\u6CA1\u6709\u53EF\u4E0B\u8F7D\u7684\u6D88\u606F",
-    "channels.errors.sourceMessageUnavailable": "\u539F\u6D88\u606F\u4E0D\u5B58\u5728\u6216\u6CA1\u6709\u53EF\u4E0B\u8F7D\u5A92\u4F53",
-    "channels.errors.fixedTargetProviderRequired": "\u56FA\u5B9A\u8BA2\u9605\u76EE\u6807\u7F3A\u5C11 provider",
-    "channels.storageCooldown": "\u23F8\uFE0F Google Drive \u4ECA\u65E5\u4E0A\u4F20\u989D\u5EA6\u5DF2\u8FBE\u4E0A\u9650\n\n\u5F53\u524D\u4EFB\u52A1\u5DF2\u81EA\u52A8\u6682\u505C\uFF0C\u5269\u4F59\u6587\u4EF6\u4E0D\u4F1A\u4E22\u5931\uFF1B\u65E0\u9700\u70B9\u51FB\u201C\u7EE7\u7EED\u201D\u3002\u7CFB\u7EDF\u5C06\u5728\u989D\u5EA6\u6062\u590D\u540E\u81EA\u52A8\u7EE7\u7EED\u3002\n\n\u6062\u590D\u65F6\u95F4\uFF1A{retryAt}\n\u4EFB\u52A1\uFF1A{jobId}",
-    "channels.recoveryComplete": "\u267B\uFE0F \u5DF2\u6062\u590D\u5E76\u5B8C\u6210\u4EFB\u52A1 {jobId}\uFF1A\u6210\u529F {successful}\uFF0C\u8DF3\u8FC7 {skipped}\uFF0C\u5931\u8D25 {failed}",
-    "subscriptions.syncComplete": "\u2705 \u8BA2\u9605 {source} \u5DF2\u540C\u6B65 {found} \u4E2A\u65B0\u6587\u4EF6\uFF0C\u8DF3\u8FC7 {skipped} \u6761\uFF0C\u5931\u8D25 {failed} \u6761\u3002",
-    "subscriptions.syncCompleteContinues": "\u2705 \u8BA2\u9605 {source} \u5DF2\u540C\u6B65 {found} \u4E2A\u65B0\u6587\u4EF6\uFF0C\u8DF3\u8FC7 {skipped} \u6761\uFF0C\u5931\u8D25 {failed} \u6761\u3002\u672C\u8F6E\u8FBE\u5230\u626B\u63CF\u4E0A\u9650\u6216\u5B58\u5728\u5931\u8D25\u9879\uFF0C\u5269\u4F59\u5C06\u5728\u540E\u7EED\u7EE7\u7EED\u5904\u7406\u3002",
-    "subscriptions.disabled.inviteExpired": "\u8BA2\u9605\u5DF2\u6682\u505C\uFF1A\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u5DF2\u8FC7\u671F\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u89E3\u6790\u6216\u4E0B\u8F7D\u3002\u8BF7\u91CD\u65B0\u52A0\u5165/\u66F4\u65B0\u94FE\u63A5\u540E\u518D\u8BA2\u9605\u3002",
-    "subscriptions.disabled.inviteInvalid": "\u8BA2\u9605\u5DF2\u6682\u505C\uFF1A\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u65E0\u6548\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u89E3\u6790\u6216\u4E0B\u8F7D\u3002\u8BF7\u68C0\u67E5\u94FE\u63A5\u540E\u91CD\u65B0\u8BA2\u9605\u3002",
-    "subscriptions.disabled.notParticipant": "\u8BA2\u9605\u5DF2\u6682\u505C\uFF1A\u5F53\u524D Telegram \u7528\u6237\u8D26\u53F7\u5DF2\u4E0D\u5728\u8BE5\u79C1\u5BC6\u9891\u9053/\u7FA4\u5185\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u4E0B\u8F7D\u3002\u8BF7\u5148\u91CD\u65B0\u52A0\u5165\u540E\u518D\u8BA2\u9605\u3002",
-    "subscriptions.disabled.inaccessible": "\u8BA2\u9605\u5DF2\u6682\u505C\uFF1A\u5F53\u524D Telegram \u7528\u6237\u8D26\u53F7\u65E0\u6CD5\u8BBF\u95EE\u8BE5\u9891\u9053/\u7FA4\uFF0C\u53EF\u80FD\u5DF2\u9000\u51FA\u3001\u88AB\u79FB\u9664\u6216\u9891\u9053\u53D8\u4E3A\u79C1\u5BC6\u3002\u8BF7\u68C0\u67E5\u8D26\u53F7\u6743\u9650\u540E\u91CD\u65B0\u8BA2\u9605\u3002",
-    "subscriptions.disabled.unknown": "\u8BA2\u9605\u5DF2\u6682\u505C\uFF1A\u65E0\u6CD5\u8BBF\u95EE\u6216\u4E0B\u8F7D\u8BE5\u9891\u9053/\u7FA4\u5185\u5BB9\uFF08{error}\uFF09\u3002\u8BF7\u68C0\u67E5\u8D26\u53F7\u662F\u5426\u4ECD\u53EF\u8BBF\u95EE\u540E\u91CD\u65B0\u8BA2\u9605\u3002",
-    "subscriptions.paused.inviteExpired": "\u26A0\uFE0F \u5DF2\u6682\u505C\u8BA2\u9605 {source}\n\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u5DF2\u8FC7\u671F\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u89E3\u6790\u6216\u4E0B\u8F7D\u3002\n\n\u4F60\u53EF\u4EE5\u5728 /tg_subs \u6216 /tg_sub \u8BA2\u9605\u5217\u8868\u4E2D\u67E5\u770B\u63D0\u9192\uFF1B\u66F4\u65B0\u94FE\u63A5\u5E76\u786E\u8BA4\u8D26\u53F7\u53EF\u8BBF\u95EE\u540E\u91CD\u65B0\u6DFB\u52A0\u8BA2\u9605\u5373\u53EF\u3002",
-    "subscriptions.paused.inviteInvalid": "\u26A0\uFE0F \u5DF2\u6682\u505C\u8BA2\u9605 {source}\n\u79C1\u5BC6\u9891\u9053/\u7FA4\u9080\u8BF7\u94FE\u63A5\u65E0\u6548\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u89E3\u6790\u6216\u4E0B\u8F7D\u3002\n\n\u4F60\u53EF\u4EE5\u5728 /tg_subs \u6216 /tg_sub \u8BA2\u9605\u5217\u8868\u4E2D\u67E5\u770B\u63D0\u9192\uFF1B\u68C0\u67E5\u94FE\u63A5\u5E76\u786E\u8BA4\u8D26\u53F7\u53EF\u8BBF\u95EE\u540E\u91CD\u65B0\u6DFB\u52A0\u8BA2\u9605\u5373\u53EF\u3002",
-    "subscriptions.paused.notParticipant": "\u26A0\uFE0F \u5DF2\u6682\u505C\u8BA2\u9605 {source}\n\u5F53\u524D Telegram \u7528\u6237\u8D26\u53F7\u5DF2\u4E0D\u5728\u8BE5\u79C1\u5BC6\u9891\u9053/\u7FA4\u5185\uFF0C\u65E0\u6CD5\u7EE7\u7EED\u4E0B\u8F7D\u3002\n\n\u4F60\u53EF\u4EE5\u5728 /tg_subs \u6216 /tg_sub \u8BA2\u9605\u5217\u8868\u4E2D\u67E5\u770B\u63D0\u9192\uFF1B\u91CD\u65B0\u52A0\u5165\u5E76\u786E\u8BA4\u8D26\u53F7\u53EF\u8BBF\u95EE\u540E\u91CD\u65B0\u6DFB\u52A0\u8BA2\u9605\u5373\u53EF\u3002",
-    "subscriptions.paused.inaccessible": "\u26A0\uFE0F \u5DF2\u6682\u505C\u8BA2\u9605 {source}\n\u5F53\u524D Telegram \u7528\u6237\u8D26\u53F7\u65E0\u6CD5\u8BBF\u95EE\u8BE5\u9891\u9053/\u7FA4\uFF0C\u53EF\u80FD\u5DF2\u9000\u51FA\u3001\u88AB\u79FB\u9664\u6216\u9891\u9053\u53D8\u4E3A\u79C1\u5BC6\u3002\n\n\u4F60\u53EF\u4EE5\u5728 /tg_subs \u6216 /tg_sub \u8BA2\u9605\u5217\u8868\u4E2D\u67E5\u770B\u63D0\u9192\uFF1B\u786E\u8BA4\u8D26\u53F7\u53EF\u8BBF\u95EE\u540E\u91CD\u65B0\u6DFB\u52A0\u8BA2\u9605\u5373\u53EF\u3002",
-    "subscriptions.paused.unknown": "\u26A0\uFE0F \u5DF2\u6682\u505C\u8BA2\u9605 {source}\n\u65E0\u6CD5\u8BBF\u95EE\u6216\u4E0B\u8F7D\u8BE5\u9891\u9053/\u7FA4\u5185\u5BB9\uFF08{error}\uFF09\u3002\n\n\u4F60\u53EF\u4EE5\u5728 /tg_subs \u6216 /tg_sub \u8BA2\u9605\u5217\u8868\u4E2D\u67E5\u770B\u63D0\u9192\uFF1B\u786E\u8BA4\u8D26\u53F7\u53EF\u8BBF\u95EE\u540E\u91CD\u65B0\u6DFB\u52A0\u8BA2\u9605\u5373\u53EF\u3002",
-    "ads.reason.allowRule": "\u547D\u4E2D\u5141\u8BB8\u89C4\u5219",
-    "ads.reason.blockedTemplate": "\u547D\u4E2D\u5DF2\u786E\u8BA4\u5E7F\u544A\u6A21\u677F",
-    "ads.reason.blockRule": "\u547D\u4E2D\u5C4F\u853D\u89C4\u5219",
-    "ads.reason.normalTemplate": "\u4E0E\u5DF2\u786E\u8BA4\u6B63\u5E38\u5185\u5BB9\u76F8\u4F3C",
-    "ads.reason.adHistoryTemplate": "\u4E0E\u5386\u53F2\u5E7F\u544A\u6A21\u677F\u9AD8\u5EA6\u76F8\u4F3C",
-    "ads.reason.transactionContact": "\u5305\u542B\u4EA4\u6613\u610F\u56FE\u548C\u5916\u90E8\u8054\u7CFB\u65B9\u5F0F",
-    "ads.reason.transactionIntent": "\u5305\u542B\u4EA4\u6613\u6216\u4FC3\u9500\u610F\u56FE",
-    "ads.reason.ctaLink": "\u5305\u542B\u884C\u52A8\u53F7\u53EC\u548C\u5916\u90E8\u8DF3\u8F6C",
-    "ads.reason.callToAction": "\u5305\u542B\u660E\u663E\u884C\u52A8\u53F7\u53EC",
-    "ads.reason.linkDensity": "\u5916\u90E8\u94FE\u63A5\u6216\u8054\u7CFB\u65B9\u5F0F\u5BC6\u96C6",
-    "ads.reason.scarcity": "\u5305\u542B\u9650\u65F6\u6216\u7A00\u7F3A\u6027\u8BDD\u672F",
-    "ads.reason.decorativeMarketing": "\u8425\u9500\u5F0F\u7B26\u53F7\u8F83\u591A",
-    "task.pause": "\u23F8 \u6682\u505C",
-    "task.resume": "\u25B6\uFE0F \u7EE7\u7EED",
-    "task.cancel": "\u{1F6D1} \u53D6\u6D88",
-    "task.retryFailed": "\u{1F504} \u91CD\u8BD5\u5931\u8D25 ({count})",
-    "task.failureDetails": "\u67E5\u770B\u5931\u8D25\u660E\u7EC6",
-    "upload.success": "\u2705 **\u4E0A\u4F20\u6210\u529F\uFF01**",
-    "upload.failed": "\u274C **\u4E0A\u4F20\u5931\u8D25**",
-    "upload.downloading": "\u23F3 **\u6B63\u5728\u4E0B\u8F7D**",
-    "upload.saving": "\u{1F4BE} **\u6B63\u5728\u4FDD\u5B58...**",
-    "upload.queued": "\u23F3 **\u5DF2\u52A0\u5165\u4E0B\u8F7D\u961F\u5217**",
-    "upload.retrying": "\u{1F504} **\u4E0A\u4F20\u5931\u8D25\uFF0C\u6B63\u5728\u91CD\u8BD5...**",
-    "upload.duplicateSkipped": "\u23ED\uFE0F **\u5DF2\u8DF3\u8FC7\u91CD\u590D\u6587\u4EF6**",
-    "upload.reason": "\u539F\u56E0: {error}",
-    "upload.currentQueue": "\u{1F4CA} \u5F53\u524D\u6392\u961F: {count} \u4E2A\u4EFB\u52A1",
-    "upload.wait": "\u{1F4A1} Bot \u5C06\u6309\u987A\u5E8F\u5904\u7406\uFF0C\u8BF7\u8010\u5FC3\u7B49\u5F85",
-    "upload.duplicateCopiedOutcome": "\u267B\uFE0F \u91CD\u590D\u5904\u7406\uFF1A\u5DF2\u751F\u6210\u526F\u672C",
-    "upload.duplicateSkippedOutcome": "\u23ED\uFE0F \u91CD\u590D\u5904\u7406\uFF1A\u5DF2\u8DF3\u8FC7",
-    "upload.manageHint": "\u{1F447} \u53EF\u5728\u201C\u641C\u7D22\u548C\u64CD\u4F5C\u6587\u4EF6\u201D\u4E2D\u7EE7\u7EED\u7BA1\u7406\u3002",
-    "upload.failureRetryNote": "\u{1F504} \u5927\u6587\u4EF6\u53EF\u80FD\u56E0\u7F51\u7EDC\u6CE2\u52A8\u3001Telegram \u9650\u6D41\u6216\u4E34\u65F6\u65AD\u6D41\u5931\u8D25\uFF1BBot \u5DF2\u81EA\u52A8\u91CD\u8BD5\u4E00\u6B21\u3002",
-    "upload.failureAdvice": "\u{1F4A1} \u53EF\u91CD\u65B0\u53D1\u9001\u8BE5\u6587\u4EF6\uFF0C\u6216\u7528 /download_workers \u964D\u4F4E\u5E76\u53D1\u540E\u518D\u8BD5\u3002",
-    "upload.receipt.saved": "\u2705 **\u6587\u4EF6\u5DF2\u4FDD\u5B58**",
-    "upload.receipt.partial": "\u26A0\uFE0F **\u6279\u91CF\u4EFB\u52A1\u90E8\u5206\u5B8C\u6210**",
-    "upload.receipt.failed": "\u274C **\u4FDD\u5B58\u5931\u8D25**",
-    "upload.receipt.processing": "\u23F3 **\u6B63\u5728\u5904\u7406**",
-    "upload.receipt.stats": "\u{1F4CA} \u5171 {total} \xB7 \u6210\u529F {successful} \xB7 \u5931\u8D25 {failed}",
-    "upload.receipt.duplicateCopied": "\u267B\uFE0F \u91CD\u590D\u5904\u7406\uFF1A\u5DF2\u751F\u6210\u526F\u672C",
-    "upload.receipt.duplicateSkipped": "\u23ED\uFE0F \u91CD\u590D\u5904\u7406\uFF1A\u5DF2\u8DF3\u8FC7",
-    "upload.receipt.task": "\u4EFB\u52A1\uFF1A{taskId}",
-    "upload.receipt.findFolder": "\u641C\u7D22\u540C\u76EE\u5F55",
-    "upload.receipt.deleteFile": "\u5220\u9664\u8BE5\u6587\u4EF6",
-    "upload.existingId": "\u{1F194} \u5DF2\u5B58\u5728: {id}",
-    "upload.duplicateCopyAdvice": "\u5982\u9700\u4FDD\u7559\u526F\u672C\uFF0C\u8BF7\u6253\u5F00\u201C\u91CD\u590D\u6587\u4EF6\u5904\u7406\u201D\u5E76\u9009\u62E9\u201C\u751F\u6210\u526F\u672C\u201D\u3002",
-    "upload.taskCancelled.title": "\u{1F6D1} **\u540E\u53F0\u4EFB\u52A1\u5DF2\u53D6\u6D88**",
-    "upload.taskCancelled.id": "\u{1F194} \u4EFB\u52A1\uFF1A`{taskId}`",
-    "upload.taskCancelled.completed": "\u2705 \u5DF2\u5B8C\u6210: {count} \u4E2A\u6587\u4EF6",
-    "upload.taskCancelled.failed": "\u274C \u5931\u8D25: {count} \u4E2A\u6587\u4EF6",
-    "upload.taskCancelled.stopped": "\u{1F6AB} \u5DF2\u505C\u6B62/\u6E05\u7A7A: {count} \u4E2A\u7B49\u5F85\u6216\u8FDB\u884C\u4E2D\u7684\u4EFB\u52A1",
-    "upload.taskCancelled.controlsRemoved": "\u5DF2\u79FB\u9664\u6682\u505C / \u7EE7\u7EED / \u53D6\u6D88\u6309\u94AE\uFF0C\u6B64\u4EFB\u52A1\u4E0D\u4F1A\u518D\u54CD\u5E94\u65E7\u6309\u94AE\u64CD\u4F5C\u3002",
-    "upload.error.unknown": "\u672A\u77E5\u9519\u8BEF",
-    "upload.failedDetail.batch": "{name}: {count} \u9879\u5931\u8D25",
-    "upload.cleanup.expired": "\u8BE5\u6E05\u7406\u4EFB\u52A1\u5DF2\u8FC7\u671F\u6216\u4E0D\u5B58\u5728",
-    "upload.cleanup.success": "\u2705 \u5DF2\u6E05\u7406 {fileName} \u7684\u5783\u573E\u7F13\u5B58 ({size})",
-    "upload.cleanup.failed": "\u6E05\u7406\u5931\u8D25: {error}",
-    "taskCenter.kind.single": "\u5355\u6587\u4EF6",
-    "taskCenter.kind.album": "\u76F8\u518C",
-    "taskCenter.kind.channel": "\u9891\u9053\u4EFB\u52A1",
-    "taskCenter.state.running": "\u6B63\u5728\u8FD0\u884C",
-    "taskCenter.state.waiting": "\u7B49\u5F85\u5F00\u59CB",
-    "taskCenter.state.pausing": "\u6B63\u5728\u5B8C\u6210\u5F53\u524D\u6587\u4EF6",
-    "taskCenter.state.paused": "\u5DF2\u6682\u505C",
-    "taskCenter.state.cooling": "\u7CFB\u7EDF\u7B49\u5F85",
-    "taskCenter.state.failed": "\u5904\u7406\u5931\u8D25",
-    "taskCenter.age.justNow": "\u521A\u521A",
-    "taskCenter.age.minutes": "{count} \u5206\u949F\u524D",
-    "taskCenter.age.hours": "{count} \u5C0F\u65F6\u524D",
-    "taskCenter.age.days": "{count} \u5929\u524D",
-    "taskCenter.progress.active": "\u4E0B\u8F7D\u4E2D {count}",
-    "taskCenter.progress.pending": "\u5F85\u5904\u7406 {count}",
-    "taskCenter.progress.failed": "\u5931\u8D25 {count}",
-    "taskCenter.progress.skipped": "\u8DF3\u8FC7 {count}",
-    "taskCenter.title": "\u{1F4E5} **\u4E0B\u8F7D\u4EFB\u52A1**",
-    "taskCenter.summary": "\u{1F7E2} \u8FD0\u884C\u4E2D {running}\u3000\u23F3 \u7B49\u5F85 {waiting}\u3000\u23F8 \u5DF2\u6682\u505C {paused}",
-    "taskCenter.summaryCooling": "\u{1F9CA} \u7CFB\u7EDF\u7B49\u5F85 {count}",
-    "taskCenter.total": "\u5171 {count} \u4E2A\u8FDB\u884C\u4E2D\u7684\u4EFB\u52A1",
-    "taskCenter.totalPaged": "\u5171 {count} \u4E2A\u8FDB\u884C\u4E2D\u7684\u4EFB\u52A1 \xB7 \u7B2C {page}/{totalPages} \u9875",
-    "taskCenter.item.current": "{kind} \xB7 {progress} \xB7 \u5F53\u524D\uFF1A{file}",
-    "taskCenter.item.state": "{kind} \xB7 {progress} \xB7 {state}",
-    "taskCenter.openHint": "\u70B9\u51FB\u7F16\u53F7\u67E5\u770B\u8BE6\u60C5\u5E76\u63A7\u5236\u9009\u4E2D\u7684\u4EFB\u52A1\u3002",
-    "taskCenter.button.previous": "\u25C0\uFE0F \u4E0A\u4E00\u9875",
-    "taskCenter.button.refresh": "\u{1F504} \u5237\u65B0",
-    "taskCenter.button.next": "\u4E0B\u4E00\u9875 \u25B6\uFE0F",
-    "taskCenter.button.start": "\u25B6\uFE0F \u4F18\u5148\u5F00\u59CB",
-    "taskCenter.button.pause": "\u23F8 \u6682\u505C\u4EFB\u52A1",
-    "taskCenter.button.resume": "\u25B6\uFE0F \u7EE7\u7EED",
-    "taskCenter.button.undoPause": "\u25B6\uFE0F \u64A4\u9500\u6682\u505C",
-    "taskCenter.button.retry": "\u{1F504} \u91CD\u8BD5",
-    "taskCenter.button.cancel": "\u{1F6D1} \u53D6\u6D88",
-    "taskCenter.button.backList": "\u21A9\uFE0F \u8FD4\u56DE\u4EFB\u52A1\u5217\u8868",
-    "taskCenter.button.confirmCancel": "\u26A0\uFE0F \u786E\u8BA4\u53D6\u6D88",
-    "taskCenter.button.backDetail": "\u8FD4\u56DE\u8BE6\u60C5",
-    "taskCenter.untitled": "\u672A\u547D\u540D\u4EFB\u52A1",
-    "taskCenter.detail.type": "\u7C7B\u578B\uFF1A{value}",
-    "taskCenter.detail.source": "\u6765\u6E90\uFF1A{value}",
-    "taskCenter.detail.progress": "\u8FDB\u5EA6\uFF1A{value}",
-    "taskCenter.detail.currentFile": "\u5F53\u524D\u6587\u4EF6\uFF1A{value}",
-    "taskCenter.detail.targetFolder": "\u4FDD\u5B58\u4F4D\u7F6E\uFF1A{value}",
-    "taskCenter.detail.reason": "\u539F\u56E0\uFF1A{value}",
-    "taskCenter.detail.created": "\u521B\u5EFA\uFF1A{value}",
-    "taskCenter.detail.updated": "\u6700\u8FD1\u6D3B\u52A8\uFF1A{value}",
-    "taskCenter.detail.id": "\u4EFB\u52A1 ID\uFF1A{value}",
-    "taskCenter.protection.retryAt": "\u7CFB\u7EDF\u4F1A\u5728 {value} \u540E\u91CD\u65B0\u68C0\u67E5\u5E76\u81EA\u52A8\u6062\u590D\u3002",
-    "taskCenter.protection.recheck": "\u7CFB\u7EDF\u6BCF {count} \u79D2\u91CD\u65B0\u68C0\u67E5\uFF0C\u6761\u4EF6\u6EE1\u8DB3\u540E\u81EA\u52A8\u6062\u590D\u3002",
-    "taskCenter.protection.autoResume": "\u7CFB\u7EDF\u4F1A\u6301\u7EED\u68C0\u67E5\uFF0C\u6761\u4EF6\u6EE1\u8DB3\u540E\u81EA\u52A8\u6062\u590D\u3002",
-    "taskCenter.protection.manual": "\u6B64\u72B6\u6001\u4E0D\u4F1A\u81EA\u52A8\u6062\u590D\uFF0C\u8BF7\u6309\u539F\u56E0\u5904\u7406\u540E\u91CD\u8BD5\u3002",
-    "taskCenter.protection.paused": "\u8BE5\u4EFB\u52A1\u7531\u7CFB\u7EDF\u4FDD\u62A4\u6682\u505C\uFF1B{recovery}",
-    "taskCenter.note.pausing": "\u5F53\u524D\u6587\u4EF6\u5B8C\u6210\u540E\u4F1A\u81EA\u52A8\u8FDB\u5165\u5DF2\u6682\u505C\u72B6\u6001\u3002",
-    "taskCenter.note.failed": "\u8BE5\u4EFB\u52A1\u6CA1\u6709\u7EE7\u7EED\u8FD0\u884C\uFF1B\u786E\u8BA4\u5916\u90E8\u5199\u7ED3\u679C\u5DF2\u5BF9\u8D26\u540E\uFF0C\u53EF\u4EE5\u91CD\u65B0\u63D0\u4EA4\u4E0B\u8F7D\u3002",
-    "taskCenter.note.start": "\u201C\u4F18\u5148\u5F00\u59CB\u201D\u4F1A\u628A\u8BE5\u4EFB\u52A1\u79FB\u5230\u7B49\u5F85\u961F\u5217\u524D\u9762\uFF0C\u4E0D\u4F1A\u4E2D\u65AD\u6B63\u5728\u4E0B\u8F7D\u7684\u6587\u4EF6\u3002",
-    "taskCenter.note.pause": "\u6682\u505C\u4F1A\u5148\u5B8C\u6210\u5F53\u524D\u6587\u4EF6\uFF0C\u518D\u505C\u6B62\u8FD9\u4E2A\u4EFB\u52A1\u7684\u540E\u7EED\u6587\u4EF6\u3002",
-    "taskCenter.cancel.title": "\u26A0\uFE0F **\u786E\u8BA4\u53D6\u6D88\u8FD9\u4E2A\u4EFB\u52A1\uFF1F**",
-    "taskCenter.cancel.activeWarning": "\u6B63\u5728\u4E0B\u8F7D\u7684\u6587\u4EF6\u4F1A\u88AB\u4E2D\u6B62\u5E76\u6E05\u7406\u4E34\u65F6\u6587\u4EF6\uFF0C\u7B49\u5F85\u4E2D\u7684\u6587\u4EF6\u4F1A\u7ACB\u5373\u79FB\u51FA\u961F\u5217\u3002",
-    "taskCenter.cancel.waitingWarning": "\u7B49\u5F85\u4E2D\u7684\u6587\u4EF6\u4F1A\u7ACB\u5373\u79FB\u51FA\u961F\u5217\u3002",
-    "taskCenter.cancel.unaffected": "\u5176\u5B83\u4EFB\u52A1\u4E0D\u4F1A\u53D7\u5230\u5F71\u54CD\u3002",
-    "taskCenter.stage.waiting": "\u7B49\u5F85\u5F00\u59CB",
-    "taskCenter.stage.recovering": "\u670D\u52A1\u91CD\u542F\u540E\u6062\u590D",
-    "taskCenter.stage.downloading": "\u4E0B\u8F7D\u6E90\u6587\u4EF6",
-    "taskCenter.stage.uploading": "\u4E0A\u4F20\u5230\u5B58\u50A8",
-    "taskCenter.stage.processing": "\u670D\u52A1\u5668\u5904\u7406\u4E2D",
-    "taskCenter.defaultAccount": "\u9ED8\u8BA4\u8D26\u6237",
-    "taskCenter.cooldown.storageLimit": "Google Drive \u4ECA\u65E5\u4E0A\u4F20\u989D\u5EA6\u5DF2\u8FBE\u4E0A\u9650",
-    "taskCenter.cooldown.floodWait": "Telegram \u8BF7\u6C42\u9891\u7387\u53D7\u9650\uFF08FloodWait\uFF09",
-    "taskCenter.cooldown.autoResume": "{cause}\uFF1B\u7CFB\u7EDF\u4F1A\u6301\u7EED\u68C0\u67E5\u5E76\u81EA\u52A8\u6062\u590D",
-    "taskCenter.cooldown.autoResumeAt": "{cause}\uFF1B\u9884\u8BA1 {time} \u540E\u81EA\u52A8\u6062\u590D",
-    "taskCenter.cooldown.system": "\u7CFB\u7EDF\u51B7\u5374\u4E2D",
-    "taskCenter.reason.userPaused": "\u7528\u6237\u8BF7\u6C42\u6682\u505C",
-    "status.none": "\u65E0",
-    "status.redacted": "[\u5DF2\u8131\u654F]",
-    "status.state.healthy": "\u6B63\u5E38",
-    "status.state.running": "\u8FD0\u884C\u4E2D",
-    "status.state.connected": "\u5DF2\u8FDE\u63A5",
-    "status.state.disabled": "\u672A\u542F\u7528",
-    "status.state.expired": "\u767B\u5F55\u5DF2\u8FC7\u671F",
-    "status.state.failed": "\u5F02\u5E38",
-    "status.state.unknown": "\u672A\u77E5",
-    "status.state.cooldown": "\u51B7\u5374\u4E2D",
-    "status.title": "\u{1FA7A} **TG Vault \u8BCA\u65AD\u72B6\u6001**",
-    "status.requestId": "\u64CD\u4F5C ID\uFF1A{requestId}",
-    "status.degraded": "\uFF08\u964D\u7EA7\uFF09",
-    "status.bot": "Bot\uFF1A{status}{degraded} \xB7 \u91CD\u8FDE {reconnectCount} \u6B21",
-    "status.userClient": "\u8D26\u53F7\u4E0B\u8F7D\u5668\uFF1A{status}{username}",
-    "status.accountRecovery": "\u8D26\u53F7\u6062\u590D\uFF1A{action}",
-    "status.storage": "\u5F53\u524D\u5B58\u50A8\uFF1A{provider} \xB7 {accountName}",
-    "status.probe": "\u8FDE\u63A5\u68C0\u67E5\uFF1A{status}",
-    "status.recoveryTime": "\u6062\u590D\u65F6\u95F4\uFF1A{time}",
-    "status.storageError": "\u5B58\u50A8\u9519\u8BEF\uFF1A{error}",
-    "status.disk": "\u4E34\u65F6\u78C1\u76D8\uFF1A\u53EF\u7528 {free} / {total} \xB7 \u5DF2\u7528 {usedPercent}%",
-    "status.queue": "\u961F\u5217\uFF1A\u6D3B\u8DC3 {active} \xB7 \u7B49\u5F85 {pending} \xB7 \u5931\u8D25 {failed}{paused}",
-    "status.queuePaused": " \xB7 \u5DF2\u6682\u505C",
-    "status.subscriptions": "\u8BA2\u9605\uFF1A\u542F\u7528 {enabled} \xB7 \u6700\u8FD1\u626B\u63CF {lastScan}",
-    "status.subscriptionError": "\u8BA2\u9605\u9519\u8BEF\uFF1A{error}",
-    "status.reconciliation": "\u5BF9\u8D26\uFF1A\u5F85\u5BF9\u8D26\uFF1A{pending} \xB7 \u9700\u4EBA\u5DE5\uFF1A{operatorRequired}",
-    "status.advice": "\u5EFA\u8BAE\uFF1A{action}",
-    "status.defaultAdvice": "\u5EFA\u8BAE\uFF1A\u5982\u7EC4\u4EF6\u5F02\u5E38\uFF0C\u8BF7\u643A\u5E26\u64CD\u4F5C ID \u67E5\u770B\u7ED3\u6784\u5316\u65E5\u5FD7\u3002",
-    "path.preview": "\u4FDD\u5B58\u5230\uFF1A{folder}/\u6587\u4EF6\u540D\uFF08\u4E0D\u4F1A\u8FFD\u52A0\u9891\u9053\u540D\u6216\u6587\u4EF6\u7C7B\u578B\u76EE\u5F55\uFF09",
-    "path.prompt.onceTitle": "\u{1F4CC} **\u8BBE\u7F6E\u4E0B\u4E00\u6B21\u4E0B\u8F7D\u76EE\u5F55**",
-    "path.prompt.sessionTitle": "\u{1F4CD} **\u8BBE\u7F6E\u4F1A\u8BDD\u4E0B\u8F7D\u76EE\u5F55**",
-    "path.prompt.sendFolder": "\u8BF7\u76F4\u63A5\u53D1\u9001\u76EE\u5F55\u540D\u79F0\uFF1A",
-    "path.prompt.onceExample": "\u4F8B\u5982\uFF1A`PIXIV/\u6BCF\u65E5Top50`",
-    "path.prompt.sessionExample": "\u4F8B\u5982\uFF1A`\u76F8\u518C/2026-07`",
-    "path.prompt.recent": "\u6700\u8FD1\u4F7F\u7528\u76EE\u5F55\uFF1A",
-    "path.prompt.onceNote": "\u8BF4\u660E\uFF1A\u53EA\u5F71\u54CD\u4E0B\u4E00\u6B21\u8FDB\u5165\u4E0B\u8F7D\u6D41\u7A0B\u7684\u6587\u4EF6\u3002",
-    "path.prompt.sessionNote": "\u8BF4\u660E\uFF1A\u4F1A\u5F71\u54CD\u5F53\u524D\u804A\u5929\u540E\u7EED\u4E0B\u8F7D\uFF0C\u76F4\u5230\u53D1\u9001 `/pc` \u6216\u70B9\u51FB\u6E05\u9664\u3002",
-    "path.prompt.cancel": "\u53D1\u9001\u201C\u53D6\u6D88\u201D\u53EF\u9000\u51FA\u672C\u6B21\u8BBE\u7F6E\u3002",
-    "path.state.current": "\u5F53\u524D\u4FDD\u5B58\uFF1A{value}",
-    "path.state.custom": "{folder}\uFF08\u81EA\u5B9A\u4E49\u76EE\u5F55\uFF09",
-    "path.state.automatic": "\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B",
-    "path.state.defaultExample": "\u9ED8\u8BA4\u793A\u4F8B\uFF1A`telegram/\u8D44\u6E90\u4E0B\u8F7D/images`",
-    "path.state.once": "\u{1F4CC} \u4E0B\u4E00\u6B21\u76EE\u5F55\uFF1A{value}",
-    "path.state.session": "\u{1F4CD} \u672C\u4F1A\u8BDD\u76EE\u5F55\uFF1A{value}",
-    "path.state.unset": "\u672A\u8BBE\u7F6E",
-    "path.button.setOnce": "\u{1F4CC} \u8BBE\u7F6E\u4E0B\u4E00\u6B21\u76EE\u5F55",
-    "path.button.setSession": "\u{1F4CD} \u8BBE\u7F6E\u4F1A\u8BDD\u76EE\u5F55",
-    "path.button.recent": "\u{1F558} \u6700\u8FD1\u76EE\u5F55",
-    "path.button.clear": "\u{1F9F9} \u6E05\u9664\u81EA\u5B9A\u4E49\u76EE\u5F55",
-    "path.settings.title": "\u{1F4C1} **\u4FDD\u5B58\u4F4D\u7F6E**",
-    "path.settings.defaultLogicTitle": "**\u9ED8\u8BA4\u4FDD\u5B58\u903B\u8F91**",
-    "path.settings.defaultLogic": "\u672A\u8BBE\u7F6E\u81EA\u5B9A\u4E49\u76EE\u5F55\u65F6\uFF1A\u81EA\u52A8\u6309\u6765\u6E90/\u9891\u9053 + \u6587\u4EF6\u7C7B\u578B\u4FDD\u5B58\u3002",
-    "path.settings.examples": "\u4F8B\u5982\uFF1A`telegram/\u8D44\u6E90\u4E0B\u8F7D/images`\u3001`telegram/\u8D44\u6E90\u4E0B\u8F7D/videos`\u3002",
-    "path.settings.customLogic": "\u8BBE\u7F6E\u81EA\u5B9A\u4E49\u76EE\u5F55\u540E\uFF1A\u6587\u4EF6\u4F1A\u76F4\u63A5\u4FDD\u5B58\u5230\u8BE5\u76EE\u5F55\u672C\u8EAB\uFF0C\u4E0D\u518D\u8FFD\u52A0\u9891\u9053\u540D\u6216\u6587\u4EF6\u7C7B\u578B\u76EE\u5F55\u3002",
-    "path.settings.currentTitle": "**\u5F53\u524D\u8DEF\u5F84\u72B6\u6001**",
-    "path.settings.choose": "\u{1F447} \u70B9\u51FB\u6309\u94AE\u9009\u62E9\u4FDD\u5B58\u4F4D\u7F6E\u3002",
-    "path.recent.title": "\u{1F558} **Recently used folders**",
-    "path.recent.hint": "To use a folder, choose one-time or chat folder in \u201CSave location\u201D, then send its name.",
-    "path.recent.empty": "\u{1F558} No recently used folders. Folders are recorded after you set one.",
-    "path.toast.recentSent": "Recent folders sent",
-    "path.toast.sendFolder": "Send a folder name, or send \u201Ccancel\u201D to exit",
-    "path.toast.updated": "\u5DF2\u66F4\u65B0\u4FDD\u5B58\u4F4D\u7F6E",
-    "path.toast.cancelled": "\u5DF2\u53D6\u6D88\u4FDD\u5B58\u8DEF\u5F84\u8BBE\u7F6E\u3002",
-    "bot.home.category.main": "\u5E38\u7528\u5165\u53E3",
-    "bot.home.category.files": "\u6587\u4EF6\u4E0E\u4FDD\u5B58\u4F4D\u7F6E",
-    "bot.home.category.channels": "\u9891\u9053\u4E0E\u8BA2\u9605",
-    "bot.home.category.settings": "\u4EFB\u52A1\u4E0E\u7CFB\u7EDF\u8BBE\u7F6E",
-    "bot.home.category.security": "\u5B89\u5168",
-    "bot.home.page": "\u7B2C {page}/{totalPages} \u9875",
-    "bot.home.hint": "\u70B9\u51FB\u6309\u94AE\u53EF\u76F4\u63A5\u6253\u5F00\u5BF9\u5E94\u529F\u80FD\u3002",
-    "bot.home.uploadHint": "\u{1F4E4} \u76F4\u63A5\u53D1\u9001\u6216\u8F6C\u53D1\u6587\u4EF6\u5373\u53EF\u4E0A\u4F20\u3002\n\n\u4E0B\u65B9\u53EF\u6253\u5F00\u4EFB\u52A1\u6216\u66F4\u591A\u529F\u80FD\u3002",
-    "bot.home.logoutHint": "\u53D1\u9001 /logout \u53EF\u7ACB\u5373\u64A4\u9500\u5F53\u524D Bot \u8BA4\u8BC1\u3002",
-    "bot.home.twoFactorHint": "\u8BF7\u4ECE Telegram \u547D\u4EE4\u83DC\u5355\u53D1\u9001\u201C\u914D\u7F6E\u53CC\u91CD\u9A8C\u8BC1\u201D\u3002",
-    "bot.home.prompt.oncePath": "\u8BF7\u53D1\u9001\u4E0B\u4E00\u6B21\u8981\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002",
-    "bot.home.prompt.sessionPath": "\u8BF7\u53D1\u9001\u672C\u804A\u5929\u8981\u6301\u7EED\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002",
-    "bot.home.prompt.delete": "\u8BF7\u5728\u201C\u641C\u7D22\u548C\u64CD\u4F5C\u6587\u4EF6\u201D\u4E2D\u9009\u62E9\u6587\u4EF6\u5E76\u70B9\u51FB\u5220\u9664\u3002",
-    "bot.home.prompt.cancelTask": "\u8BF7\u5728\u4EFB\u52A1\u4E2D\u5FC3\u9009\u62E9\u8981\u53D6\u6D88\u7684\u4EFB\u52A1\u3002",
-    "bot.home.prompt.unsubscribe": "\u8BF7\u5728\u9891\u9053\u8BA2\u9605\u9762\u677F\u9009\u62E9\u8981\u53D6\u6D88\u7684\u8BA2\u9605\u3002",
-    "bot.home.followPrompt": "{description}\n\n\u8BF7\u6309\u63D0\u793A\u8F93\u5165\uFF0C\u6216\u8FD4\u56DE\u201C\u66F4\u591A\u529F\u80FD\u201D\u9009\u62E9\u5176\u5B83\u5165\u53E3\u3002",
-    "bot.home.unavailable": "\u8FD9\u4E2A\u5165\u53E3\u6682\u65F6\u4E0D\u53EF\u7528\u3002",
-    "bot.button.dateMode": "\u{1F5D3}\uFE0F \u6309\u65E5\u671F\u4E0B\u8F7D",
-    "bot.button.tagMode": "\u{1F3F7}\uFE0F \u6309\u6807\u7B7E\u4E0B\u8F7D",
-    "bot.button.channelOnly": "\u4EC5\u9891\u9053\u6B63\u6587",
-    "bot.button.channelComments": "\u9891\u9053 + \u8BC4\u8BBA\u533A",
-    "bot.button.editFolder": "\u270F\uFE0F \u4FEE\u6539\u4E13\u5C5E\u76EE\u5F55",
-    "bot.button.clearFolder": "\u{1F9F9} \u6E05\u9664\u76EE\u5F55",
-    "bot.button.unsubscribe": "\u53D6\u6D88\u8BA2\u9605",
-    "bot.button.previous": "\u25C0\uFE0F \u4E0A\u4E00\u9875",
-    "bot.button.next": "\u4E0B\u4E00\u9875 \u25B6\uFE0F",
-    "bot.button.addSubscription": "\u2795 \u65B0\u589E\u8BA2\u9605",
-    "bot.button.bestVideo": "\u6700\u4F73\u89C6\u9891",
-    "bot.button.audioOnly": "\u4EC5\u97F3\u9891",
-    "bot.wizard.title.subscription": "\u{1F4E1} **\u8BA2\u9605\u9891\u9053\u7BA1\u7406**",
-    "bot.wizard.title.tag": "\u{1F3F7}\uFE0F **\u6309\u6807\u7B7E\u4E0B\u8F7D\u9891\u9053\u6587\u4EF6**",
-    "bot.wizard.title.date": "\u{1F5D3}\uFE0F **\u6309\u65E5\u671F\u4E0B\u8F7D\u9891\u9053\u6587\u4EF6**",
-    "bot.wizard.title.download": "\u{1F4E6} **\u9891\u9053\u6587\u4EF6\u4E0B\u8F7D**",
-    "bot.wizard.mode": "{title}\n\n\u8BF7\u9009\u62E9\u4E0B\u8F7D\u65B9\u5F0F\uFF1A\n\u2022 \u6309\u65E5\u671F\uFF1A\u4E0B\u8F7D\u6307\u5B9A\u65E5\u671F\u8303\u56F4\u5185\u7684\u6587\u4EF6\n\u2022 \u6309\u6807\u7B7E\uFF1A\u4E0B\u8F7D\u5E26\u6307\u5B9A\u6807\u7B7E\u7684\u6587\u4EF6\n\n\u{1F447} \u70B9\u51FB\u6309\u94AE\u7EE7\u7EED\u3002",
-    "bot.wizard.source": "{title}\n\n\u8BF7\u53D1\u9001\u9891\u9053\u7528\u6237\u540D\u6216\u94FE\u63A5\u3002\n\u652F\u6301\u516C\u5F00\u9891\u9053\u3001\u79C1\u5BC6\u9080\u8BF7\u94FE\u63A5\u548C\u5DF2\u52A0\u5165\u7684\u9891\u9053\u3002\n\n\u53D1\u9001\u201C\u53D6\u6D88\u201D\u53EF\u9000\u51FA\u3002",
-    "bot.wizard.path": "{title}\n\u{1F4CD} \u9891\u9053\uFF1A{source}\n\n\u662F\u5426\u8981\u7ED9{scope}\u5355\u72EC\u6307\u5B9A\u4FDD\u5B58\u76EE\u5F55\uFF1F\n\n\u76F4\u63A5\u53D1\u9001\u76EE\u5F55\uFF0C\u4F8B\u5982\uFF1A`\u9891\u9053\u5907\u4EFD/\u58C1\u7EB8`\n\u53D1\u9001 `\u8DF3\u8FC7` / `skip` \u4F7F\u7528\u9ED8\u8BA4\u4FDD\u5B58\u8DEF\u5F84\u89C4\u5219\u3002\n\n\u8BF4\u660E\uFF1A\u8FD9\u91CC\u8BBE\u7F6E\u7684\u76EE\u5F55\u53EA\u5BF9{scope}\u751F\u6548\uFF0C\u4E0D\u4F1A\u6539\u53D8\u5168\u5C40 /path_rules\uFF0C\u4E5F\u4E0D\u4F1A\u5F71\u54CD\u5176\u5B83\u4E0B\u8F7D\u3002\n\u53D1\u9001\u201C\u53D6\u6D88\u201D\u53EF\u9000\u51FA\u3002",
-    "bot.wizard.scope.subscription": "\u8FD9\u4E2A\u8BA2\u9605",
-    "bot.wizard.scope.newSubscription": "\u672C\u6B21\u8BA2\u9605",
-    "bot.wizard.scope.download": "\u672C\u6B21\u4E0B\u8F7D\u4EFB\u52A1",
-    "bot.wizard.comments": "{title}\n\u{1F4CD} \u9891\u9053\uFF1A{source}\n{folder}\n\n\u662F\u5426\u540C\u65F6\u626B\u63CF\u9891\u9053\u5E16\u5B50\u4E0B\u65B9\u7684\u8BC4\u8BBA\u533A\u6587\u4EF6\uFF1F\n\n\u9ED8\u8BA4\u5173\u95ED\uFF1B\u5F00\u542F\u540E\u6BCF\u4E2A\u9891\u9053\u5E16\u5B50\u6700\u591A\u626B\u63CF {count} \u6761\u8BC4\u8BBA\u3002\n\u6587\u5B57\u8BC4\u8BBA\u3001\u666E\u901A\u94FE\u63A5\u548C\u5176\u5B83\u65E0\u6587\u4EF6\u6D88\u606F\u4F1A\u81EA\u52A8\u5FFD\u7565\u3002\n\n\u{1F447} \u70B9\u51FB\u6309\u94AE\u9009\u62E9\u662F\u5426\u626B\u63CF\u8BC4\u8BBA\u533A\u3002",
-    "bot.wizard.folder.custom": "\u{1F4C1} \u4FDD\u5B58\u76EE\u5F55\uFF1A{folder}",
-    "bot.wizard.folder.default": "\u{1F4C1} \u4FDD\u5B58\u7B56\u7565\uFF1A\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B",
-    "bot.wizard.tag": "{title}\n\u{1F4CD} \u9891\u9053\uFF1A{source}\n\n\u8BF7\u53D1\u9001\u8981\u4E0B\u8F7D\u7684\u6807\u7B7E\uFF1A\n\u4F8B\u5982\uFF1A`#\u58C1\u7EB8` \u6216 `\u58C1\u7EB8`\n\n\u53D1\u9001\u201C\u53D6\u6D88\u201D\u53EF\u9000\u51FA\u3002",
-    "bot.wizard.startDate": "{title}\n\u{1F4CD} \u9891\u9053\uFF1A{source}\n\n\u8BF7\u53D1\u9001\u5F00\u59CB\u65E5\u671F\uFF1A\n\u683C\u5F0F\uFF1A`YYYY-MM-DD`\uFF0C\u4F8B\u5982 `2026-06-01`\n\n\u53D1\u9001\u201C\u53D6\u6D88\u201D\u53EF\u9000\u51FA\u3002",
-    "bot.wizard.endDate": "{title}\n\u{1F4CD} \u9891\u9053\uFF1A{source}\n\u{1F5D3}\uFE0F \u5F00\u59CB\u65E5\u671F\uFF1A{startDate}\n\n\u8BF7\u53D1\u9001\u7ED3\u675F\u65E5\u671F\uFF1A\n\u683C\u5F0F\uFF1A`YYYY-MM-DD`\uFF0C\u4F8B\u5982 `2026-06-27`\n\n\u53D1\u9001\u201C\u53D6\u6D88\u201D\u53EF\u9000\u51FA\u3002",
-    "bot.wizard.expired": "\u231B \u5F53\u524D\u5411\u5BFC\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u3002",
-    "bot.wizard.cancelled": "\u5DF2\u53D6\u6D88 Telegram \u9891\u9053\u64CD\u4F5C\u5411\u5BFC\u3002",
-    "bot.wizard.invalidMode": "\u274C \u8BF7\u53D1\u9001 `date`/`\u65E5\u671F` \u6216 `tag`/`\u6807\u7B7E`\uFF0C\u4E5F\u53EF\u4EE5\u53D1\u9001\u201C\u53D6\u6D88\u201D\u9000\u51FA\u3002",
-    "bot.wizard.invalidComments": "\u274C \u8BF7\u53D1\u9001 `\u5F00`/`\u5173`\uFF0C\u6216\u70B9\u51FB\u6309\u94AE\u9009\u62E9\u662F\u5426\u5305\u542B\u8BC4\u8BBA\u533A\u6587\u4EF6\u3002",
-    "bot.wizard.confirmInput": "\u8BF7\u53D1\u9001 `\u786E\u8BA4` \u5F00\u59CB\u4EFB\u52A1\uFF0C\u6216\u53D1\u9001 `\u53D6\u6D88` \u653E\u5F03\u3002",
-    "bot.wizard.invalidDate": "\u274C \u65E5\u671F\u683C\u5F0F\u5FC5\u987B\u662F YYYY-MM-DD\uFF0C\u4F8B\u5982\uFF1A{example}",
-    "bot.wizard.invalidRange": "\u65E5\u671F\u8303\u56F4\u65E0\u6548",
-    "bot.wizard.callbackExpired": "\u5411\u5BFC\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00",
-    "bot.wizard.downloadCancelled": "\u5DF2\u53D6\u6D88\u9891\u9053\u6587\u4EF6\u4E0B\u8F7D\u5411\u5BFC\u3002",
-    "bot.wizard.modeDate": "\u6309\u65E5\u671F\u4E0B\u8F7D",
-    "bot.wizard.modeTag": "\u6309\u6807\u7B7E\u4E0B\u8F7D",
-    "bot.wizard.commentsOn": "\u5C06\u5305\u542B\u8BC4\u8BBA\u533A\u6587\u4EF6",
-    "bot.wizard.commentsOff": "\u4EC5\u4E0B\u8F7D\u9891\u9053\u6B63\u6587\u6587\u4EF6",
-    "bot.subscription.confirmTitle": "\u26A0\uFE0F **\u786E\u8BA4\u53D6\u6D88\u8FD9\u4E2A\u9891\u9053\u8BA2\u9605\uFF1F**",
-    "bot.subscription.source": "\u6765\u6E90\uFF1A{source}",
-    "bot.subscription.folder": "\u4E13\u5C5E\u76EE\u5F55\uFF1A{folder}",
-    "bot.subscription.defaultFolder": "\u4FDD\u5B58\u7B56\u7565\uFF1A\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B",
-    "bot.subscription.position": "\u540C\u6B65\u4F4D\u7F6E\uFF1A\u7B2C {messageId} \u6761\u6D88\u606F\u4E4B\u540E",
-    "bot.subscription.panelTitle": "\u{1F4E1} **\u9891\u9053\u8BA2\u9605**",
-    "bot.subscription.page": "\u7B2C {page}/{totalPages} \u9875 \xB7 \u5171 {count} \u4E2A",
-    "bot.subscription.empty": "\u5F53\u524D\u6CA1\u6709\u8BA2\u9605\u3002",
-    "bot.subscription.manageHint": "\u{1F447} \u70B9\u51FB\u4E0B\u65B9\u6309\u94AE\u7BA1\u7406\u6216\u65B0\u589E\u8BA2\u9605\u3002",
-    "bot.subscription.action.sync": "\u7ACB\u5373\u540C\u6B65",
-    "bot.subscription.action.pause": "\u6682\u505C",
-    "bot.subscription.action.resume": "\u6062\u590D",
-    "bot.subscription.action.target": "\u4FEE\u6539\u76EE\u6807",
-    "bot.subscription.action.fromNow": "\u4ECE\u73B0\u5728\u5F00\u59CB",
-    "bot.subscription.action.backfill": "\u6309\u65E5\u671F\u8865\u6293",
-    "bot.subscription.action.result": "\u6700\u8FD1\u7ED3\u679C",
-    "bot.subscription.action.retry": "\u91CD\u8BD5\u5931\u8D25\u9879",
-    "bot.subscription.followSystemDefault": "\u8DDF\u968F\u7CFB\u7EDF\u9ED8\u8BA4",
-    "bot.subscription.target": "\u{1F3AF} \u5B58\u50A8\uFF1A{target}",
-    "bot.subscription.lastScan": "\u{1F50E} \u4E0A\u6B21\u626B\u63CF\uFF1A{time}",
-    "bot.subscription.nextScan": "\u23ED\uFE0F \u4E0B\u6B21\u626B\u63CF\u7EA6\uFF1A{time}",
-    "bot.subscription.notScanned": "\u{1F50E} \u5C1A\u672A\u626B\u63CF",
-    "bot.subscription.lastResult": "\u{1F4CA} \u6700\u8FD1\u7ED3\u679C\uFF1A{status}\uFF0C\u53D1\u73B0 {found}\uFF0C\u5931\u8D25 {failed}",
-    "bot.subscription.disabledReason": "\u26A0\uFE0F {reason}",
-    "bot.subscription.error": "   \u26A0\uFE0F \u9519\u8BEF\uFF1A{error}",
-    "bot.subscription.result.recorded": "\u5DF2\u8BB0\u5F55",
-    "bot.subscription.result.completed": "\u5B8C\u6210",
-    "bot.subscription.result.partial": "\u90E8\u5206\u5B8C\u6210",
-    "bot.subscription.result.running": "\u8FDB\u884C\u4E2D",
-    "bot.subscription.result.paused": "\u5DF2\u6682\u505C",
-    "bot.subscription.confirmBody": "\u786E\u8BA4\u540E\u4F1A\u505C\u6B62\u81EA\u52A8\u540C\u6B65\uFF0C\u5E76\u4ECE\u8BA2\u9605\u7BA1\u7406\u5217\u8868\u4E2D\u79FB\u9664\uFF1B\u5DF2\u4FDD\u5B58\u7684\u6587\u4EF6\u4E0D\u4F1A\u5220\u9664\u3002",
-    "bot.subscription.confirmButton": "\u26A0\uFE0F \u786E\u8BA4\u53D6\u6D88",
-    "bot.subscription.backButton": "\u8FD4\u56DE\u8BA2\u9605\u5217\u8868",
-    "bot.callback.cancelled": "\u5DF2\u53D6\u6D88",
-    "bot.callback.expired": "\u5DF2\u5931\u6548",
-    "bot.callback.submitted": "\u4EFB\u52A1\u5DF2\u63D0\u4EA4",
-    "bot.callback.failed": "\u64CD\u4F5C\u5931\u8D25\uFF1A{error}",
-    "bot.legacy.pausedTitle": "\u23F8\uFE0F **\u9891\u9053\u4E0B\u8F7D\u5DF2\u6682\u505C**",
-    "bot.legacy.floodWaitTitle": "\u23F3 **Telegram FloodWait \u51B7\u5374\u4E2D**",
-    "bot.legacy.storageCooldownTitle": "\u23F8\uFE0F **\u5B58\u50A8\u670D\u52A1\u4FDD\u62A4\u51B7\u5374\u4E2D**",
-    "bot.legacy.cancelledTitle": "\u{1F6D1} **\u9891\u9053\u4E0B\u8F7D\u5DF2\u53D6\u6D88**",
-    "bot.legacy.completedTitle": "\u2705 **\u9891\u9053\u4EFB\u52A1\u5B8C\u6210**",
-    "bot.legacy.runningTitle": "\u{1F50E} **\u9891\u9053\u4EFB\u52A1\u8FD0\u884C\u4E2D**",
-    "bot.legacy.controlsPaused": "\u53EF\u5728\u4EFB\u52A1\u4E2D\u5FC3\u7EE7\u7EED\u6216\u53D6\u6D88\u3002",
-    "bot.legacy.controlsActive": "\u53EF\u5728\u4EFB\u52A1\u4E2D\u5FC3\u6682\u505C\u6216\u53D6\u6D88\u3002",
-    "bot.legacy.job": "\u{1F194} job: {jobId}",
-    "bot.legacy.source": "\u{1F4CD} \u9891\u9053\uFF1A{source}",
-    "bot.legacy.scan": "\u{1F50E} \u626B\u63CF\uFF1A{status}",
-    "bot.legacy.channelScan": "\u{1F4C4} \u9891\u9053\u6B63\u6587\uFF1A\u5DF2\u626B {scanned} \u6761\uFF0C\u53D1\u73B0 {found} \u4E2A\u6587\u4EF6",
-    "bot.legacy.commentScan": "\u{1F4AC} \u8BC4\u8BBA\u533A\uFF1A\u5DF2\u626B {scanned} \u6761\uFF0C\u53D1\u73B0 {found} \u4E2A\u6587\u4EF6",
-    "bot.legacy.download": "\u2B07\uFE0F \u4E0B\u8F7D\uFF1A{status}",
-    "bot.legacy.counts": "\u2705 \u6210\u529F {completed}\u3000\u23F3 \u5F85\u4E0B\u8F7D {pending}\u3000\u{1F504} \u4E0B\u8F7D\u4E2D {downloading}\u3000\u274C \u5931\u8D25 {failed}\u3000\u23ED \u8DF3\u8FC7 {skipped}",
-    "bot.legacy.floodWait": "\u23F3 Telegram FloodWait\u51B7\u5374\u5230\uFF1A{until}",
-    "bot.legacy.storageCooldown": "\u23F8\uFE0F \u5B58\u50A8\u670D\u52A1\u4FDD\u62A4\u51B7\u5374\u5230\uFF1A{until}",
-    "bot.legacy.scanComplete": "\u{1F50E} **\u626B\u63CF\u5B8C\u6210\uFF0C\u5F00\u59CB\u4E0B\u8F7D**",
-    "bot.legacy.channelScanned": "\u{1F4C4} \u9891\u9053\u6B63\u6587\uFF1A\u626B\u63CF {scanned} \u6761\uFF0C\u53D1\u73B0 {found} \u4E2A\u6587\u4EF6",
-    "bot.legacy.commentsScanned": "\u{1F4AC} \u8BC4\u8BBA\u533A\uFF1A\u626B\u63CF {scanned} \u6761\uFF0C\u53D1\u73B0 {found} \u4E2A\u6587\u4EF6\uFF08\u6BCF\u5E16\u6700\u591A {max} \u6761\uFF09",
-    "bot.legacy.commentsDisabled": "\u{1F4AC} \u8BC4\u8BBA\u533A\uFF1A\u672A\u542F\u7528",
-    "bot.legacy.pending": "\u{1F4E6} \u5F85\u4E0B\u8F7D\uFF1A{count} \u4E2A\u6587\u4EF6",
-    "bot.legacy.queueing": "\u23F3 \u6B63\u5728\u52A0\u5165\u4E0B\u8F7D\u961F\u5217\uFF0C\u53EF\u7528 /tasks \u67E5\u770B\u540E\u53F0\u4EFB\u52A1\u3002",
-    "bot.legacy.commentLine": "\u8BC4\u8BBA\u533A: \u626B\u63CF {scanned} \u6761\uFF0C\u53D1\u73B0 {found} \u4E2A\u6587\u4EF6",
-    "bot.legacy.cancelledResult": "\u{1F6D1} {mode}\u4E0B\u8F7D\u4EFB\u52A1\u5DF2\u53D6\u6D88\nID: {jobId}\n\u5DF2\u5B8C\u6210: {successful}\n\u8DF3\u8FC7: {skipped}{commentLine}",
-    "bot.legacy.tagResult": "\u2705 \u6807\u7B7E\u4E0B\u8F7D\u4EFB\u52A1\u5B8C\u6210\n\u6807\u7B7E: {tag}\nID: {jobId}\n\u5165\u961F: {found}\n\u8DF3\u8FC7: {skipped}\n\u5931\u8D25: {failed}{commentLine}",
-    "bot.legacy.dateResult": "\u2705 \u65E5\u671F\u8303\u56F4\u4EFB\u52A1\u5B8C\u6210\nID: {jobId}\n\u5165\u961F: {found}\n\u8DF3\u8FC7: {skipped}\n\u5931\u8D25: {failed}{commentLine}",
-    "bot.legacy.failed": "\u274C {mode}\u4E0B\u8F7D\u5931\u8D25: {error}",
-    "bot.link.empty": "\u8FD9\u6761\u6D88\u606F\u6CA1\u6709\u53EF\u4E0B\u8F7D\u7684\u6587\u4EF6\uFF0C\u53EF\u80FD\u5DF2\u88AB\u5220\u9664\u6216\u5F53\u524D\u4E0B\u8F7D\u8D26\u53F7\u65E0\u6CD5\u8BBF\u95EE\u3002",
-    "bot.link.failed": "\u94FE\u63A5\u4E0B\u8F7D\u5931\u8D25: {error}",
-    "bot.legacy.confirmTag": "\u23F3 \u5DF2\u786E\u8BA4\uFF0C\u5F00\u59CB\u540E\u53F0\u626B\u63CF {source} \u4E2D\u5E26\u6709 {tag} \u7684\u5A92\u4F53\u6D88\u606F\u2026",
-    "bot.legacy.confirmDate": "\u23F3 \u5DF2\u786E\u8BA4\uFF0C\u5F00\u59CB\u540E\u53F0\u626B\u63CF {source}\uFF1A{startDate} \u2192 {endDate}\u2026",
-    "bot.legacy.submitFailed": "\u274C \u4EFB\u52A1\u63D0\u4EA4\u5931\u8D25: {error}",
-    "bot.legacy.usageDate": "\u274C \u7528\u6CD5\uFF1A/tg_date @channel YYYY-MM-DD YYYY-MM-DD",
-    "bot.legacy.usageTag": "\u274C \u7528\u6CD5\uFF1A/tg_tag @channel #tag",
-    "bot.auth.rateLimited": "\u23F3 \u64CD\u4F5C\u8FC7\u4E8E\u9891\u7E41\uFF0C\u8BF7 {seconds} \u79D2\u540E\u518D\u8BD5\u3002",
-    "bot.auth.pinLocked": "\u5BC6\u7801\u9519\u8BEF\u6B21\u6570\u8FC7\u591A\uFF0C\u8BF7 {seconds} \u79D2\u540E\u518D\u8BD5",
-    "bot.auth.pinLockedBody": "\u274C \u5BC6\u7801\u9519\u8BEF\u6B21\u6570\u8FC7\u591A\uFF0C\u5DF2\u4E34\u65F6\u9501\u5B9A {seconds} \u79D2\u3002",
-    "bot.auth.pinLockedShort": "\u5DF2\u4E34\u65F6\u9501\u5B9A",
-    "bot.auth.pinWrongShort": "\u5BC6\u7801\u9519\u8BEF",
-    "bot.auth.notAllowed": "\u26D4 \u5F53\u524D Telegram \u7528\u6237\u4E0D\u5728\u5141\u8BB8\u5217\u8868\u4E2D\uFF0C\u8BF7\u5728 TELEGRAM_ALLOWED_USER_IDS \u6216\u540E\u53F0\u5141\u8BB8\u5217\u8868\u4E2D\u52A0\u5165\u4F60\u7684 user id\u3002",
-    "bot.auth.notAllowedShort": "\u672A\u5728\u5141\u8BB8\u5217\u8868\u4E2D",
-    "bot.auth.twoFactorEnabled": "\u{1F510} \u53CC\u91CD\u9A8C\u8BC1\u5DF2\u542F\u7528\u3002\u4E3A\u4FDD\u62A4\u73B0\u6709\u5BC6\u94A5\uFF0CBot \u4E0D\u4F1A\u518D\u6B21\u663E\u793A\u4E8C\u7EF4\u7801\u3002",
-    "bot.auth.loggedOut": "\u2705 \u5F53\u524D Telegram \u7528\u6237\u7684 Bot \u8BA4\u8BC1\u5DF2\u64A4\u9500\u3002\u53D1\u9001 /start \u53EF\u91CD\u65B0\u8BA4\u8BC1\u3002",
-    "bot.auth.logoutFailed": "\u274C \u9000\u51FA\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002\n\u64CD\u4F5C ID\uFF1A{operationId}",
-    "bot.notification.securityLogin": "\u{1F514} **\u5B89\u5168\u767B\u5F55\u63D0\u793A**",
-    "bot.notification.passthrough": "{message}",
-    "menu.start": "\u5F00\u59CB\u4F7F\u7528 / \u9A8C\u8BC1\u8EAB\u4EFD",
-    "menu.tasks": "\u67E5\u770B\u5B9E\u65F6\u4EFB\u52A1",
-    "menu.storage": "\u5B58\u50A8\u72B6\u6001 / \u5220\u9664\u672C\u5730\u5B9E\u4F53\u6587\u4EF6",
-    "menu.path_rules": "\u4FDD\u5B58\u4F4D\u7F6E / \u81EA\u5B9A\u4E49\u76EE\u5F55",
-    "menu.tg_download": "\u6309\u65E5\u671F / \u6807\u7B7E\u4E0B\u8F7D\u9891\u9053\u6587\u4EF6",
-    "menu.list": "\u67E5\u770B\u6700\u8FD1\u6587\u4EF6",
-    "menu.find": "\u641C\u7D22\u548C\u64CD\u4F5C\u6587\u4EF6",
-    "menu.tg_sub": "\u7BA1\u7406\u9891\u9053\u81EA\u52A8\u540C\u6B65",
-    "menu.storage_switch": "\u5207\u6362\u7CFB\u7EDF\u9ED8\u8BA4\u5B58\u50A8",
-    "menu.target": "\u8BBE\u7F6E\u5F53\u524D\u804A\u5929\u5B58\u50A8\u76EE\u6807",
-    "menu.help": "\u67E5\u770B\u5B8C\u6574\u5E2E\u52A9",
-    "menu.status": "\u7CFB\u7EDF\u8BCA\u65AD\u72B6\u6001",
-    "menu.notifications": "\u901A\u77E5\u504F\u597D",
-    "menu.language": "\u66F4\u6539 Bot \u754C\u9762\u8BED\u8A00",
-    "commands.auto001": "\u2699\uFE0F **Telegram \u5206\u7247\u5E76\u53D1\u8BBE\u7F6E**",
-    "commands.auto002": "\u5F53\u524D\u5206\u7247\u6570\uFF1A**{value0}**",
-    "commands.auto003": "\u8FD9\u91CC\u63A7\u5236\u5355\u4E2A\u6587\u4EF6\u540C\u65F6\u4E0B\u8F7D\u591A\u5C11\u4E2A\u5206\u7247\uFF1B\u6570\u503C\u8D8A\u9AD8\u8D8A\u5FEB\uFF0C\u4E5F\u8D8A\u5BB9\u6613\u89E6\u53D1\u9650\u6D41\u3002",
-    "commands.auto004": "\u5EFA\u8BAE\uFF1A4 \u7A33\u5B9A\u4F18\u5148\uFF0C8 \u901F\u5EA6\u4E0E\u7A33\u5B9A\u5E73\u8861\uFF1B12 \u6216 16 \u5C5E\u4E8E\u6FC0\u8FDB\u6A21\u5F0F\uFF0C\u9700\u8981\u4E8C\u6B21\u786E\u8BA4\u3002",
-    "commands.auto005": "\u{1F4E6} **Telegram \u6587\u4EF6\u7EA7\u5E76\u53D1\u8BBE\u7F6E**",
-    "commands.auto006": "\u5F53\u524D\u540C\u65F6\u4E0B\u8F7D\u6587\u4EF6\u6570\uFF1A**{value0}**",
-    "commands.auto007": "\u5F53\u524D\u961F\u5217\uFF1A\u8FDB\u884C\u4E2D {value0}\uFF0C\u7B49\u5F85\u4E2D {value1}",
-    "commands.auto008": "\u8FD9\u91CC\u63A7\u5236\u4E00\u6B21\u540C\u65F6\u4E0B\u8F7D\u591A\u5C11\u4E2A\u6587\u4EF6\u3002",
-    "commands.auto009": "\u5EFA\u8BAE\uFF1A1 \u6700\u7A33\u5B9A\uFF0C2 \u9ED8\u8BA4\u63A8\u8350\uFF0C3 \u901F\u5EA6\u4F18\u5148\uFF1B4 \u5C5E\u4E8E\u6FC0\u8FDB\u6A21\u5F0F\uFF0C\u9700\u8981\u4E8C\u6B21\u786E\u8BA4\u3002",
-    "commands.auto010": "\u4FEE\u6539\u540E\u53EA\u5F71\u54CD\u65B0\u5F00\u59CB\u7684\u6587\u4EF6\uFF0C\u6B63\u5728\u4E0B\u8F7D\u7684\u6587\u4EF6\u4E0D\u4F1A\u4E2D\u65AD\u3002",
-    "commands.auto011": "{value0} \u8DF3\u8FC7\u91CD\u590D",
-    "commands.auto012": "{value0} \u751F\u6210\u526F\u672C",
-    "commands.auto013": "\u{1F9EC} **\u91CD\u590D\u6587\u4EF6\u5904\u7406**",
-    "commands.auto014": "\u5F53\u524D\u6A21\u5F0F\uFF1A{value0}",
-    "commands.auto015": "\u2022 \u8DF3\u8FC7\u91CD\u590D\uFF1A\u540D\u79F0\u3001\u76EE\u5F55\u548C\u5927\u5C0F\u90FD\u76F8\u540C\u65F6\u4E0D\u518D\u4FDD\u5B58",
-    "commands.auto016": "\u2022 \u751F\u6210\u526F\u672C\uFF1A\u81EA\u52A8\u6539\u540D\u5E76\u4FDD\u7559\u4E00\u4EFD\u526F\u672C",
-    "commands.auto017": "\u53EA\u5F71\u54CD\u4E4B\u540E\u4FDD\u5B58\u7684\u6587\u4EF6\u3002",
-    "commands.auto018": "{value0} \u5173\u95ED\u81EA\u52A8\u6E05\u7406",
-    "commands.auto019": "{value0} \u5F00\u542F\u81EA\u52A8\u6E05\u7406",
-    "commands.auto020": "\u{1F9F9} **\u81EA\u52A8\u6E05\u7406\u672A\u7D22\u5F15\u4E34\u65F6\u6587\u4EF6**",
-    "commands.auto021": "\u5F53\u524D\u72B6\u6001\uFF1A{value0}",
-    "commands.auto022": "\u5F00\u542F\u540E\u6BCF\u5C0F\u65F6\u68C0\u67E5\u670D\u52A1\u5668\u4E0B\u8F7D\u76EE\u5F55\uFF0C\u53EA\u5220\u9664\u8D85\u8FC7 10 \u5206\u949F\u4E14\u672A\u51FA\u73B0\u5728\u6587\u4EF6\u5217\u8868\u4E2D\u7684\u4E34\u65F6\u6587\u4EF6\u3002",
-    "commands.auto023": "\u4E0D\u4F1A\u5220\u9664\u4EFB\u52A1\u8BB0\u5F55\u3001\u5DF2\u767B\u8BB0\u6587\u4EF6\u6216\u4E91\u7AEF\u6587\u4EF6\u3002",
-    "commands.auto024": "\u5982\u679C\u4F60\u4F1A\u7ED5\u8FC7 TG Vault \u76F4\u63A5\u5199\u5165\u670D\u52A1\u5668\u4E0B\u8F7D\u76EE\u5F55\uFF0C\u8BF7\u4FDD\u6301\u5173\u95ED\u3002",
-    "commands.auto025": "\u{1F4CC} \u4E0B\u4E00\u6B21\u4F7F\u7528\u5F53\u524D\u5B58\u50A8",
-    "commands.auto026": "\u{1F4CD} \u672C\u804A\u5929\u4F7F\u7528\u5F53\u524D\u5B58\u50A8",
-    "commands.auto027": "\u{1F9F9} \u6062\u590D\u7CFB\u7EDF\u9ED8\u8BA4",
-    "commands.auto028": "\u{1F3AF} **\u5F53\u524D\u804A\u5929\u5B58\u50A8\u76EE\u6807**",
-    "commands.auto029": "\u7CFB\u7EDF\u9ED8\u8BA4",
-    "commands.auto031": "\u7CFB\u7EDF\u9ED8\u8BA4",
-    "commands.auto033": "\u7CFB\u7EDF\u9ED8\u8BA4\uFF1A{value0}",
-    "commands.auto034": "\u{1F447} \u70B9\u51FB\u6309\u94AE\uFF0C\u7528\u5F53\u524D\u7CFB\u7EDF\u5B58\u50A8\u8BBE\u7F6E\u4E34\u65F6\u76EE\u6807\u3002",
-    "commands.auto035": "\u2705 \u5DF2\u8BBE\u7F6E{value0}\u76EE\u6807\uFF1A{value1} / {value2}\n\u4E0D\u4F1A\u4FEE\u6539\u7CFB\u7EDF\u5168\u5C40\u9ED8\u8BA4\u3002",
-    "commands.auto036": "\u{1F3AF} **\u5F53\u524D\u804A\u5929\u5B58\u50A8\u76EE\u6807**",
-    "commands.auto037": "\u7CFB\u7EDF\u9ED8\u8BA4",
-    "commands.auto039": "\u7CFB\u7EDF\u9ED8\u8BA4",
-    "commands.auto041": "\u7CFB\u7EDF\u9ED8\u8BA4\uFF1A{value0}",
-    "commands.auto042": "\u{1F447} \u70B9\u51FB\u6309\u94AE\uFF0C\u7528\u5F53\u524D\u7CFB\u7EDF\u5B58\u50A8\u8BBE\u7F6E\u4E34\u65F6\u76EE\u6807\u3002",
-    "commands.auto043": "\u6E05\u7406\u786E\u8BA4\u65E0\u6548\u6216\u5DF2\u8FC7\u671F",
-    "commands.auto044": "\u5DF2\u53D6\u6D88\u6E05\u7406\u3002\u5F53\u524D\u6CA1\u6709\u672C\u5730\u4E0B\u8F7D\u6587\u4EF6\u3002",
-    "commands.auto045": "\u5DF2\u53D6\u6D88\u6E05\u7406\u3002\u5F53\u524D\u672C\u5730\u4E0B\u8F7D\u6587\u4EF6\uFF1A{value0} \u4E2A\uFF0C\u5360\u7528 {value1}\u3002",
-    "commands.auto046": "\u26A0\uFE0F **\u786E\u8BA4\u5220\u9664\u672C\u5730\u670D\u52A1\u5668\u5168\u90E8\u4E0B\u8F7D\u6587\u4EF6\uFF1F**",
-    "commands.auto047": "\u5C06\u5220\u9664 uploads \u672C\u5730\u76EE\u5F55\u4E2D\u7684 **{value0}** \u4E2A\u6587\u4EF6\uFF0C\u5360\u7528 **{value1}**\u3002",
-    "commands.auto048": "\u8FD9\u4F1A\u5220\u9664\u672C\u5730\u5B9E\u4F53\u6587\u4EF6\u53CA\u5BF9\u5E94\u7684\u672C\u5730\u6587\u4EF6\u7D22\u5F15\uFF1B\u4E0D\u4F1A\u5220\u9664\u4EFB\u52A1\u5386\u53F2\u6216\u4EFB\u4F55\u7B2C\u4E09\u65B9\u4E91\u7AEF\u5B9E\u4F53\u3002",
-    "commands.auto049": "\u5982\u786E\u8BA4\uFF0C\u8BF7\u70B9\u51FB\u4E0B\u65B9\u7EA2\u8272\u786E\u8BA4\u6309\u94AE\u3002",
-    "commands.auto050": "\u6E05\u7406\u786E\u8BA4\u65E0\u6548\u3001\u5DF2\u8FC7\u671F\u6216\u5DF2\u4F7F\u7528",
-    "commands.auto051": "\u2705 **\u672C\u5730\u670D\u52A1\u5668\u4E0B\u8F7D\u6587\u4EF6\u5DF2\u6E05\u7406**",
-    "commands.auto052": "\u5DF2\u5220\u9664\uFF1A{value0} \u4E2A\u6587\u4EF6",
-    "commands.auto053": "\u91CA\u653E\u7A7A\u95F4\uFF1A{value0}",
-    "commands.auto054": "\u5269\u4F59\u672C\u5730\u6587\u4EF6\uFF1A{value0} \u4E2A",
-    "commands.auto055": "\u65E7\u6E05\u7406\u6309\u94AE\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u53D1\u9001 /storage",
-    "commands.auto056": "\u6E05\u7406\u5931\u8D25: {value0}",
-    "commands.auto057": "\u8BE5\u64CD\u4F5C\u4F1A\u5220\u9664\u5B9E\u4F53\u6587\u4EF6\u548C\u7D22\u5F15\u3002",
-    "commands.auto058": "\u26A0\uFE0F **\u786E\u8BA4\u5220\u9664\u8FD9\u4E2A\u6587\u4EF6\uFF1F**",
-    "commands.auto059": '\u274C \u672A\u627E\u5230 ID \u4EE5 "{value0}" \u5F00\u5934\u7684\u6587\u4EF6',
-    "commands.auto060": '\u274C ID \u524D\u7F00 "{value0}" \u5339\u914D\u5230\u591A\u4E2A\u6587\u4EF6\uFF0C\u8BF7\u590D\u5236\u66F4\u957F\u7684 ID \u524D\u7F00\u540E\u91CD\u8BD5\u3002',
-    "commands.auto061": "\u26A0\uFE0F **\u786E\u8BA4\u5220\u9664\u8FD9\u4E2A\u6587\u4EF6\uFF1F**",
-    "commands.auto062": "\u5220\u9664\u4F1A\u79FB\u9664\u6570\u636E\u5E93\u8BB0\u5F55\u5E76\u5C1D\u8BD5\u5220\u9664\u5B9E\u9645\u6587\u4EF6\u3002\u8BF7\u786E\u8BA4\u65E0\u8BEF\u540E\u70B9\u51FB\u6309\u94AE\u3002",
-    "commands.auto063": "\u5DF2\u53D6\u6D88\u5220\u9664\uFF1A{value0}",
-    "commands.auto064": "\u274C \u6587\u4EF6\u5DF2\u4E0D\u5B58\u5728\u6216\u4E0D\u5728\u5F53\u524D\u5B58\u50A8\u8303\u56F4\u5185\u3002",
-    "commands.auto065": "\u274C OpenList \u5B58\u50A8\u4E0D\u63D0\u4F9B\u7528\u6237\u5220\u9664\u529F\u80FD\u3002",
-    "commands.auto066": "\u5220\u9664\u5931\u8D25: {value0}",
-    "commands.auto067": "\u8BE5\u9891\u9053\u4EFB\u52A1\u8BF7\u4F7F\u7528\u73B0\u6709\u5931\u8D25\u91CD\u8BD5\u5165\u53E3",
-    "commands.auto068": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u5237\u65B0\u4EFB\u52A1\u5217\u8868",
-    "commands.auto069": "\u4EFB\u52A1\u5F53\u524D\u4E0D\u5728\u8FD0\u884C\u72B6\u6001",
-    "commands.auto070": "\u4EFB\u52A1\u5DF2\u7ED3\u675F\u6216\u65E0\u6CD5\u6682\u505C",
-    "commands.auto071": "\u4EFB\u52A1\u5F53\u524D\u6CA1\u6709\u53EF\u4F18\u5148\u7684\u7B49\u5F85\u6587\u4EF6",
-    "commands.auto072": "\u4EFB\u52A1\u4E0D\u5728\u53EF\u7EE7\u7EED\u72B6\u6001",
-    "commands.auto073": "\u4EFB\u52A1\u5DF2\u7ED3\u675F\u6216\u65E0\u6CD5\u53D6\u6D88",
-    "commands.auto074": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u5237\u65B0\u4EFB\u52A1\u5217\u8868",
-    "commands.auto075": "\u4EFB\u52A1\u5DF2\u7ED3\u675F\u6216\u65E0\u6CD5\u53D6\u6D88",
-    "commands.auto076": "\u4EFB\u52A1\u5DF2\u7ED3\u675F\u6216\u65E0\u6CD5\u53D6\u6D88",
-    "commands.auto077": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u5237\u65B0\u4EFB\u52A1\u5217\u8868",
-    "commands.auto078": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u5237\u65B0\u4EFB\u52A1\u5217\u8868",
-    "commands.auto079": "\u4EFB\u52A1\u5B58\u5728\u672A\u5B8C\u6210\u5BF9\u8D26\u6216\u5F53\u524D\u65E0\u6CD5\u91CD\u8BD5",
-    "commands.auto080": "\u6B63\u5728\u5B8C\u6210\u5F53\u524D\u6587\u4EF6\uFF0C\u968F\u540E\u6682\u505C",
-    "commands.auto081": "\u7528\u6237\u5DF2\u6682\u505C\u4EFB\u52A1",
-    "commands.auto082": "\u26A0\uFE0F **\u786E\u8BA4\u53D6\u6D88\u5F53\u524D\u804A\u5929\u5168\u90E8\u4EFB\u52A1\uFF1F**",
-    "commands.auto083": "\u666E\u901A\u4E0B\u8F7D\uFF1A{value0} \u4E2A\u4EFB\u52A1\uFF08\u5904\u7406\u4E2D {value1} \u4E2A\u6587\u4EF6\uFF0C\u7B49\u5F85 {value2} \u4E2A\u6587\u4EF6\uFF09",
-    "commands.auto084": "\u9891\u9053\u4EFB\u52A1\uFF1A{value0} \u4E2A",
-    "commands.auto085": "\u4EFB\u52A1\u603B\u6570\uFF1A{value0}",
-    "commands.auto086": "\u786E\u8BA4\u540E\u4F1A\u4E2D\u6B62\u6B63\u5728\u8FD0\u884C\u7684\u4EFB\u52A1\u5E76\u6E05\u7406\u5BF9\u5E94\u4E34\u65F6\u6587\u4EF6\u3002\u5176\u5B83\u804A\u5929\u548C\u5176\u5B83\u7528\u6237\u7684\u4EFB\u52A1\u4E0D\u53D7\u5F71\u54CD\u3002",
-    "commands.auto087": "\u7528\u6237\u786E\u8BA4\u53D6\u6D88\u5F53\u524D\u804A\u5929\u5168\u90E8\u4EFB\u52A1",
-    "commands.auto088": "\u{1F6D1} **\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u5DF2\u53D6\u6D88**",
-    "commands.auto089": "\u666E\u901A\u4E0B\u8F7D\uFF1A{value0} \u4E2A\u4EFB\u52A1\uFF08\u5904\u7406\u4E2D {value1} / \u7B49\u5F85 {value2} \u4E2A\u6587\u4EF6\uFF09",
-    "commands.auto090": "\u9891\u9053\u4EFB\u52A1\uFF1A{value0} \u4E2A",
-    "commands.auto091": "\u4EFB\u52A1\u603B\u6570\uFF1A{value0}",
-    "commands.auto092": "\u7528\u6237\u5DF2\u6682\u505C\u4EFB\u52A1",
-    "commands.auto093": "\u6B63\u5728\u5B8C\u6210\u5F53\u524D\u6587\u4EF6\uFF0C\u968F\u540E\u6682\u505C",
-    "commands.auto094": "\u23F8\uFE0F \u5DF2\u6682\u505C\u8BE5\u4EFB\u52A1",
-    "commands.auto095": "\u23F8\uFE0F \u5DF2\u8BBE\u7F6E\uFF1A\u5B8C\u6210\u5F53\u524D\u6587\u4EF6\u540E\u6682\u505C\u8BE5\u4EFB\u52A1",
-    "commands.auto096": "\u23F8\uFE0F \u5DF2\u6682\u505C\u9891\u9053\u4EFB\u52A1 {value0}\n\u6765\u6E90\uFF1A{value1}",
-    "commands.auto097": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u4EFB\u52A1\uFF1A{value0}\u3002\u672A\u6682\u505C\u5F53\u524D\u804A\u5929\u4E0B\u8F7D\u961F\u5217\u3002",
-    "commands.auto098": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u4EFB\u52A1\uFF1A{value0}\u3002\u672A\u6682\u505C\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u3002",
-    "commands.auto099": "\u23F8\uFE0F \u5DF2\u6682\u505C\u5F53\u524D\u804A\u5929\u7684\u666E\u901A\u4E0B\u8F7D\u4EFB\u52A1\n\n\u8FDB\u884C\u4E2D: {value0}\n\u7B49\u5F85\u4E2D: {value1}\n\n\u5F53\u524D\u6B63\u5728\u4E0B\u8F7D\u7684\u6587\u4EF6\u4F1A\u7EE7\u7EED\u5B8C\u6210\uFF0C\u65B0\u7684\u7B49\u5F85\u4EFB\u52A1\u6682\u4E0D\u5F00\u59CB\u3002",
-    "commands.auto100": "\u25B6\uFE0F \u5DF2\u7EE7\u7EED\u8BE5\u4EFB\u52A1",
-    "commands.auto101": "\u25B6\uFE0F \u5DF2\u7EE7\u7EED\u9891\u9053\u4EFB\u52A1 {value0}\n\u6765\u6E90\uFF1A{value1}",
-    "commands.auto102": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u4EFB\u52A1\uFF1A{value0}\u3002\u672A\u7EE7\u7EED\u5F53\u524D\u804A\u5929\u4E0B\u8F7D\u961F\u5217\u3002",
-    "commands.auto103": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u4EFB\u52A1\uFF1A{value0}\u3002\u672A\u7EE7\u7EED\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u3002",
-    "commands.auto104": "\u25B6\uFE0F \u5DF2\u7EE7\u7EED\u5F53\u524D\u804A\u5929\u7684\u666E\u901A\u4E0B\u8F7D\u4EFB\u52A1\n\n\u8FDB\u884C\u4E2D: {value0}\n\u7B49\u5F85\u4E2D: {value1}",
-    "commands.auto105": "\u{1F6D1} \u5DF2\u53D6\u6D88\u8BE5\u4E0B\u8F7D\u4EFB\u52A1",
-    "commands.auto106": "\u5DF2\u53D6\u6D88\u9891\u9053\u4EFB\u52A1 {value0}\n\u6765\u6E90\uFF1A{value1}",
-    "commands.auto107": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u5F53\u524D\u804A\u5929\u4E2D\u7684\u5339\u914D\u4EFB\u52A1\uFF1A{value0}",
-    "commands.auto108": "\u65E7\u7248\u53D6\u6D88\u6309\u94AE\u5DF2\u5931\u6548\uFF0C\u8BF7\u4F7F\u7528\u65B0\u7248 /tasks \u91CD\u65B0\u8FDB\u5165\u4EFB\u52A1\u8BE6\u60C5\u5E76\u786E\u8BA4",
-    "commands.auto109": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u5F53\u524D\u804A\u5929\u4E2D\u7684\u5339\u914D\u4EFB\u52A1\uFF1A{value0}",
-    "commands.auto110": "\u65E7\u7248\u53D6\u6D88\u6309\u94AE\u5DF2\u5931\u6548\uFF0C\u8BF7\u4F7F\u7528\u65B0\u7248 /tasks \u91CD\u65B0\u8FDB\u5165\u4EFB\u52A1\u8BE6\u60C5\u5E76\u786E\u8BA4",
-    "commands.auto111": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u4F7F\u7528\u65B0\u7248 /tasks \u5237\u65B0",
-    "commands.auto112": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u552F\u4E00\u7684\u9891\u9053\u4EFB\u52A1\uFF0C\u672A\u91CD\u8BD5\u5176\u5B83\u4EFB\u52A1\u3002",
-    "commands.auto113": "\u{1F4EE} \u8BE5\u9891\u9053\u4EFB\u52A1\u6CA1\u6709\u53EF\u91CD\u8BD5\u5931\u8D25\u9879",
-    "commands.auto114": "\u{1F504} \u5DF2\u91CD\u65B0\u52A0\u5165\u9891\u9053\u4EFB\u52A1\u5931\u8D25\u9879 {value0} \u4E2A\n\u4EFB\u52A1: {value1}",
-    "commands.auto115": "\u{1F4EE} \u65E0\u6CD5\u8BC6\u522B\u5F53\u524D\u804A\u5929\uFF0C\u672A\u6267\u884C\u5931\u8D25\u4EFB\u52A1\u91CD\u8BD5\u3002",
-    "commands.auto116": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u5F53\u524D\u804A\u5929\u4E2D\u7684\u5931\u8D25\u4EFB\u52A1\uFF1A{value0}",
-    "commands.auto117": "\u{1F4EE} \u6700\u8FD1\u6CA1\u6709\u53EF\u91CD\u8BD5\u7684\u5931\u8D25\u4EFB\u52A1",
-    "commands.auto119": "\u274C \u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u5355\u6587\u4EF6\u5206\u7247\u5E76\u53D1\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002",
-    "commands.auto120": "\u274C \u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u6587\u4EF6\u5E76\u53D1\u8BBE\u7F6E\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002",
-    "commands.auto121": "\u{1F4CC} \u5DF2\u8BBE\u7F6E\u4E0B\u4E00\u6B21\u4E0B\u8F7D\u76EE\u5F55\uFF1A`{value0}`\n{value1}\n\n\u6B64\u8BBE\u7F6E\u4F1A\u5728\u4E0B\u4E00\u6B21\u6210\u529F\u8FDB\u5165\u4E0B\u8F7D\u6D41\u7A0B\u65F6\u81EA\u52A8\u5931\u6548\u3002",
-    "commands.auto122": "\u{1F4CD} \u5DF2\u8BBE\u7F6E\u672C\u4F1A\u8BDD\u4E0B\u8F7D\u76EE\u5F55\uFF1A`{value0}`\n{value1}\n\n\u540E\u7EED\u6B64\u804A\u5929\u4E2D\u7684\u4E0B\u8F7D\u4F1A\u4F18\u5148\u4FDD\u5B58\u5230\u8BE5\u76EE\u5F55\uFF1B\u53EF\u5728\u201C\u4FDD\u5B58\u4F4D\u7F6E\u201D\u4E2D\u6E05\u9664\u3002",
-    "commands.auto123": "\u5982\u9700\u4F7F\u7528\u67D0\u4E2A\u76EE\u5F55\uFF0C\u8BF7\u5728\u201C\u4FDD\u5B58\u4F4D\u7F6E\u201D\u4E2D\u9009\u62E9\u4E0B\u4E00\u6B21\u6216\u672C\u804A\u5929\u76EE\u5F55\uFF0C\u7136\u540E\u53D1\u9001\u76EE\u5F55\u540D\u79F0\u3002",
-    "commands.auto124": "\u{1F558} **\u6700\u8FD1\u4F7F\u7528\u76EE\u5F55**",
-    "commands.auto125": "\u5DF2\u8BBE\u7F6E\u4E3A{value0}",
-    "commands.auto126": "\u5DF2\u5173\u95ED\u81EA\u52A8\u6E05\u7406",
-    "commands.auto127": "\u5DF2\u5F00\u542F\u81EA\u52A8\u6E05\u7406",
-    "commands.auto128": "\u26A0\uFE0F **\u786E\u8BA4\u4F7F\u7528 {value0} \u4E2A\u5206\u7247\uFF1F**",
-    "commands.auto129": "\u8FD9\u662F\u6FC0\u8FDB\u5206\u7247\u5E76\u53D1\u6A21\u5F0F\uFF0C\u53EF\u80FD\u51FA\u73B0\uFF1A",
-    "commands.auto130": "- Telegram \u98CE\u63A7\u6216\u9650\u6D41",
-    "commands.auto131": "- \u4E0B\u8F7D\u65AD\u6D41 / \u91CD\u8BD5\u589E\u591A",
-    "commands.auto132": "- Telegram \u7528\u6237\u8D26\u53F7\u53EF\u80FD\u88AB\u9650\u6D41\uFF0C\u6781\u7AEF\u60C5\u51B5\u4E0B\u4F1A\u5F71\u54CD\u8D26\u53F7",
-    "commands.auto133": "\u5982\u679C\u53EA\u662F\u65E5\u5E38\u4E0B\u8F7D\uFF0C\u5EFA\u8BAE\u4F7F\u7528 4 \u6216 8\u3002",
-    "commands.auto134": "{value0}\n\n\u2705 \u5DF2\u5207\u6362\u4E3A {value1} \u4E2A\u5206\u7247\uFF0C\u540E\u7EED\u65B0\u4E0B\u8F7D\u4EFB\u52A1\u7ACB\u5373\u751F\u6548\u3002",
-    "commands.auto135": "\u5DF2\u8BBE\u7F6E\u4E3A {value0}",
-    "commands.auto136": "{value0}\n\n\u26A0\uFE0F \u5DF2\u786E\u8BA4\u5E76\u5207\u6362\u4E3A {value1} \u4E2A\u5206\u7247\u3002\u82E5\u51FA\u73B0\u65AD\u6D41\u3001\u9650\u901F\u3001\u98CE\u63A7\u63D0\u793A\uFF0C\u8BF7\u7ACB\u5373\u964D\u56DE 4 \u6216 8\u3002",
-    "commands.auto137": "\u5DF2\u786E\u8BA4 {value0} workers",
-    "commands.auto138": "\u26A0\uFE0F **\u786E\u8BA4\u540C\u65F6\u4E0B\u8F7D 4 \u4E2A\u6587\u4EF6\uFF1F**",
-    "commands.auto139": "\u8FD9\u662F\u6587\u4EF6\u7EA7\u6FC0\u8FDB\u5E76\u53D1\u6A21\u5F0F\uFF0C\u53EF\u80FD\u51FA\u73B0\uFF1A",
-    "commands.auto140": "- Telegram \u98CE\u63A7\u6216\u9650\u6D41",
-    "commands.auto141": "- \u4E91\u76D8\u4E0A\u4F20\u9650\u901F / \u5931\u8D25\u91CD\u8BD5\u589E\u591A",
-    "commands.auto142": "- \u670D\u52A1\u5668\u78C1\u76D8\u548C\u7F51\u7EDC\u538B\u529B\u660E\u663E\u589E\u52A0",
-    "commands.auto143": "\u5982\u679C\u53EA\u662F\u65E5\u5E38\u4E0B\u8F7D\uFF0C\u5EFA\u8BAE\u4F7F\u7528 2 \u6216 3\u3002",
-    "commands.auto144": "{value0}\n\n\u2705 \u5DF2\u5207\u6362\u4E3A\u540C\u65F6\u4E0B\u8F7D {value1} \u4E2A\u6587\u4EF6\u3002",
-    "commands.auto145": "\u5DF2\u8BBE\u7F6E\u4E3A {value0}",
-    "commands.auto146": "{value0}\n\n\u26A0\uFE0F \u5DF2\u786E\u8BA4\u5E76\u5207\u6362\u4E3A\u540C\u65F6\u4E0B\u8F7D 4 \u4E2A\u6587\u4EF6\u3002\u82E5\u51FA\u73B0\u9650\u6D41\u3001\u65AD\u6D41\u6216\u4E0A\u4F20\u5931\u8D25\uFF0C\u8BF7\u7ACB\u5373\u964D\u56DE 2 \u6216 3\u3002",
-    "commands.auto147": "\u5DF2\u786E\u8BA4 4 \u4E2A\u6587\u4EF6\u5E76\u53D1",
-    "commands.authRequired": "\u{1F510} \u8BF7\u5148\u53D1\u9001 /start \u9A8C\u8BC1\u5BC6\u7801",
-    "commands.helpUnavailable": "\u274C \u6682\u65F6\u65E0\u6CD5\u663E\u793A\u5E2E\u52A9\u3002",
-    "commands.settingsSaved": "\u2705 \u8BBE\u7F6E\u5DF2\u4FDD\u5B58\u3002",
-    "commands.settingsFailed": "\u8BBE\u7F6E\u5931\u8D25\uFF1A{error}",
-    "commands.notificationsHint": "\u53D1\u9001 /notifications \u53EF\u91CD\u65B0\u67E5\u770B\u8BF4\u660E\u548C\u5FEB\u6377\u6309\u94AE\u3002",
-    "commands.alreadyCurrent": "\u5DF2\u662F\u5F53\u524D\u8BBE\u7F6E",
-    "commands.notificationsUpdated": "\u901A\u77E5\u8BBE\u7F6E\u5DF2\u66F4\u65B0",
-    "commands.settingFailedRetry": "\u8BBE\u7F6E\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5",
-    "commands.statusFailed": "\u274C \u8BCA\u65AD\u72B6\u6001\u8BFB\u53D6\u5931\u8D25\u3002\u64CD\u4F5C ID\uFF1A{requestId}",
-    "commands.localAccount": "\u670D\u52A1\u5668\u672C\u5730\u76EE\u5F55",
-    "commands.defaultAccount": "\u9ED8\u8BA4\u8D26\u6237",
-    "commands.unnamedAccount": "\u672A\u547D\u540D\u8D26\u6237",
-    "commands.localStorage": "\u672C\u5730\u5B58\u50A8",
-    "commands.refreshList": "\u{1F504} \u5237\u65B0\u5217\u8868",
-    "commands.storageSwitchTitle": "\u{1F5C4}\uFE0F **\u5B58\u50A8\u6E90\u5207\u6362**",
-    "commands.storageSwitchCurrent": "\u5F53\u524D\u4F7F\u7528\uFF1A{value}",
-    "commands.storageSwitchHint": "\u70B9\u51FB\u4E0B\u9762\u6309\u94AE\u5373\u53EF\u5207\u6362\u5230\u5DF2\u5728\u7F51\u9875\u7AEF\u914D\u7F6E\u597D\u7684\u5B58\u50A8\u8D26\u6237\uFF1B\u4E0D\u9700\u8981\u6253\u5F00\u524D\u7AEF\u9875\u9762\u3002",
-    "commands.storageSwitchOptions": "**\u53EF\u9009\u5B58\u50A8\uFF1A**",
-    "commands.storageSwitchNote": "\u63D0\u793A\uFF1A\u8FD9\u91CC\u53EA\u80FD\u5207\u6362\u5DF2\u6709\u8D26\u6237\uFF1B\u65B0\u589E OAuth/\u5BC6\u94A5\u914D\u7F6E\u4ECD\u9700\u5728\u7F51\u9875\u7AEF\u5B8C\u6210\u3002",
-    "commands.accountUnnamed": "\u672A\u547D\u540D\u8D26\u6237",
-    "commands.storageSwitchFailed": "\u274C \u83B7\u53D6\u5B58\u50A8\u6E90\u5207\u6362\u83DC\u5355\u5931\u8D25\uFF1A{error}",
-    "commands.storageRefreshed": "\u5DF2\u5237\u65B0",
-    "commands.storageInvalid": "\u65E0\u6548\u7684\u5B58\u50A8\u6E90\u9009\u62E9",
-    "commands.storageAlreadyLocal": "\u5F53\u524D\u5DF2\u7ECF\u662F\u672C\u5730\u5B58\u50A8",
-    "commands.storageSwitchedLocal": "\u5DF2\u5207\u6362\u5230\u672C\u5730\u5B58\u50A8",
-    "commands.storageMissing": "\u8BE5\u5B58\u50A8\u8D26\u6237\u5DF2\u4E0D\u5B58\u5728",
-    "commands.storageAlreadyAccount": "\u5F53\u524D\u5DF2\u7ECF\u5728\u4F7F\u7528\u8BE5\u8D26\u6237",
-    "commands.storageSwitched": "\u5DF2\u5207\u6362\u5230 {name}",
-    "commands.storageSwitchError": "\u5207\u6362\u5931\u8D25\uFF1A{error}",
-    "commands.deleteConfirm": "\u26A0\uFE0F \u786E\u8BA4\u5220\u9664",
-    "commands.bulkConfirm": "\u26A0\uFE0F \u786E\u8BA4\u53D6\u6D88\u5168\u90E8",
-    "commands.confirmCancelAll": "\u26A0\uFE0F \u786E\u8BA4\u53D6\u6D88\u5168\u90E8",
-    "commands.confirmUse": "\u26A0\uFE0F \u786E\u8BA4\u4F7F\u7528 {count}",
-    "commands.confirmFiles": "\u26A0\uFE0F \u786E\u8BA4\u540C\u65F6\u4E0B\u8F7D {count} \u4E2A\u6587\u4EF6",
-    "commands.clearLocalConfirm": "\u26A0\uFE0F \u786E\u8BA4\u5220\u9664\u672C\u5730\u5168\u90E8\u4E0B\u8F7D\u6587\u4EF6",
-    "commands.clearLocalButton": "\u{1F9F9} \u5220\u9664\u672C\u5730\u5168\u90E8\u4E0B\u8F7D\u6587\u4EF6 ({count})",
-    "commands.secondConfirm": "\u9700\u8981\u4E8C\u6B21\u786E\u8BA4",
-    "commands.cancelled": "\u5DF2\u53D6\u6D88",
-    "commands.returned": "\u5DF2\u8FD4\u56DE",
-    "commands.deleted": "\u5DF2\u5220\u9664",
-    "commands.deletedCount": "\u5DF2\u5220\u9664 {count} \u4E2A\u6587\u4EF6",
-    "commands.targetNextButton": "\u{1F4CC} \u4E0B\u4E00\u6B21\u4F7F\u7528\u5F53\u524D\u5B58\u50A8",
-    "commands.targetSessionButton": "\u{1F4CD} \u672C\u804A\u5929\u4F7F\u7528\u5F53\u524D\u5B58\u50A8",
-    "commands.targetClearButton": "\u{1F9F9} \u6062\u590D\u7CFB\u7EDF\u9ED8\u8BA4",
-    "commands.targetTitle": "\u{1F3AF} **\u5F53\u524D\u804A\u5929\u5B58\u50A8\u76EE\u6807**",
-    "commands.targetNext": "\u4E0B\u4E00\u6B21\uFF1A{value}",
-    "commands.targetSession": "\u672C\u804A\u5929\uFF1A{value}",
-    "commands.targetSystem": "\u7CFB\u7EDF\u9ED8\u8BA4\uFF1A{value}",
-    "commands.targetSet": "{value}\uFF08\u5DF2\u8BBE\u7F6E\uFF09",
-    "commands.targetDefault": "\u7CFB\u7EDF\u9ED8\u8BA4",
-    "commands.targetHint": "\u{1F447} \u70B9\u51FB\u6309\u94AE\uFF0C\u7528\u5F53\u524D\u7CFB\u7EDF\u5B58\u50A8\u8BBE\u7F6E\u4E34\u65F6\u76EE\u6807\u3002",
-    "commands.targetCleared": "\u2705 \u5DF2\u6E05\u9664\u5F53\u524D\u804A\u5929\u7684\u5B58\u50A8\u76EE\u6807\u8986\u76D6\uFF1B\u540E\u7EED\u4EFB\u52A1\u4F7F\u7528\u7CFB\u7EDF\u9ED8\u8BA4\u3002",
-    "commands.targetRestored": "\u5DF2\u6062\u590D\u7CFB\u7EDF\u9ED8\u8BA4",
-    "commands.targetInvalid": "\u274C \u65E0\u6CD5\u8BC6\u522B\u8FD9\u4E2A\u5B58\u50A8\u76EE\u6807\u3002\u8BF7\u4F7F\u7528\u4E0B\u65B9\u6309\u94AE\u3002",
-    "commands.targetAccountMissing": "\u274C \u672A\u627E\u5230\u8BE5\u5B58\u50A8\u8D26\u6237\uFF1B\u8BF7\u4ECE /storage_switch \u67E5\u770B\u5B8C\u6574\u8D26\u6237\u5217\u8868\u3002",
-    "commands.targetSaved": "\u2705 \u5DF2\u8BBE\u7F6E{scope}\u76EE\u6807\uFF1A{provider} / {account}\n\u4E0D\u4F1A\u4FEE\u6539\u7CFB\u7EDF\u5168\u5C40\u9ED8\u8BA4\u3002",
-    "commands.targetScopeNext": "\u4E0B\u4E00\u6B21",
-    "commands.targetScopeSession": "\u5F53\u524D\u804A\u5929\u4F1A\u8BDD",
-    "commands.targetNextSet": "\u5DF2\u8BBE\u7F6E\u4E0B\u4E00\u6B21\u5B58\u50A8",
-    "commands.targetSessionSet": "\u5DF2\u8BBE\u7F6E\u672C\u804A\u5929\u5B58\u50A8",
-    "commands.fileSearchFailed": "\u274C \u641C\u7D22\u5931\u8D25\uFF1A{error}",
-    "commands.fileUnavailable": "\u6587\u4EF6\u5DF2\u4E0D\u5B58\u5728\u6216\u4E0D\u5728\u5F53\u524D\u5B58\u50A8\u8303\u56F4\u5185",
-    "commands.fileDetail": "\u6587\u4EF6\u8BE6\u60C5",
-    "commands.confirmRequired": "\u9700\u8981\u4E8C\u6B21\u786E\u8BA4",
-    "commands.fileFavorited": "\u5DF2\u6536\u85CF",
-    "commands.fileUnfavorited": "\u5DF2\u53D6\u6D88\u6536\u85CF",
-    "commands.fileShareUnsupported": "\u5F53\u524D provider \u4E0D\u652F\u6301\u5206\u4EAB\uFF1B\u53EF\u5728 Web \u4E2D\u4E0B\u8F7D",
-    "commands.fileSignedLink": "\u{1F517} 1 \u5C0F\u65F6\u7B7E\u540D\u94FE\u63A5\uFF1A\n{link}",
-    "commands.fileLinkCreated": "\u5DF2\u751F\u6210\u7B7E\u540D\u94FE\u63A5",
-    "commands.fileMovePrompt": "\u8BF7\u53D1\u9001\u76EE\u6807\u76EE\u5F55\uFF1B\u53D1\u9001\u201C\u53D6\u6D88\u201D\u9000\u51FA\u3002",
-    "commands.fileRenamePrompt": "\u8BF7\u53D1\u9001\u65B0\u6587\u4EF6\u540D\uFF08\u5FC5\u987B\u4FDD\u7559\u539F\u6269\u5C55\u540D\uFF09\uFF1B\u53D1\u9001\u201C\u53D6\u6D88\u201D\u9000\u51FA\u3002",
-    "commands.fileAwaitFolder": "\u7B49\u5F85\u76EE\u6807\u76EE\u5F55",
-    "commands.fileAwaitName": "\u7B49\u5F85\u65B0\u6587\u4EF6\u540D",
-    "commands.fileDeleteTitle": "\u26A0\uFE0F **\u786E\u8BA4\u5220\u9664\u8FD9\u4E2A\u6587\u4EF6\uFF1F**",
-    "commands.fileDeleteImpact": "\u8BE5\u64CD\u4F5C\u4F1A\u5220\u9664\u5B9E\u4F53\u6587\u4EF6\u548C\u7D22\u5F15\u3002",
-    "commands.fileMutationExpired": "\u64CD\u4F5C\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u6587\u4EF6\u8BE6\u60C5\u3002",
-    "commands.fileMutationCancelled": "\u5DF2\u53D6\u6D88\u6587\u4EF6\u64CD\u4F5C\u3002",
-    "commands.fileMoved": "\u2705 \u5DF2\u79FB\u52A8\u5230\uFF1A{folder}",
-    "commands.fileRenamed": "\u2705 \u5DF2\u91CD\u547D\u540D\u4E3A\uFF1A{name}",
-    "commands.fileDeleteChoose": "\u8BF7\u4ECE\u201C\u641C\u7D22\u548C\u64CD\u4F5C\u6587\u4EF6\u201D\u4E2D\u9009\u62E9\u6587\u4EF6\uFF0C\u7136\u540E\u70B9\u51FB\u201C\u5220\u9664\u201D\u3002",
-    "commands.fileDeleteNoIndex": "\u274C \u4E3A\u907F\u514D\u8BEF\u5220\uFF0CTelegram Bot \u4E0D\u652F\u6301\u6309\u5217\u8868\u5E8F\u53F7\u5220\u9664\u3002\u8BF7\u53D1\u9001 /list \u5E76\u590D\u5236\u81F3\u5C11 8 \u4F4D\u6587\u4EF6 ID \u524D\u7F00\u3002",
-    "commands.fileIdTooShort": "\u274C ID \u524D\u7F00\u81F3\u5C11\u9700\u8981 8 \u4F4D\u3002\u8BF7\u4ECE\u7F51\u9875\u7AEF\u6587\u4EF6\u5217\u8868\u590D\u5236\u66F4\u957F\u7684\u6587\u4EF6 ID\u3002",
-    "commands.fileNotFound": '\u274C \u672A\u627E\u5230 ID \u4EE5 "{selector}" \u5F00\u5934\u7684\u6587\u4EF6',
-    "commands.fileAmbiguous": '\u274C ID \u524D\u7F00 "{selector}" \u5339\u914D\u5230\u591A\u4E2A\u6587\u4EF6\uFF0C\u8BF7\u590D\u5236\u66F4\u957F\u7684 ID \u524D\u7F00\u540E\u91CD\u8BD5\u3002',
-    "commands.fileOpenListDeleteUnsupported": "OpenList \u5B58\u50A8\u4E0D\u63D0\u4F9B\u7528\u6237\u5220\u9664\u529F\u80FD\u3002",
-    "commands.fileDeleteHint": "\u5220\u9664\u4F1A\u79FB\u9664\u6570\u636E\u5E93\u8BB0\u5F55\u5E76\u5C1D\u8BD5\u5220\u9664\u5B9E\u9645\u6587\u4EF6\u3002\u8BF7\u786E\u8BA4\u65E0\u8BEF\u540E\u70B9\u51FB\u6309\u94AE\u3002",
-    "commands.deleteExpired": "\u5220\u9664\u786E\u8BA4\u65E0\u6548\u6216\u5DF2\u8FC7\u671F",
-    "commands.deleteNotOwner": "\u5220\u9664\u786E\u8BA4\u4E0D\u5C5E\u4E8E\u4F60\u6216\u5DF2\u8FC7\u671F",
-    "commands.deleteInvalid": "\u5220\u9664\u786E\u8BA4\u4E0D\u5C5E\u4E8E\u4F60\u3001\u5DF2\u8FC7\u671F\u6216\u5DF2\u4F7F\u7528",
-    "commands.deleteCancelled": "\u5DF2\u53D6\u6D88\u5220\u9664\uFF1A{name}",
-    "commands.fileMissingShort": "\u6587\u4EF6\u4E0D\u5B58\u5728",
-    "commands.fileDeleteUnsupportedShort": "\u5F53\u524D\u5B58\u50A8\u4E0D\u652F\u6301\u7528\u6237\u5220\u9664",
-    "commands.deleteFailed": "\u5220\u9664\u5931\u8D25\uFF1A{error}",
-    "commands.pathOncePrompt": "\u8BF7\u76F4\u63A5\u53D1\u9001\u4E0B\u4E00\u6B21\u8981\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002",
-    "commands.pathSessionPrompt": "\u8BF7\u76F4\u63A5\u53D1\u9001\u672C\u804A\u5929\u8981\u6301\u7EED\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002",
-    "commands.pathOnceSaved": "\u{1F4CC} \u5DF2\u8BBE\u7F6E\u4E0B\u4E00\u6B21\u4E0B\u8F7D\u76EE\u5F55\uFF1A`{folder}`\n{preview}\n\n\u6B64\u8BBE\u7F6E\u4F1A\u5728\u4E0B\u4E00\u6B21\u6210\u529F\u8FDB\u5165\u4E0B\u8F7D\u6D41\u7A0B\u65F6\u81EA\u52A8\u5931\u6548\u3002",
-    "commands.pathSessionSaved": "\u{1F4CD} \u5DF2\u8BBE\u7F6E\u672C\u4F1A\u8BDD\u4E0B\u8F7D\u76EE\u5F55\uFF1A`{folder}`\n{preview}\n\n\u540E\u7EED\u6B64\u804A\u5929\u4E2D\u7684\u4E0B\u8F7D\u4F1A\u4F18\u5148\u4FDD\u5B58\u5230\u8BE5\u76EE\u5F55\uFF1B\u53EF\u5728\u201C\u4FDD\u5B58\u4F4D\u7F6E\u201D\u4E2D\u6E05\u9664\u3002",
-    "commands.pathInvalid": "\u274C \u8DEF\u5F84\u65E0\u6548\uFF1A{error}",
-    "commands.pathCleared": "\u{1F9F9} \u5DF2\u6E05\u9664\u4E0B\u4E00\u6B21/\u672C\u4F1A\u8BDD\u81EA\u5B9A\u4E49\u4E0B\u8F7D\u76EE\u5F55\uFF0C\u540E\u7EED\u6062\u590D\u4F7F\u7528\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B\u76EE\u5F55\u3002",
-    "commands.pathRecentTitle": "\u{1F558} **\u6700\u8FD1\u4F7F\u7528\u76EE\u5F55**",
-    "commands.pathRecentHint": "\u5982\u9700\u4F7F\u7528\u67D0\u4E2A\u76EE\u5F55\uFF0C\u8BF7\u5728\u201C\u4FDD\u5B58\u4F4D\u7F6E\u201D\u4E2D\u9009\u62E9\u4E0B\u4E00\u6B21\u6216\u672C\u804A\u5929\u76EE\u5F55\uFF0C\u7136\u540E\u53D1\u9001\u76EE\u5F55\u540D\u79F0\u3002",
-    "commands.pathRecentEmpty": "\u{1F558} \u6682\u65E0\u6700\u8FD1\u4F7F\u7528\u76EE\u5F55\u3002\u8BBE\u7F6E\u76EE\u5F55\u540E\u4F1A\u81EA\u52A8\u8BB0\u5F55\u3002",
-    "commands.pathRecentSent": "\u5DF2\u53D1\u9001\u6700\u8FD1\u76EE\u5F55",
-    "commands.pathInputToast": "\u8BF7\u76F4\u63A5\u53D1\u9001\u76EE\u5F55\uFF0C\u6216\u53D1\u9001\u201C\u53D6\u6D88\u201D\u9000\u51FA",
-    "commands.pathUpdated": "\u4FDD\u5B58\u4F4D\u7F6E\u5DF2\u66F4\u65B0",
-    "commands.taskInvalidButton": "\u4EFB\u52A1\u6309\u94AE\u65E0\u6548\u6216\u5DF2\u8FC7\u671F",
-    "commands.cleanupCancelledSummary": "\u5DF2\u53D6\u6D88\u6E05\u7406\u3002\u5F53\u524D\u672C\u5730\u4E0B\u8F7D\u6587\u4EF6\uFF1A{count} \u4E2A\uFF0C\u5360\u7528 {size}\u3002",
-    "commands.cleanupCancelledEmpty": "\u5DF2\u53D6\u6D88\u6E05\u7406\u3002\u5F53\u524D\u6CA1\u6709\u672C\u5730\u4E0B\u8F7D\u6587\u4EF6\u3002",
-    "commands.cleanupConfirmTitle": "\u26A0\uFE0F **\u786E\u8BA4\u5220\u9664\u672C\u5730\u670D\u52A1\u5668\u5168\u90E8\u4E0B\u8F7D\u6587\u4EF6\uFF1F**",
-    "commands.cleanupConfirmSummary": "\u5C06\u5220\u9664 uploads \u672C\u5730\u76EE\u5F55\u4E2D\u7684 **{count}** \u4E2A\u6587\u4EF6\uFF0C\u5360\u7528 **{size}**\u3002",
-    "commands.cleanupConfirmImpact": "\u8FD9\u4F1A\u5220\u9664\u672C\u5730\u5B9E\u4F53\u6587\u4EF6\u53CA\u5BF9\u5E94\u7684\u672C\u5730\u6587\u4EF6\u7D22\u5F15\uFF1B\u4E0D\u4F1A\u5220\u9664\u4EFB\u52A1\u5386\u53F2\u6216\u4EFB\u4F55\u7B2C\u4E09\u65B9\u4E91\u7AEF\u5B9E\u4F53\u3002",
-    "commands.cleanupConfirmHint": "\u5982\u786E\u8BA4\uFF0C\u8BF7\u70B9\u51FB\u4E0B\u65B9\u7EA2\u8272\u786E\u8BA4\u6309\u94AE\u3002",
-    "commands.cleanupConfirmRequired": "\u9700\u8981\u4E8C\u6B21\u786E\u8BA4",
-    "commands.cleanupConfirmInvalid": "\u6E05\u7406\u786E\u8BA4\u65E0\u6548\u3001\u5DF2\u8FC7\u671F\u6216\u5DF2\u4F7F\u7528",
-    "commands.cleanupDoneTitle": "\u2705 **\u672C\u5730\u670D\u52A1\u5668\u4E0B\u8F7D\u6587\u4EF6\u5DF2\u6E05\u7406**",
-    "commands.cleanupDoneSummary": "\u5DF2\u5220\u9664\uFF1A{count} \u4E2A\u6587\u4EF6\n\u91CA\u653E\u7A7A\u95F4\uFF1A{size}\n\u5269\u4F59\u672C\u5730\u6587\u4EF6\uFF1A{remaining} \u4E2A",
-    "commands.cleanupDeleted": "\u5DF2\u5220\u9664 {count} \u4E2A\u6587\u4EF6",
-    "commands.cleanupOldButton": "\u65E7\u6E05\u7406\u6309\u94AE\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u53D1\u9001 /storage",
-    "commands.cleanupFailed": "\u6E05\u7406\u5931\u8D25\uFF1A{error}",
-    "commands.bulkInvalidConfirm": "\u6279\u91CF\u53D6\u6D88\u786E\u8BA4\u65E0\u6548\u6216\u5DF2\u8FC7\u671F",
-    "commands.bulkNotOwner": "\u8BE5\u786E\u8BA4\u4E0D\u5C5E\u4E8E\u4F60\u6216\u5DF2\u8FC7\u671F",
-    "commands.bulkReturnedToast": "\u5DF2\u8FD4\u56DE",
-    "commands.bulkInvalidUsed": "\u8BE5\u786E\u8BA4\u4E0D\u5C5E\u4E8E\u4F60\u3001\u5DF2\u8FC7\u671F\u6216\u5DF2\u4F7F\u7528",
-    "commands.bulkDoneMessage": "\u5DF2\u8FD4\u56DE\uFF0C\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u672A\u88AB\u53D6\u6D88\u3002",
-    "commands.bulkCancelledToast": "\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u5DF2\u53D6\u6D88",
-    "commands.bulkCancelFailed": "\u53D6\u6D88\u5931\u8D25\uFF1A{error}",
-    "commands.taskStopFailed": "\u274C \u5F3A\u5236\u505C\u6B62\u4EFB\u52A1\u5931\u8D25\uFF1A{error}",
-    "commands.taskPausedChannel": "\u23F8\uFE0F \u5DF2\u6682\u505C\u9891\u9053\u4EFB\u52A1 {task}\n\u6765\u6E90\uFF1A{source}",
-    "commands.taskNotFoundPause": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u4EFB\u52A1\uFF1A{task}\u3002\u672A\u6682\u505C\u5F53\u524D\u804A\u5929\u4E0B\u8F7D\u961F\u5217\u3002",
-    "commands.taskResumedSingle": "\u25B6\uFE0F \u5DF2\u7EE7\u7EED\u8BE5\u4EFB\u52A1",
-    "commands.taskResumedChannel": "\u25B6\uFE0F \u5DF2\u7EE7\u7EED\u9891\u9053\u4EFB\u52A1 {task}\n\u6765\u6E90\uFF1A{source}",
-    "commands.taskNotFoundResume": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u4EFB\u52A1\uFF1A{task}\u3002\u672A\u7EE7\u7EED\u5F53\u524D\u804A\u5929\u4E0B\u8F7D\u961F\u5217\u3002",
-    "commands.taskCancelledSingle": "\u{1F6D1} \u5DF2\u53D6\u6D88\u8BE5\u4E0B\u8F7D\u4EFB\u52A1",
-    "commands.taskCancelledChannel": "\u{1F6D1} \u5DF2\u53D6\u6D88\u9891\u9053\u4EFB\u52A1 {task}\n\u6765\u6E90\uFF1A{source}",
-    "commands.taskNotFound": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u5F53\u524D\u804A\u5929\u4E2D\u7684\u5339\u914D\u4EFB\u52A1\uFF1A{task}",
-    "commands.taskLegacyCancel": "\u65E7\u7248\u53D6\u6D88\u6309\u94AE\u5DF2\u5931\u6548\uFF0C\u8BF7\u4F7F\u7528\u65B0\u7248 /tasks \u91CD\u65B0\u8FDB\u5165\u4EFB\u52A1\u8BE6\u60C5\u5E76\u786E\u8BA4",
-    "commands.taskLegacyAmbiguous": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u4F7F\u7528\u65B0\u7248 /tasks \u5237\u65B0",
-    "commands.taskLegacyEnded": "\u4EFB\u52A1\u5DF2\u7ED3\u675F\u6216\u5DF2\u5931\u6548",
-    "commands.retryNoUniqueChannel": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u552F\u4E00\u7684\u9891\u9053\u4EFB\u52A1\uFF0C\u672A\u91CD\u8BD5\u5176\u5B83\u4EFB\u52A1\u3002",
-    "commands.retryChannelDone": "\u{1F504} \u5DF2\u91CD\u65B0\u52A0\u5165\u9891\u9053\u4EFB\u52A1\u5931\u8D25\u9879 {count} \u4E2A\n\u4EFB\u52A1: {task}",
-    "commands.retryChannelEmpty": "\u{1F4EE} \u8BE5\u9891\u9053\u4EFB\u52A1\u6CA1\u6709\u53EF\u91CD\u8BD5\u5931\u8D25\u9879",
-    "commands.retryInvalidChat": "\u{1F4EE} \u65E0\u6CD5\u8BC6\u522B\u5F53\u524D\u804A\u5929\uFF0C\u672A\u6267\u884C\u5931\u8D25\u4EFB\u52A1\u91CD\u8BD5\u3002",
-    "commands.retryTaskMissing": "\u{1F4EE} \u6CA1\u6709\u627E\u5230\u5F53\u524D\u804A\u5929\u4E2D\u7684\u5931\u8D25\u4EFB\u52A1\uFF1A{task}",
-    "commands.workerReadFailed": "\u274C \u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u5355\u6587\u4EF6\u5206\u7247\u5E76\u53D1\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002",
-    "commands.concurrencyReadFailed": "\u274C \u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u6587\u4EF6\u5E76\u53D1\u8BBE\u7F6E\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002",
-    "commands.pathOncePromptDirect": "\u8BF7\u76F4\u63A5\u53D1\u9001\u4E0B\u4E00\u6B21\u8981\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002",
-    "commands.pathOnceSavedDirect": "\u{1F4CC} \u5DF2\u8BBE\u7F6E\u4E0B\u4E00\u6B21\u4E0B\u8F7D\u76EE\u5F55\uFF1A`{folder}`\n{preview}\n\n\u6B64\u8BBE\u7F6E\u4F1A\u5728\u4E0B\u4E00\u6B21\u6210\u529F\u8FDB\u5165\u4E0B\u8F7D\u6D41\u7A0B\u65F6\u81EA\u52A8\u5931\u6548\u3002",
-    "commands.pathSessionPromptDirect": "\u8BF7\u76F4\u63A5\u53D1\u9001\u672C\u804A\u5929\u8981\u6301\u7EED\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002",
-    "commands.pathSessionSavedDirect": "\u{1F4CD} \u5DF2\u8BBE\u7F6E\u672C\u4F1A\u8BDD\u4E0B\u8F7D\u76EE\u5F55\uFF1A`{folder}`\n{preview}\n\n\u540E\u7EED\u6B64\u804A\u5929\u4E2D\u7684\u4E0B\u8F7D\u4F1A\u4F18\u5148\u4FDD\u5B58\u5230\u8BE5\u76EE\u5F55\uFF1B\u53EF\u5728\u201C\u4FDD\u5B58\u4F4D\u7F6E\u201D\u4E2D\u6E05\u9664\u3002",
-    "commands.pathClearedDirect": "\u{1F9F9} \u5DF2\u6E05\u9664\u4E0B\u4E00\u6B21/\u672C\u4F1A\u8BDD\u81EA\u5B9A\u4E49\u4E0B\u8F7D\u76EE\u5F55\uFF0C\u540E\u7EED\u6062\u590D\u4F7F\u7528\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B\u76EE\u5F55\u3002",
-    "commands.pathInvalidDirect": "\u274C \u8DEF\u5F84\u65E0\u6548\uFF1A{error}",
-    "commands.taskOldCard": "\u65E7\u4EFB\u52A1\u5361\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u53D1\u9001 /tasks",
-    "commands.taskWrongOwner": "\u8BE5\u4EFB\u52A1\u5361\u4E0D\u5C5E\u4E8E\u4F60\u6216\u5DF2\u8FC7\u671F",
-    "commands.taskRefreshed": "\u4EFB\u52A1\u5217\u8868\u5DF2\u5237\u65B0",
-    "commands.taskEnded": "\u4EFB\u52A1\u5DF2\u7ED3\u675F\u6216\u5DF2\u5931\u6548",
-    "commands.taskConfirmCancel": "\u8BF7\u786E\u8BA4\u662F\u5426\u53D6\u6D88",
-    "commands.taskCancelExpired": "\u53D6\u6D88\u786E\u8BA4\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u8FDB\u5165\u4EFB\u52A1\u8BE6\u60C5",
-    "commands.taskRetryUnsupported": "\u8BE5\u4EFB\u52A1\u7C7B\u578B\u4E0D\u652F\u6301\u6B64\u91CD\u8BD5\u6309\u94AE",
-    "commands.taskPrioritized": "\u5DF2\u63D0\u5347\u5230\u7B49\u5F85\u961F\u5217\u524D\u9762",
-    "commands.taskPausing": "\u5C06\u5728\u5B8C\u6210\u5F53\u524D\u6587\u4EF6\u540E\u6682\u505C",
-    "commands.taskPaused": "\u4EFB\u52A1\u5DF2\u6682\u505C",
-    "commands.taskResumed": "\u4EFB\u52A1\u5DF2\u7EE7\u7EED",
-    "commands.taskCancelled": "\u4EFB\u52A1\u5DF2\u53D6\u6D88",
-    "commands.taskProtected": "\u4EFB\u52A1\u7531\u7CFB\u7EDF\u4FDD\u62A4\u6682\u505C\uFF0C\u9700\u7B49\u5F85\u7CFB\u7EDF\u6761\u4EF6\u6062\u590D",
-    "commands.taskForbidden": "\u4EFB\u52A1\u4E0D\u5C5E\u4E8E\u5F53\u524D\u804A\u5929",
-    "commands.taskOperationFailed": "\u64CD\u4F5C\u5931\u8D25\uFF1A{error}",
-    "commands.taskPrefixAmbiguous": "\u4EFB\u52A1 ID \u524D\u7F00\u4E0D\u552F\u4E00\uFF0C\u8BF7\u5237\u65B0\u4EFB\u52A1\u5217\u8868",
-    "commands.bulkInvalidChat": "\u{1F4EE} \u65E0\u6CD5\u8BC6\u522B\u5F53\u524D\u804A\u5929\uFF0C\u672A\u53D6\u6D88\u4EFB\u52A1",
-    "commands.bulkEmpty": "\u{1F4EE} \u5F53\u524D\u804A\u5929\u6CA1\u6709\u53EF\u53D6\u6D88\u7684\u4EFB\u52A1",
-    "commands.bulkTitle": "\u26A0\uFE0F **\u786E\u8BA4\u53D6\u6D88\u5F53\u524D\u804A\u5929\u5168\u90E8\u4EFB\u52A1\uFF1F**",
-    "commands.bulkOrdinary": "\u666E\u901A\u4E0B\u8F7D\uFF1A{tasks} \u4E2A\u4EFB\u52A1\uFF08\u5904\u7406\u4E2D {active} \u4E2A\u6587\u4EF6\uFF0C\u7B49\u5F85 {pending} \u4E2A\u6587\u4EF6\uFF09",
-    "commands.bulkChannels": "\u9891\u9053\u4EFB\u52A1\uFF1A{count} \u4E2A",
-    "commands.bulkWarning": "\u786E\u8BA4\u540E\u4F1A\u4E2D\u6B62\u6B63\u5728\u8FD0\u884C\u7684\u4EFB\u52A1\u5E76\u6E05\u7406\u5BF9\u5E94\u4E34\u65F6\u6587\u4EF6\u3002\u5176\u5B83\u804A\u5929\u548C\u5176\u5B83\u7528\u6237\u7684\u4EFB\u52A1\u4E0D\u53D7\u5F71\u54CD\u3002",
-    "commands.bulkInvalid": "\u6279\u91CF\u53D6\u6D88\u786E\u8BA4\u65E0\u6548\u6216\u5DF2\u8FC7\u671F",
-    "commands.confirmWrongOwner": "\u8BE5\u786E\u8BA4\u4E0D\u5C5E\u4E8E\u4F60\u6216\u5DF2\u8FC7\u671F",
-    "commands.confirmInvalid": "\u8BE5\u786E\u8BA4\u4E0D\u5C5E\u4E8E\u4F60\u3001\u5DF2\u8FC7\u671F\u6216\u5DF2\u4F7F\u7528",
-    "commands.bulkReturned": "\u5DF2\u8FD4\u56DE\uFF0C\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u672A\u88AB\u53D6\u6D88\u3002",
-    "commands.bulkDoneTitle": "\u{1F6D1} **\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u5DF2\u53D6\u6D88**",
-    "commands.bulkDone": "\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u5DF2\u53D6\u6D88",
-    "commands.bulkFailed": "\u53D6\u6D88\u5931\u8D25\uFF1A{error}",
-    "commands.stopFailed": "\u274C \u5F3A\u5236\u505C\u6B62\u4EFB\u52A1\u5931\u8D25\uFF1A{error}",
-    "bot.wizard.confirmTitle": "\u8BF7\u786E\u8BA4\u4EFB\u52A1\u8303\u56F4\uFF1A",
-    "bot.wizard.confirmSource": "\u{1F4CC} \u9891\u9053\uFF1A{source}",
-    "bot.wizard.confirmComments": "\u{1F4AC} \u8BC4\u8BBA\u533A\uFF1A{value}",
-    "bot.wizard.folder.defaultValue": "\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B",
-    "bot.wizard.storage.current": "\u5F53\u524D\u5B58\u50A8",
-    "bot.wizard.storage.currentAccount": "\u5F53\u524D\u8D26\u6237",
-    "bot.wizard.confirmTagRange": "\u6807\u7B7E\uFF1A#{tag}",
-    "bot.wizard.confirmDateRange": "\u65E5\u671F\uFF1A{startDate} \u2192 {endDate}",
-    "bot.wizard.confirmDays": "\u{1F4C5} \u5171 {days} \u5929\uFF08\u542B\u9996\u5C3E\u65E5\u671F\uFF09",
-    "bot.wizard.confirmLargeRange": "\u26A0\uFE0F \u8303\u56F4\u8F83\u5927\uFF1A\u786E\u8BA4\u540E\u5C06\u6267\u884C\u5206\u6BB5\u626B\u63CF\uFF0C\u8BF7\u6838\u5BF9\u65E5\u671F\u548C\u5B58\u50A8\u76EE\u6807\u3002",
-    "bot.wizard.confirmCommentsOn": "\u5305\u542B\uFF08\u6BCF\u5E16\u6700\u591A {count} \u6761\uFF09",
-    "bot.wizard.confirmCommentsOff": "\u4E0D\u5305\u542B",
-    "bot.wizard.confirmFolder": "\u{1F4C1} \u76EE\u5F55\uFF1A{folder}",
-    "bot.wizard.confirmStorage": "\u2601\uFE0F \u56FA\u5B9A\u5B58\u50A8\uFF1A{provider} / {account}",
-    "bot.wizard.confirmNote": "\u626B\u63CF\u8FDB\u5EA6\u4F1A\u5B9E\u65F6\u66F4\u65B0\uFF1B\u53EF\u5728\u4EFB\u52A1\u4E2D\u5FC3\u968F\u65F6\u53D6\u6D88\u3002",
-    "bot.wizard.subscriptionIndexInvalid": "\u274C \u6CA1\u6709\u8FD9\u4E2A\u5E8F\u53F7\uFF0C\u8BF7\u56DE\u590D\u5217\u8868\u4E2D\u7684\u5E8F\u53F7\uFF0C\u6216\u53D1\u9001\u9891\u9053\u7528\u6237\u540D/\u94FE\u63A5\u6765\u65B0\u589E\u8BA2\u9605\u3002",
-    "bot.wizard.subscriptionInputInvalid": "\u274C \u8BF7\u56DE\u590D\u8BA2\u9605\u5E8F\u53F7\u6765\u53D6\u6D88\uFF0C\u6216\u53D1\u9001\u9891\u9053\u7528\u6237\u540D/\u94FE\u63A5\u6765\u65B0\u589E\u8BA2\u9605\uFF0C\u4F8B\u5982\uFF1A`@channel_username`\u3002",
-    "bot.wizard.pathInvalid": "\u274C \u8DEF\u5F84\u65E0\u6548\uFF1A{error}\n\n\u8BF7\u91CD\u65B0\u53D1\u9001\u76EE\u5F55\uFF0C\u6216\u53D1\u9001\u201C\u8DF3\u8FC7\u201D\u4F7F\u7528\u9ED8\u8BA4\u4FDD\u5B58\u8DEF\u5F84\u89C4\u5219\u3002",
-    "bot.wizard.subscriptionUpdated": "\u2705 \u5DF2\u66F4\u65B0\u8BA2\u9605\u76EE\u5F55\uFF1A{source}",
-    "bot.wizard.subscriptionNotFound": "\u274C \u672A\u627E\u5230\u8BE5\u8BA2\u9605",
-    "bot.wizard.subscriptionFolder": "\u{1F4C1} \u4E13\u5C5E\u76EE\u5F55\uFF1A{folder}\n{preview}",
-    "bot.wizard.defaultFolder": "\u{1F4C1} \u4FDD\u5B58\u7B56\u7565\uFF1A\u9ED8\u8BA4\u81EA\u52A8\u5206\u7C7B",
-    "bot.wizard.subscribed": "\u2705 \u5DF2\u8BA2\u9605 {source}",
-    "bot.wizard.subscriptionFolderLabel": "\u{1F4C1} \u672C\u8BA2\u9605\u4E13\u5C5E\u4FDD\u5B58\u76EE\u5F55\uFF1A{folder}\n{preview}",
-    "bot.wizard.subscriptionDefaultLabel": "\u{1F4C1} \u672C\u8BA2\u9605\u4F7F\u7528\u9ED8\u8BA4\u4FDD\u5B58\u8DEF\u5F84\u89C4\u5219",
-    "bot.wizard.subscriptionStart": "\u4ECE\u5F53\u524D\u6700\u65B0\u6D88\u606F ID {messageId} \u4E4B\u540E\u5F00\u59CB\u81EA\u52A8\u540C\u6B65\u3002",
-    "bot.wizard.subscriptionFailed": "\u274C \u8BA2\u9605\u64CD\u4F5C\u5931\u8D25\uFF1A{error}",
-    "bot.wizard.dateRangeInvalid": "\u274C {error}",
-    "bot.callback.taskCardInvalid": "\u4EFB\u52A1\u5361\u5DF2\u5931\u6548\u6216\u4E0D\u5C5E\u4E8E\u5F53\u524D\u804A\u5929",
-    "bot.callback.retryCount": "\u5DF2\u91CD\u8BD5 {count} \u9879",
-    "bot.callback.noRetry": "\u6CA1\u6709\u53EF\u91CD\u8BD5\u5931\u8D25\u9879",
-    "bot.callback.failureDetailsTitle": "\u274C **\u5931\u8D25\u660E\u7EC6**",
-    "bot.callback.failureDetailsEmpty": "\u5931\u8D25\u8BB0\u5F55\u5DF2\u6E05\u7406\u6216\u4EFB\u52A1\u5DF2\u91CD\u8BD5\u3002",
-    "bot.callback.failureDetailsSent": "\u5DF2\u53D1\u9001\u5931\u8D25\u660E\u7EC6",
-    "bot.callback.taskUnavailable": "\u4EFB\u52A1\u5DF2\u5B8C\u6210\u3001\u5DF2\u5931\u6548\u6216\u4E0D\u5C5E\u4E8E\u5F53\u524D\u804A\u5929",
-    "bot.callback.queuePaused": "\u5DF2\u6682\u505C\u4E0B\u8F7D\u961F\u5217",
-    "bot.callback.noPausableTasks": "\u5F53\u524D\u6CA1\u6709\u53EF\u6682\u505C\u7684\u4E0B\u8F7D\u4EFB\u52A1",
-    "bot.callback.queueResumed": "\u5DF2\u7EE7\u7EED\u4E0B\u8F7D\u961F\u5217",
-    "bot.callback.noWaitingTasks": "\u5F53\u524D\u6CA1\u6709\u7B49\u5F85\u4E2D\u7684\u4E0B\u8F7D\u4EFB\u52A1",
-    "bot.callback.backgroundCancelled": "\u5DF2\u53D6\u6D88\u540E\u53F0\u4EFB\u52A1",
-    "bot.callback.operationFailed": "\u64CD\u4F5C\u5931\u8D25\uFF1A{error}",
-    "bot.callback.sendChannel": "\u8BF7\u53D1\u9001\u9891\u9053",
-    "bot.callback.subscriptionInvalid": "\u8BA2\u9605\u6309\u94AE\u65E0\u6548\u6216\u5DF2\u8FC7\u671F",
-    "bot.callback.subscriptionRefreshed": "\u8BA2\u9605\u5217\u8868\u5DF2\u5237\u65B0",
-    "bot.callback.subscriptionConfirmInvalid": "\u53D6\u6D88\u786E\u8BA4\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u5237\u65B0\u8BA2\u9605\u5217\u8868",
-    "bot.callback.subscriptionCancelled": "\u5DF2\u53D6\u6D88\u8BA2\u9605",
-    "bot.callback.subscriptionMissing": "\u8BA2\u9605\u4E0D\u5B58\u5728\u6216\u5DF2\u7ECF\u53D6\u6D88",
-    "bot.callback.subscriptionBack": "\u5DF2\u8FD4\u56DE\u8BA2\u9605\u5217\u8868",
-    "bot.callback.syncRequested": "\u5DF2\u8BF7\u6C42\u7ACB\u5373\u540C\u6B65",
-    "bot.callback.subscriptionResumed": "\u5DF2\u6062\u590D\u8BA2\u9605",
-    "bot.callback.subscriptionPaused": "\u5DF2\u6682\u505C\u8BA2\u9605",
-    "bot.callback.cursorUpdated": "\u6E38\u6807\u5DF2\u66F4\u65B0\u4E3A\u5F53\u524D\u6700\u65B0\u6D88\u606F",
-    "bot.callback.followGlobal": "\u5DF2\u6539\u4E3A\u8DDF\u968F\u5168\u5C40",
-    "bot.callback.fixedTarget": "\u5DF2\u56FA\u5B9A\u4E3A\u5F53\u524D\u76EE\u6807",
-    "bot.callback.noResult": "\u6682\u65E0\u8FD0\u884C\u7ED3\u679C",
-    "bot.callback.retryLatest": "\u5DF2\u91CD\u8BD5\u6700\u8FD1\u5931\u8D25\u9879",
-    "bot.callback.enterBackfillDate": "\u8BF7\u8F93\u5165\u8865\u6293\u5F00\u59CB\u65E5\u671F",
-    "bot.callback.currentFolder": "\u4E13\u5C5E\u76EE\u5F55\uFF1A{folder}",
-    "bot.callback.defaultPath": "\u5F53\u524D\u4F7F\u7528\u9ED8\u8BA4\u4FDD\u5B58\u8DEF\u5F84",
-    "bot.callback.sendFolder": "\u8BF7\u53D1\u9001\u65B0\u7684\u4E13\u5C5E\u76EE\u5F55",
-    "bot.callback.folderCleared": "\u5DF2\u6E05\u9664\u4E13\u5C5E\u76EE\u5F55",
-    "bot.callback.confirmUnsubscribe": "\u8BF7\u786E\u8BA4\u662F\u5426\u53D6\u6D88\u8BA2\u9605",
-    "bot.callback.cleanupSuccess": "\u2705 \u6E05\u7406\u6210\u529F",
-    "bot.callback.cleanupFailed": "\u274C \u6E05\u7406\u5931\u8D25"
-  },
-  en: {
-    "bot.wizard.confirmTitle": "Please confirm the task scope:",
-    "bot.wizard.confirmSource": "\u{1F4CC} Channel: {source}",
-    "bot.wizard.confirmComments": "\u{1F4AC} Comments: {value}",
-    "bot.wizard.folder.defaultValue": "Default automatic organization",
-    "bot.wizard.storage.current": "Current storage",
-    "bot.wizard.storage.currentAccount": "Current account",
-    "bot.wizard.confirmTagRange": "Tag: #{tag}",
-    "bot.wizard.confirmDateRange": "Dates: {startDate} \u2192 {endDate}",
-    "bot.wizard.confirmDays": "\u{1F4C5} {days} days, inclusive",
-    "bot.wizard.confirmLargeRange": "\u26A0\uFE0F This is a large range. The scan will run in segments after confirmation. Check the dates and storage target.",
-    "bot.wizard.confirmCommentsOn": "Included (up to {count} per post)",
-    "bot.wizard.confirmCommentsOff": "Not included",
-    "bot.wizard.confirmFolder": "\u{1F4C1} Folder: {folder}",
-    "bot.wizard.confirmStorage": "\u2601\uFE0F Fixed storage: {provider} / {account}",
-    "bot.wizard.confirmNote": "Scan progress updates in real time. You can cancel it from the task center.",
-    "bot.wizard.subscriptionIndexInvalid": "\u274C No subscription has that number. Reply with a list number, or send a channel username/link to add one.",
-    "bot.wizard.subscriptionInputInvalid": "\u274C Reply with a subscription number to cancel, or send a channel username/link to add one, for example `@channel_username`.",
-    "bot.wizard.pathInvalid": "\u274C Invalid path: {error}\n\nSend the folder again, or send \u201Cskip\u201D to use the default save rule.",
-    "bot.wizard.subscriptionUpdated": "\u2705 Subscription folder updated: {source}",
-    "bot.wizard.subscriptionNotFound": "\u274C Subscription not found",
-    "bot.wizard.subscriptionFolder": "\u{1F4C1} Dedicated folder: {folder}\n{preview}",
-    "bot.wizard.defaultFolder": "\u{1F4C1} Save rule: automatic categorization",
-    "bot.wizard.subscribed": "\u2705 Subscribed to {source}",
-    "bot.wizard.subscriptionFolderLabel": "\u{1F4C1} Dedicated folder for this subscription: {folder}\n{preview}",
-    "bot.wizard.subscriptionDefaultLabel": "\u{1F4C1} This subscription uses the default save rule",
-    "bot.wizard.subscriptionStart": "Automatic sync starts after the current latest message ID {messageId}.",
-    "bot.wizard.subscriptionFailed": "\u274C Subscription operation failed: {error}",
-    "bot.wizard.dateRangeInvalid": "\u274C {error}",
-    "bot.callback.taskCardInvalid": "The task card is invalid or does not belong to this chat",
-    "bot.callback.retryCount": "Retried {count} items",
-    "bot.callback.noRetry": "No failed items can be retried",
-    "bot.callback.failureDetailsTitle": "\u274C **Failure details**",
-    "bot.callback.failureDetailsEmpty": "Failure records were cleared or the task was retried.",
-    "bot.callback.failureDetailsSent": "Failure details sent",
-    "bot.callback.taskUnavailable": "The task is complete, expired, or does not belong to this chat",
-    "bot.callback.queuePaused": "Download queue paused",
-    "bot.callback.noPausableTasks": "There are no downloadable tasks that can be paused",
-    "bot.callback.queueResumed": "Download queue resumed",
-    "bot.callback.noWaitingTasks": "There are no waiting downloads",
-    "bot.callback.backgroundCancelled": "Background task cancelled",
-    "bot.callback.operationFailed": "Operation failed: {error}",
-    "bot.callback.sendChannel": "Send a channel",
-    "bot.callback.subscriptionInvalid": "The subscription button is invalid or expired",
-    "bot.callback.subscriptionRefreshed": "Subscription list refreshed",
-    "bot.callback.subscriptionConfirmInvalid": "The cancellation confirmation is invalid or expired. Refresh the subscription list.",
-    "bot.callback.subscriptionCancelled": "Subscription cancelled",
-    "bot.callback.subscriptionMissing": "The subscription does not exist or was already cancelled",
-    "bot.callback.subscriptionBack": "Back to the subscription list",
-    "bot.callback.syncRequested": "Sync requested",
-    "bot.callback.subscriptionResumed": "Subscription resumed",
-    "bot.callback.subscriptionPaused": "Subscription paused",
-    "bot.callback.cursorUpdated": "Cursor updated to the latest message",
-    "bot.callback.followGlobal": "Now following the global setting",
-    "bot.callback.fixedTarget": "Fixed to the current target",
-    "bot.callback.noResult": "No run result yet",
-    "bot.callback.retryLatest": "Retried the latest failed items",
-    "bot.callback.enterBackfillDate": "Enter the backfill start date",
-    "bot.callback.currentFolder": "Dedicated folder: {folder}",
-    "bot.callback.defaultPath": "Using the default save location",
-    "bot.callback.sendFolder": "Send the new dedicated folder",
-    "bot.callback.folderCleared": "Dedicated folder cleared",
-    "bot.callback.confirmUnsubscribe": "Confirm whether to unsubscribe",
-    "bot.callback.cleanupSuccess": "\u2705 Cleanup succeeded",
-    "bot.callback.cleanupFailed": "\u274C Cleanup failed",
-    "language.choose": "Please choose your language",
-    "language.title": "\u{1F310} **Language**",
-    "language.current": "Current language: {language}",
-    "language.changed": "\u2705 Language changed to English",
-    "language.chinese": "Simplified Chinese",
-    "language.english": "English",
-    "language.russian": "\u0420\u0443\u0441\u0441\u043A\u0438\u0439",
-    "language.hint": "Choose the Bot interface language. This changes presentation only.",
-    "auth.required": "\u{1F510} Send /start and verify your PIN first",
-    "auth.requiredUpload": "\u{1F510} Send /start and verify your PIN before uploading files",
-    "auth.inputPrompt": "\u{1F510} Enter your PIN using the keyboard below:",
-    "auth.cancelled": "\u{1F6AB} PIN entry cancelled\n\nSend /start to begin again",
-    "auth.wrong": "\u274C Incorrect PIN. Please try again:",
-    "auth.success": "\u2705 PIN verified!",
-    "auth.startPrompt": "\u{1F44B} **Welcome to TG Vault Bot!**\n\n\u{1F510} Enter your PIN using the keyboard below:",
-    "auth.welcomeBack": "\u{1F44B} **Welcome back!**\n\nSend or forward a file to upload it.\n\nStart with one of the four shortcuts below, or use /help for everything.",
-    "auth.successBody": "\u2705 **PIN verified!**\n\nYou can now:\n\u{1F4E4}  Send or forward any file to upload it (up to 2 GB; account downloads are not subject to this limit)\n\u{1F4CA}  /storage \u2014 View storage usage",
-    "auth.twoFactorPrompt": "\u{1F510} PIN verified!\n\nEnter your **6-digit 2FA code** to finish signing in:",
-    "auth.twoFactorToast": "Enter your 2FA code",
-    "auth.twoFactorWrong": "\u274C Incorrect code. Enter a new 6-digit code:",
-    "auth.twoFactorActivated": "\u2705 **2FA enabled successfully!**\n\n\u{1F6E1}\uFE0F Your account is now protected by two-factor authentication.",
-    "auth.twoFactorLoginOk": "\u2705 **2FA verified**\n\nWelcome back!",
-    "auth.twoFactorQrFail": "\u274C Could not generate the QR code. Check the server logs.",
-    "common.unknownText": "\u2753 Unknown command\n\nSend /start to begin or /help for help",
-    "common.unsupportedMedia": "\u26A0\uFE0F This media format is not supported",
-    "common.emptyFiles": "\u{1F4EE} No uploads yet",
-    "common.emptyTasks": "\u{1F4EE} No active tasks",
-    "common.fileCount": "{count, plural, one {# file} other {# files}}",
-    "common.refresh": "Refresh",
-    "common.confirm": "Confirm",
-    "common.cancel": "Cancel",
-    "common.back": "Back",
-    "common.failed": "Failed",
-    "common.success": "Succeeded",
-    "messages.storage.title": "\u{1F4CA} **Storage usage**",
-    "messages.storage.disk": "**\u{1F4BF} Server disk**",
-    "messages.storage.total": "  Total\u3000{value}",
-    "messages.storage.used": "  Used\u3000{value} ({percent}%)",
-    "messages.storage.free": "  Free\u3000{value}",
-    "messages.storage.indexed": "**\u{1F4C1} Indexed files**",
-    "messages.storage.fileCount": "  Files\u3000{count}",
-    "messages.storage.size": "  Size\u3000{value}",
-    "messages.storage.local": "**\u{1F5A5}\uFE0F Local download files**",
-    "messages.storage.location": "  Location\u3000local uploads/cache directory",
-    "messages.storage.queue": "**\u{1F4E1} Download queue**",
-    "messages.storage.queueCounts": "  \u{1F504} Active {active}\u3000\u23F3 Pending {pending}",
-    "messages.files.title": "\u{1F4CB} **Recently uploaded files** ({count} on this page)",
-    "messages.files.unnamed": "Unnamed file",
-    "messages.files.hint": "\u{1F4A1} To search or manage files, open \u201CSearch and manage files.\u201D",
-    "fileBrowser.detail": "Details",
-    "fileBrowser.copyId": "Copy ID",
-    "fileBrowser.favorite": "Add to favorites",
-    "fileBrowser.unfavorite": "Remove from favorites",
-    "fileBrowser.signedLink": "Signed link",
-    "fileBrowser.move": "Move",
-    "fileBrowser.rename": "Rename",
-    "fileBrowser.delete": "Delete\u2026",
-    "fileBrowser.unnamed": "Unnamed file",
-    "fileBrowser.other": "Other",
-    "fileBrowser.localStorage": "Local storage",
-    "fileBrowser.rootFolder": "Root folder",
-    "fileBrowser.unknown": "Unknown",
-    "fileBrowser.search": "File search",
-    "fileBrowser.recentFiles": "Recent files",
-    "fileBrowser.noMatches": "No matching files.",
-    "fileBrowser.hint": "Tap a file to view details, copy its ID, favorite it, create a link, move/rename it, or confirm deletion.",
-    "messages.delete.success": "\u2705 **File deleted**",
-    "keyboard.upload": "\u{1F4E4} Upload instructions",
-    "keyboard.tasks": "\u{1F527} Tasks",
-    "keyboard.storage": "\u{1F4CA} Storage",
-    "keyboard.more": "\u2630 More",
-    "keyboard.cancel": "Cancel",
-    "help.body": "\u{1F4D6} **Help**\n\n\u{1F4E4} Send or forward files: upload directly\n\u{1F517} Send a video URL: choose a format after parsing\n\u{1F4E5} Tasks: view progress, pause, or cancel\n\u{1F4C1} Save location: choose a folder and storage target\n\u{1F4E1} Channels: download by date/tag or manage subscriptions\n\u{1F310} /language: change interface language\n\n\u{1F447} Choose a feature below.",
-    "notification.digestTitle": "\u{1F4EC} **Notification digest**",
-    "notification.settingsTitle": "\u{1F514} **Notification settings**",
-    "notification.securityImmediate": "Security alerts are always delivered immediately.",
-    "notification.clickToChange": "\u{1F447} Tap a button to change a setting",
-    "notifications.digestTitle": "\u{1F4EC} **Notification digest**",
-    "notifications.title": "\u{1F514} **Notification settings**",
-    "notifications.securityAlways": "Security alerts are always delivered immediately.",
-    "notifications.clickToChange": "\u{1F447} Tap a button to change a setting",
-    "notifications.successImmediate": "Success \xB7 immediate",
-    "notifications.successDigest": "Success \xB7 digest",
-    "notifications.successOff": "Success \xB7 off",
-    "notifications.invalidTimezone": "Invalid time zone",
-    "notifications.failureImmediate": "Failure \xB7 immediate",
-    "notifications.failureDigest": "Failure \xB7 digest",
-    "notifications.subscriptionImmediate": "Subscription \xB7 immediate",
-    "notifications.subscriptionDigest": "Subscription \xB7 digest",
-    "notifications.quietPreset": "Quiet 22:00\u201307:00",
-    "notifications.quietOff": "Disable quiet hours",
-    "notifications.timezoneShanghai": "Time zone \xB7 Shanghai",
-    "notifications.timezoneUtc": "Time zone \xB7 UTC",
-    "notifications.modeImmediate": "immediate",
-    "notifications.modeDigest": "digest",
-    "notifications.modeDigestCombined": "digest",
-    "notifications.modeOff": "off",
-    "notifications.quietDisabled": "off",
-    "notifications.settingsModes": "Failure: {failure} | Success: {success}",
-    "notifications.settingsSchedule": "Subscription: {subscription} | Quiet: {quiet}",
-    "notifications.settingsTimezone": "Time zone: {timezone}",
-    "notifications.error.timezoneRequired": "Enter a time zone, for example Asia/Shanghai",
-    "notifications.error.quietFormat": "Quiet hours must use HH:MM-HH:MM, for example 22:00-07:00; use quiet off to disable them",
-    "notifications.error.successMode": "Success notifications must be immediate, digest, or off",
-    "notifications.error.deliveryMode": "Notification delivery must be immediate or digest",
-    "notifications.error.unknownSetting": "Unknown setting. Send /notifications to see the available options",
-    "channels.errors.sourceAllowlistRequired": "No Telegram source allowlist is configured. Numeric IDs, private chats, and private groups are not allowed. Configure TELEGRAM_ALLOWED_SOURCES.",
-    "channels.errors.sourceNotAllowed": "Source {source} is not in the Telegram download allowlist",
-    "channels.errors.downloaderNotReady": "The Telegram user-account downloader is not ready",
-    "channels.errors.sourceRequired": "Enter a channel",
-    "channels.errors.inviteExpired": "This private channel or group invite has expired. Get a new invite, or join with the same Telegram account used to create the user session, then try again.",
-    "channels.errors.inviteInvalid": "This private channel or group invite is invalid. Check that the link is complete or create a new invite.",
-    "channels.errors.inviteAlreadyJoined": "The account has already joined, but Telegram returned an unexpected state. Try resolving the channel again.",
-    "channels.errors.inviteResolutionFailed": "Could not resolve the private channel or group invite: {error}",
-    "channels.errors.inviteNotJoined": "The Telegram user account has not joined this private channel or group, so its messages cannot be read. Open the invite and join with the same account used to create the user session, then run the subscription or download command again.",
-    "channels.errors.inviteMissingEntity": "Could not resolve the private channel or group invite because Telegram did not return a readable entity. Check that the account is still a member.",
-    "channels.errors.hashtagRequired": "Enter a hashtag",
-    "channels.errors.hashtagInvalid": "Use a hashtag in the form #example, without spaces",
-    "channels.errors.subscriptionNotFound": "Subscription not found",
-    "channels.errors.subscriptionDisabled": "This subscription is disabled",
-    "channels.errors.noDownloadableMessages": "There are no messages available to download",
-    "channels.errors.sourceMessageUnavailable": "The original message no longer exists or has no downloadable media",
-    "channels.errors.fixedTargetProviderRequired": "Choose a provider for the fixed subscription target",
-    "channels.storageCooldown": "\u23F8\uFE0F Google Drive has reached today\u2019s upload limit\n\nThis task has been paused automatically. No remaining files will be lost, and you do not need to tap Resume. It will continue when the quota resets.\n\nRetry time: {retryAt}\nTask: {jobId}",
-    "channels.recoveryComplete": "\u267B\uFE0F Recovered and completed task {jobId}: {successful} succeeded, {skipped} skipped, {failed} failed",
-    "subscriptions.syncComplete": "\u2705 Subscription {source} synced {found} new files; {skipped} skipped and {failed} failed.",
-    "subscriptions.syncCompleteContinues": "\u2705 Subscription {source} synced {found} new files; {skipped} skipped and {failed} failed. This scan reached its limit or encountered failures, so the remaining items will be handled in a later scan.",
-    "subscriptions.disabled.inviteExpired": "Subscription paused: the private channel or group invite has expired, so content can no longer be resolved or downloaded. Join again or update the link before resubscribing.",
-    "subscriptions.disabled.inviteInvalid": "Subscription paused: the private channel or group invite is invalid, so content can no longer be resolved or downloaded. Check the link before resubscribing.",
-    "subscriptions.disabled.notParticipant": "Subscription paused: the Telegram user account is no longer a member of this private channel or group. Join it again before resubscribing.",
-    "subscriptions.disabled.inaccessible": "Subscription paused: the Telegram user account cannot access this channel or group. It may have left, been removed, or the channel may now be private. Check account access before resubscribing.",
-    "subscriptions.disabled.unknown": "Subscription paused: this channel or group could not be accessed or downloaded ({error}). Check that the account still has access before resubscribing.",
-    "subscriptions.paused.inviteExpired": "\u26A0\uFE0F Subscription {source} has been paused\nThe private channel or group invite has expired, so content can no longer be resolved or downloaded.\n\nView the alert in /tg_subs or /tg_sub. Update the link and confirm account access before adding the subscription again.",
-    "subscriptions.paused.inviteInvalid": "\u26A0\uFE0F Subscription {source} has been paused\nThe private channel or group invite is invalid, so content can no longer be resolved or downloaded.\n\nView the alert in /tg_subs or /tg_sub. Check the link and confirm account access before adding the subscription again.",
-    "subscriptions.paused.notParticipant": "\u26A0\uFE0F Subscription {source} has been paused\nThe Telegram user account is no longer a member of this private channel or group, so downloads cannot continue.\n\nView the alert in /tg_subs or /tg_sub. Join again and confirm account access before adding the subscription again.",
-    "subscriptions.paused.inaccessible": "\u26A0\uFE0F Subscription {source} has been paused\nThe Telegram user account cannot access this channel or group. It may have left, been removed, or the channel may now be private.\n\nView the alert in /tg_subs or /tg_sub. Confirm account access before adding the subscription again.",
-    "subscriptions.paused.unknown": "\u26A0\uFE0F Subscription {source} has been paused\nThis channel or group could not be accessed or downloaded ({error}).\n\nView the alert in /tg_subs or /tg_sub. Confirm account access before adding the subscription again.",
-    "ads.reason.allowRule": "Matched an allow rule",
-    "ads.reason.blockedTemplate": "Matched a confirmed advertising template",
-    "ads.reason.blockRule": "Matched a block rule",
-    "ads.reason.normalTemplate": "Similar to confirmed normal content",
-    "ads.reason.adHistoryTemplate": "Highly similar to a previous advertising template",
-    "ads.reason.transactionContact": "Contains a sales pitch and off-platform contact details",
-    "ads.reason.transactionIntent": "Contains sales or promotional language",
-    "ads.reason.ctaLink": "Contains a call to action and an external destination",
-    "ads.reason.callToAction": "Contains a prominent call to action",
-    "ads.reason.linkDensity": "Contains many external links or contact details",
-    "ads.reason.scarcity": "Uses urgency or scarcity language",
-    "ads.reason.decorativeMarketing": "Uses many promotional symbols",
-    "task.pause": "\u23F8 Pause",
-    "task.resume": "\u25B6\uFE0F Resume",
-    "task.cancel": "\u{1F6D1} Cancel",
-    "task.retryFailed": "\u{1F504} Retry failures ({count})",
-    "task.failureDetails": "Failure details",
-    "upload.success": "\u2705 **Upload complete!**",
-    "upload.failed": "\u274C **Upload failed**",
-    "upload.downloading": "\u23F3 **Downloading**",
-    "upload.saving": "\u{1F4BE} **Saving...**",
-    "upload.queued": "\u23F3 **Added to download queue**",
-    "upload.retrying": "\u{1F504} **Upload failed; retrying...**",
-    "upload.duplicateSkipped": "\u23ED\uFE0F **Duplicate file skipped**",
-    "upload.reason": "Reason: {error}",
-    "upload.currentQueue": "\u{1F4CA} Queue: {count} tasks",
-    "upload.wait": "\u{1F4A1} The Bot will process tasks in order. Please wait.",
-    "upload.duplicateCopiedOutcome": "\u267B\uFE0F Duplicate handling: copy created",
-    "upload.duplicateSkippedOutcome": "\u23ED\uFE0F Duplicate handling: skipped",
-    "upload.manageHint": "\u{1F447} Continue managing this file from \u201CSearch and manage files.\u201D",
-    "upload.failureRetryNote": "\u{1F504} Large files can fail because of network instability, Telegram rate limits, or interrupted transfers. The Bot already retried once.",
-    "upload.failureAdvice": "\u{1F4A1} Send the file again, or lower concurrency with /download_workers before retrying.",
-    "upload.receipt.saved": "\u2705 **File saved**",
-    "upload.receipt.partial": "\u26A0\uFE0F **Batch partially completed**",
-    "upload.receipt.failed": "\u274C **Save failed**",
-    "upload.receipt.processing": "\u23F3 **Processing**",
-    "upload.receipt.stats": "\u{1F4CA} Total {total} \xB7 succeeded {successful} \xB7 failed {failed}",
-    "upload.receipt.duplicateCopied": "\u267B\uFE0F Duplicate handling: copy created",
-    "upload.receipt.duplicateSkipped": "\u23ED\uFE0F Duplicate handling: skipped",
-    "upload.receipt.task": "Task: {taskId}",
-    "upload.receipt.findFolder": "Search same folder",
-    "upload.receipt.deleteFile": "Delete file",
-    "upload.existingId": "\u{1F194} Existing: {id}",
-    "upload.duplicateCopyAdvice": "To keep another copy, open \u201CDuplicate file handling\u201D and choose \u201CCreate copy.\u201D",
-    "upload.taskCancelled.title": "\u{1F6D1} **Background task cancelled**",
-    "upload.taskCancelled.id": "\u{1F194} Task: `{taskId}`",
-    "upload.taskCancelled.completed": "\u2705 Completed: {count} files",
-    "upload.taskCancelled.failed": "\u274C Failed: {count} files",
-    "upload.taskCancelled.stopped": "\u{1F6AB} Stopped/cleared: {count} waiting or active tasks",
-    "upload.taskCancelled.controlsRemoved": "Pause, resume, and cancel controls were removed. Old buttons will no longer affect this task.",
-    "upload.error.unknown": "Unknown error",
-    "upload.failedDetail.batch": "{name}: {count} failures",
-    "upload.cleanup.expired": "This cleanup task has expired or does not exist",
-    "upload.cleanup.success": "\u2705 Removed temporary data for {fileName} ({size})",
-    "upload.cleanup.failed": "Cleanup failed: {error}",
-    "taskCenter.kind.single": "Single file",
-    "taskCenter.kind.album": "Album",
-    "taskCenter.kind.channel": "Channel task",
-    "taskCenter.state.running": "Running",
-    "taskCenter.state.waiting": "Waiting to start",
-    "taskCenter.state.pausing": "Finishing current file",
-    "taskCenter.state.paused": "Paused",
-    "taskCenter.state.cooling": "System wait",
-    "taskCenter.state.failed": "Failed",
-    "taskCenter.age.justNow": "Just now",
-    "taskCenter.age.minutes": "{count} min ago",
-    "taskCenter.age.hours": "{count} hr ago",
-    "taskCenter.age.days": "{count} d ago",
-    "taskCenter.progress.active": "Downloading {count}",
-    "taskCenter.progress.pending": "Pending {count}",
-    "taskCenter.progress.failed": "Failed {count}",
-    "taskCenter.progress.skipped": "Skipped {count}",
-    "taskCenter.title": "\u{1F4E5} **Download tasks**",
-    "taskCenter.summary": "\u{1F7E2} Running {running}\u3000\u23F3 Waiting {waiting}\u3000\u23F8 Paused {paused}",
-    "taskCenter.summaryCooling": "\u{1F9CA} System wait {count}",
-    "taskCenter.total": "{count} active tasks",
-    "taskCenter.totalPaged": "{count} active tasks \xB7 Page {page}/{totalPages}",
-    "taskCenter.item.current": "{kind} \xB7 {progress} \xB7 Current: {file}",
-    "taskCenter.item.state": "{kind} \xB7 {progress} \xB7 {state}",
-    "taskCenter.openHint": "Tap a number to view details and control that task.",
-    "taskCenter.button.previous": "\u25C0\uFE0F Previous",
-    "taskCenter.button.refresh": "\u{1F504} Refresh",
-    "taskCenter.button.next": "Next \u25B6\uFE0F",
-    "taskCenter.button.start": "\u25B6\uFE0F Prioritize",
-    "taskCenter.button.pause": "\u23F8 Pause task",
-    "taskCenter.button.resume": "\u25B6\uFE0F Resume",
-    "taskCenter.button.undoPause": "\u25B6\uFE0F Keep running",
-    "taskCenter.button.retry": "\u{1F504} Retry",
-    "taskCenter.button.cancel": "\u{1F6D1} Cancel",
-    "taskCenter.button.backList": "\u21A9\uFE0F Back to tasks",
-    "taskCenter.button.confirmCancel": "\u26A0\uFE0F Confirm cancellation",
-    "taskCenter.button.backDetail": "Back to details",
-    "taskCenter.untitled": "Untitled task",
-    "taskCenter.detail.type": "Type: {value}",
-    "taskCenter.detail.source": "Source: {value}",
-    "taskCenter.detail.progress": "Progress: {value}",
-    "taskCenter.detail.currentFile": "Current file: {value}",
-    "taskCenter.detail.targetFolder": "Save location: {value}",
-    "taskCenter.detail.reason": "Reason: {value}",
-    "taskCenter.detail.created": "Created: {value}",
-    "taskCenter.detail.updated": "Last activity: {value}",
-    "taskCenter.detail.id": "Task ID: {value}",
-    "taskCenter.protection.retryAt": "The system will check again after {value} and resume automatically.",
-    "taskCenter.protection.recheck": "The system checks every {count} seconds and resumes automatically when conditions allow.",
-    "taskCenter.protection.autoResume": "The system will keep checking and resume automatically when conditions allow.",
-    "taskCenter.protection.manual": "This state will not recover automatically. Address the reason, then retry.",
-    "taskCenter.protection.paused": "System protection paused this task; {recovery}",
-    "taskCenter.note.pausing": "The task will pause after the current file finishes.",
-    "taskCenter.note.failed": "This task is no longer running. Once external writes are reconciled, you can submit the download again.",
-    "taskCenter.note.start": "\u201CPrioritize\u201D moves this task to the front of the waiting queue without interrupting current downloads.",
-    "taskCenter.note.pause": "Pausing finishes the current file, then stops processing later files in this task.",
-    "taskCenter.cancel.title": "\u26A0\uFE0F **Cancel this task?**",
-    "taskCenter.cancel.activeWarning": "The active download will stop and its temporary file will be removed. Waiting files will leave the queue immediately.",
-    "taskCenter.cancel.waitingWarning": "Waiting files will leave the queue immediately.",
-    "taskCenter.cancel.unaffected": "Other tasks will not be affected.",
-    "taskCenter.stage.waiting": "Waiting to start",
-    "taskCenter.stage.recovering": "Recovering after restart",
-    "taskCenter.stage.downloading": "Downloading source file",
-    "taskCenter.stage.uploading": "Uploading to storage",
-    "taskCenter.stage.processing": "Processing on server",
-    "taskCenter.defaultAccount": "Default account",
-    "taskCenter.cooldown.storageLimit": "Google Drive\u2019s daily upload limit has been reached",
-    "taskCenter.cooldown.floodWait": "Telegram request rate limited (FloodWait)",
-    "taskCenter.cooldown.autoResume": "{cause}; the system will keep checking and resume automatically",
-    "taskCenter.cooldown.autoResumeAt": "{cause}; expected to resume automatically after {time}",
-    "taskCenter.cooldown.system": "System cooldown",
-    "taskCenter.reason.userPaused": "Paused by user",
-    "status.none": "None",
-    "status.redacted": "[redacted]",
-    "status.state.healthy": "Healthy",
-    "status.state.running": "Running",
-    "status.state.connected": "Connected",
-    "status.state.disabled": "Disabled",
-    "status.state.expired": "Session expired",
-    "status.state.failed": "Error",
-    "status.state.unknown": "Unknown",
-    "status.state.cooldown": "Cooling down",
-    "status.title": "\u{1FA7A} **TG Vault diagnostics**",
-    "status.requestId": "Request ID: {requestId}",
-    "status.degraded": " (degraded)",
-    "status.bot": "Bot: {status}{degraded} \xB7 Reconnects: {reconnectCount}",
-    "status.userClient": "Account downloader: {status}{username}",
-    "status.accountRecovery": "Account recovery: {action}",
-    "status.storage": "Current storage: {provider} \xB7 {accountName}",
-    "status.probe": "Connection check: {status}",
-    "status.recoveryTime": "Recovery time: {time}",
-    "status.storageError": "Storage error: {error}",
-    "status.disk": "Temporary disk: {free} free / {total} \xB7 {usedPercent}% used",
-    "status.queue": "Queue: {active} active \xB7 {pending} waiting \xB7 {failed} failed{paused}",
-    "status.queuePaused": " \xB7 paused",
-    "status.subscriptions": "Subscriptions: {enabled} enabled \xB7 Last scan: {lastScan}",
-    "status.subscriptionError": "Subscription error: {error}",
-    "status.reconciliation": "Reconciliation: {pending} pending \xB7 {operatorRequired} require an operator",
-    "status.advice": "Recommendation: {action}",
-    "status.defaultAdvice": "Recommendation: if a component is unhealthy, use the Request ID to find its structured logs.",
-    "path.preview": "Saves to: {folder}/filename (no channel-name or file-type folder is appended)",
-    "path.prompt.onceTitle": "\u{1F4CC} **Set folder for next download**",
-    "path.prompt.sessionTitle": "\u{1F4CD} **Set folder for this chat**",
-    "path.prompt.sendFolder": "Send the folder name:",
-    "path.prompt.onceExample": "Example: `PIXIV/DailyTop50`",
-    "path.prompt.sessionExample": "Example: `Albums/2026-07`",
-    "path.prompt.recent": "Recently used folders:",
-    "path.prompt.onceNote": "Note: this applies only to the next file that enters the download workflow.",
-    "path.prompt.sessionNote": "Note: this applies to later downloads in this chat until you send `/pc` or tap Clear.",
-    "path.prompt.cancel": "Send \u201CCancel\u201D to exit without changing the setting.",
-    "path.state.current": "Current destination: {value}",
-    "path.state.custom": "{folder} (custom folder)",
-    "path.state.automatic": "Automatic categorization",
-    "path.state.defaultExample": "Default example: `telegram/resources/images`",
-    "path.state.once": "\u{1F4CC} Next-download folder: {value}",
-    "path.state.session": "\u{1F4CD} This-chat folder: {value}",
-    "path.state.unset": "Not set",
-    "path.button.setOnce": "\u{1F4CC} Set next folder",
-    "path.button.setSession": "\u{1F4CD} Set chat folder",
-    "path.button.recent": "\u{1F558} Recent folders",
-    "path.button.clear": "\u{1F9F9} Clear custom folder",
-    "path.settings.title": "\u{1F4C1} **Save location**",
-    "path.settings.defaultLogicTitle": "**Default save behavior**",
-    "path.settings.defaultLogic": "Without a custom folder, files are organized by source/channel and file type.",
-    "path.settings.examples": "Examples: `telegram/resources/images`, `telegram/resources/videos`.",
-    "path.settings.customLogic": "With a custom folder, files are saved directly there without appending channel-name or file-type folders.",
-    "path.settings.currentTitle": "**Current path settings**",
-    "path.settings.choose": "\u{1F447} Choose a save location.",
-    "path.recent.title": "\u{1F558} **Recently used folders**",
-    "path.recent.hint": "To use a folder, choose one-time or chat folder in \u201CSave location\u201D, then send its name.",
-    "path.recent.empty": "\u{1F558} No recently used folders. Folders are recorded after you set one.",
-    "path.toast.recentSent": "Recent folders sent",
-    "path.toast.sendFolder": "Send a folder name, or send \u201Ccancel\u201D to exit",
-    "path.toast.updated": "Save location updated",
-    "path.toast.cancelled": "Save location setup cancelled.",
-    "bot.home.category.main": "Shortcuts",
-    "bot.home.category.files": "Files and save locations",
-    "bot.home.category.channels": "Channels and subscriptions",
-    "bot.home.category.settings": "Tasks and system settings",
-    "bot.home.category.security": "Security",
-    "bot.home.page": "Page {page}/{totalPages}",
-    "bot.home.hint": "Tap a button to open that feature.",
-    "bot.home.uploadHint": "\u{1F4E4} Send or forward a file to upload it.\n\nUse the buttons below for tasks or more features.",
-    "bot.home.logoutHint": "Send /logout to revoke this Telegram user\u2019s Bot authentication immediately.",
-    "bot.home.twoFactorHint": "Use \u201CSet up two-factor authentication\u201D in the Telegram command menu.",
-    "bot.home.prompt.oncePath": "Send the folder to use for the next download.",
-    "bot.home.prompt.sessionPath": "Send the folder to keep using in this chat.",
-    "bot.home.prompt.delete": "Choose a file under \u201CSearch and manage files,\u201D then tap Delete.",
-    "bot.home.prompt.cancelTask": "Choose the task to cancel in the task center.",
-    "bot.home.prompt.unsubscribe": "Choose the subscription to cancel in the channel subscription panel.",
-    "bot.home.followPrompt": "{description}\n\nFollow the prompt, or return to More features to choose another action.",
-    "bot.home.unavailable": "This shortcut is currently unavailable.",
-    "bot.button.dateMode": "\u{1F5D3}\uFE0F Download by date",
-    "bot.button.tagMode": "\u{1F3F7}\uFE0F Download by tag",
-    "bot.button.channelOnly": "Channel posts only",
-    "bot.button.channelComments": "Channel + comments",
-    "bot.button.editFolder": "\u270F\uFE0F Change folder",
-    "bot.button.clearFolder": "\u{1F9F9} Clear folder",
-    "bot.button.unsubscribe": "Unsubscribe",
-    "bot.button.previous": "\u25C0\uFE0F Previous",
-    "bot.button.next": "Next \u25B6\uFE0F",
-    "bot.button.addSubscription": "\u2795 Add subscription",
-    "bot.button.bestVideo": "Best video",
-    "bot.button.audioOnly": "Audio only",
-    "bot.wizard.title.subscription": "\u{1F4E1} **Manage channel subscriptions**",
-    "bot.wizard.title.tag": "\u{1F3F7}\uFE0F **Download channel files by tag**",
-    "bot.wizard.title.date": "\u{1F5D3}\uFE0F **Download channel files by date**",
-    "bot.wizard.title.download": "\u{1F4E6} **Download channel files**",
-    "bot.wizard.mode": "{title}\n\nChoose a download mode:\n\u2022 By date: files in a date range\n\u2022 By tag: files with a specific tag\n\n\u{1F447} Tap a button to continue.",
-    "bot.wizard.source": "{title}\n\nSend a channel username or link.\nPublic channels, private invite links, and joined channels are supported.\n\nSend \u201CCancel\u201D to exit.",
-    "bot.wizard.path": "{title}\n\u{1F4CD} Channel: {source}\n\nDo you want a separate save folder for {scope}?\n\nSend a folder such as `channel-backup/wallpapers`.\nSend `skip` to use the default save rules.\n\nThis folder applies only to {scope}; it does not change /path_rules or other downloads.\nSend \u201CCancel\u201D to exit.",
-    "bot.wizard.scope.subscription": "this subscription",
-    "bot.wizard.scope.newSubscription": "this new subscription",
-    "bot.wizard.scope.download": "this download task",
-    "bot.wizard.comments": "{title}\n\u{1F4CD} Channel: {source}\n{folder}\n\nAlso scan files in the comments under channel posts?\n\nThis is off by default. When enabled, up to {count} comments are scanned per post.\nText comments, ordinary links, and messages without files are ignored.\n\n\u{1F447} Choose whether to scan comments.",
-    "bot.wizard.folder.custom": "\u{1F4C1} Save folder: {folder}",
-    "bot.wizard.folder.default": "\u{1F4C1} Save rule: automatic categorization",
-    "bot.wizard.tag": "{title}\n\u{1F4CD} Channel: {source}\n\nSend the tag to download, for example `#wallpaper` or `wallpaper`.\n\nSend \u201CCancel\u201D to exit.",
-    "bot.wizard.startDate": "{title}\n\u{1F4CD} Channel: {source}\n\nSend the start date as `YYYY-MM-DD`, for example `2026-06-01`.\n\nSend \u201CCancel\u201D to exit.",
-    "bot.wizard.endDate": "{title}\n\u{1F4CD} Channel: {source}\n\u{1F5D3}\uFE0F Start date: {startDate}\n\nSend the end date as `YYYY-MM-DD`, for example `2026-06-27`.\n\nSend \u201CCancel\u201D to exit.",
-    "bot.wizard.expired": "\u231B This wizard expired. Open it again.",
-    "bot.wizard.cancelled": "Telegram channel wizard cancelled.",
-    "bot.wizard.invalidMode": "\u274C Send `date` or `tag`, or send \u201CCancel\u201D to exit.",
-    "bot.wizard.invalidComments": "\u274C Send `on` or `off`, or tap a button to choose whether to include comment files.",
-    "bot.wizard.confirmInput": "Send `confirm` to start, or \u201CCancel\u201D to stop.",
-    "bot.wizard.invalidDate": "\u274C Use YYYY-MM-DD, for example {example}.",
-    "bot.wizard.invalidRange": "Invalid date range",
-    "bot.wizard.callbackExpired": "This wizard expired. Open it again.",
-    "bot.wizard.downloadCancelled": "Channel download wizard cancelled.",
-    "bot.wizard.modeDate": "Download by date",
-    "bot.wizard.modeTag": "Download by tag",
-    "bot.wizard.commentsOn": "Comment files will be included",
-    "bot.wizard.commentsOff": "Only channel-post files will be downloaded",
-    "bot.subscription.confirmTitle": "\u26A0\uFE0F **Unsubscribe from this channel?**",
-    "bot.subscription.source": "Source: {source}",
-    "bot.subscription.folder": "Dedicated folder: {folder}",
-    "bot.subscription.defaultFolder": "Save rule: automatic categorization",
-    "bot.subscription.position": "Sync position: after message {messageId}",
-    "bot.subscription.panelTitle": "\u{1F4E1} **Channel subscriptions**",
-    "bot.subscription.page": "Page {page}/{totalPages} \xB7 {count} total",
-    "bot.subscription.empty": "No subscriptions.",
-    "bot.subscription.manageHint": "\u{1F447} Tap a button to manage or add a subscription.",
-    "bot.subscription.action.sync": "Sync now",
-    "bot.subscription.action.pause": "Pause",
-    "bot.subscription.action.resume": "Resume",
-    "bot.subscription.action.target": "Change target",
-    "bot.subscription.action.fromNow": "From now",
-    "bot.subscription.action.backfill": "Backfill by date",
-    "bot.subscription.action.result": "Latest result",
-    "bot.subscription.action.retry": "Retry failed",
-    "bot.subscription.followSystemDefault": "Follow system default",
-    "bot.subscription.target": "\u{1F3AF} Storage: {target}",
-    "bot.subscription.lastScan": "\u{1F50E} Last scan: {time}",
-    "bot.subscription.nextScan": "\u23ED\uFE0F Next scan: about {time}",
-    "bot.subscription.notScanned": "\u{1F50E} Not scanned yet",
-    "bot.subscription.lastResult": "\u{1F4CA} Latest result: {status}, found {found}, failed {failed}",
-    "bot.subscription.disabledReason": "\u26A0\uFE0F {reason}",
-    "bot.subscription.error": "   \u26A0\uFE0F Error: {error}",
-    "bot.subscription.result.recorded": "Recorded",
-    "bot.subscription.result.completed": "Completed",
-    "bot.subscription.result.partial": "Partially completed",
-    "bot.subscription.result.running": "Running",
-    "bot.subscription.result.paused": "Paused",
-    "bot.subscription.confirmBody": "Confirming stops automatic sync and removes this item from subscription management. Saved files are not deleted.",
-    "bot.subscription.confirmButton": "\u26A0\uFE0F Confirm unsubscribe",
-    "bot.subscription.backButton": "Back to subscriptions",
-    "bot.callback.cancelled": "Cancelled",
-    "bot.callback.expired": "Expired",
-    "bot.callback.submitted": "Task submitted",
-    "bot.callback.failed": "Operation failed: {error}",
-    "bot.legacy.pausedTitle": "\u23F8\uFE0F **Channel download paused**",
-    "bot.legacy.floodWaitTitle": "\u23F3 **Telegram FloodWait cooldown**",
-    "bot.legacy.storageCooldownTitle": "\u23F8\uFE0F **Storage protection cooldown**",
-    "bot.legacy.cancelledTitle": "\u{1F6D1} **Channel download cancelled**",
-    "bot.legacy.completedTitle": "\u2705 **Channel task complete**",
-    "bot.legacy.runningTitle": "\u{1F50E} **Channel task running**",
-    "bot.legacy.controlsPaused": "You can resume or cancel it in the task center.",
-    "bot.legacy.controlsActive": "You can pause or cancel it in the task center.",
-    "bot.legacy.job": "\u{1F194} Job: {jobId}",
-    "bot.legacy.source": "\u{1F4CD} Channel: {source}",
-    "bot.legacy.scan": "\u{1F50E} Scan: {status}",
-    "bot.legacy.channelScan": "\u{1F4C4} Channel posts: scanned {scanned}, found {found} files",
-    "bot.legacy.commentScan": "\u{1F4AC} Comments: scanned {scanned}, found {found} files",
-    "bot.legacy.download": "\u2B07\uFE0F Download: {status}",
-    "bot.legacy.counts": "\u2705 Succeeded {completed}\u3000\u23F3 Pending {pending}\u3000\u{1F504} Downloading {downloading}\u3000\u274C Failed {failed}\u3000\u23ED Skipped {skipped}",
-    "bot.legacy.floodWait": "\u23F3 Telegram FloodWait until: {until}",
-    "bot.legacy.storageCooldown": "\u23F8\uFE0F Storage protection until: {until}",
-    "bot.legacy.scanComplete": "\u{1F50E} **Scan complete; starting downloads**",
-    "bot.legacy.channelScanned": "\u{1F4C4} Channel posts: scanned {scanned}, found {found} files",
-    "bot.legacy.commentsScanned": "\u{1F4AC} Comments: scanned {scanned}, found {found} files (up to {max} per post)",
-    "bot.legacy.commentsDisabled": "\u{1F4AC} Comments: disabled",
-    "bot.legacy.pending": "\u{1F4E6} Pending downloads: {count} files",
-    "bot.legacy.queueing": "\u23F3 Adding files to the download queue. Use /tasks to view background tasks.",
-    "bot.legacy.commentLine": "Comments: scanned {scanned}, found {found} files",
-    "bot.legacy.cancelledResult": "\u{1F6D1} {mode} download task cancelled\nID: {jobId}\nCompleted: {successful}\nSkipped: {skipped}{commentLine}",
-    "bot.legacy.tagResult": "\u2705 Tag download task complete\nTag: {tag}\nID: {jobId}\nQueued: {found}\nSkipped: {skipped}\nFailed: {failed}{commentLine}",
-    "bot.legacy.dateResult": "\u2705 Date-range task complete\nID: {jobId}\nQueued: {found}\nSkipped: {skipped}\nFailed: {failed}{commentLine}",
-    "bot.legacy.failed": "\u274C {mode} download failed: {error}",
-    "bot.link.empty": "No downloadable file found in this message. It may have been deleted or be inaccessible.",
-    "bot.link.failed": "Link download failed: {error}",
-    "bot.legacy.confirmTag": "\u23F3 Confirmed. Starting a background scan of {source} for media messages with {tag}\u2026",
-    "bot.legacy.confirmDate": "\u23F3 Confirmed. Starting a background scan of {source}: {startDate} \u2192 {endDate}\u2026",
-    "bot.legacy.submitFailed": "\u274C Could not submit the task: {error}",
-    "bot.legacy.usageDate": "\u274C Usage: /tg_date @channel YYYY-MM-DD YYYY-MM-DD",
-    "bot.legacy.usageTag": "\u274C Usage: /tg_tag @channel #tag",
-    "bot.auth.rateLimited": "\u23F3 Too many actions. Try again in {seconds} seconds.",
-    "bot.auth.pinLocked": "Too many incorrect PIN attempts. Try again in {seconds} seconds.",
-    "bot.auth.pinLockedBody": "\u274C Too many incorrect PIN attempts. Locked for {seconds} seconds.",
-    "bot.auth.pinLockedShort": "Temporarily locked",
-    "bot.auth.pinWrongShort": "Incorrect PIN",
-    "bot.auth.notAllowed": "\u26D4 This Telegram user is not allowed. Add the user ID to TELEGRAM_ALLOWED_USER_IDS or the allowlist in the web interface.",
-    "bot.auth.notAllowedShort": "Not on the allowlist",
-    "bot.auth.twoFactorEnabled": "\u{1F510} Two-factor authentication is already enabled. The Bot will not show the QR code again because it contains the existing secret.",
-    "bot.auth.loggedOut": "\u2705 Bot authentication for this Telegram user has been revoked. Send /start to authenticate again.",
-    "bot.auth.logoutFailed": "\u274C Could not log out. Try again later.\nOperation ID: {operationId}",
-    "bot.notification.securityLogin": "\u{1F514} **Security login alert**",
-    "bot.notification.passthrough": "{message}",
-    "menu.start": "Start / verify identity",
-    "menu.tasks": "View live tasks",
-    "menu.storage": "Storage status / delete local files",
-    "menu.path_rules": "Save location / custom folder",
-    "menu.tg_download": "Download channel files by date / tag",
-    "menu.list": "View recent files",
-    "menu.find": "Search and manage files",
-    "menu.tg_sub": "Manage automatic channel sync",
-    "menu.storage_switch": "Switch default storage",
-    "menu.target": "Set this chat\u2019s storage target",
-    "menu.help": "View full help",
-    "menu.status": "System diagnostics",
-    "menu.notifications": "Notification preferences",
-    "menu.language": "Change Bot interface language",
-    "commands.auto001": "\u2699\uFE0F **Telegram chunk concurrency**",
-    "commands.auto002": "Current chunk count: **{value0}**",
-    "commands.auto003": "Controls how many chunks of one file are downloaded at the same time; higher values are faster but more likely to trigger rate limits.",
-    "commands.auto004": "Recommended: 4 for stability, 8 for a balance of speed and stability; 12 or 16 are aggressive and require confirmation.",
-    "commands.auto005": "\u{1F4E6} **Telegram file concurrency**",
-    "commands.auto006": "Files downloading at once: **{value0}**",
-    "commands.auto007": "Current queue: {value0} active, {value1} waiting",
-    "commands.auto008": "Controls how many files are downloaded at the same time.",
-    "commands.auto009": "Recommended: 1 for maximum stability, 2 by default, 3 for speed; 4 is aggressive and requires confirmation.",
-    "commands.auto010": "Changes apply only to newly started files; files already downloading will not be interrupted.",
-    "commands.auto011": "{value0} Skip duplicates",
-    "commands.auto012": "{value0} Create copies",
-    "commands.auto013": "\u{1F9EC} **Duplicate file handling**",
-    "commands.auto014": "Current mode: {value0}",
-    "commands.auto015": "\u2022 Skip duplicates: do not save when the name, folder, and size are identical",
-    "commands.auto016": "\u2022 Create copies: rename automatically and keep a separate copy",
-    "commands.auto017": "Only affects files saved from now on.",
-    "commands.auto018": "{value0} Disable automatic cleanup",
-    "commands.auto019": "{value0} Enable automatic cleanup",
-    "commands.auto020": "\u{1F9F9} **Automatic cleanup of unindexed temporary files**",
-    "commands.auto021": "Current status: {value0}",
-    "commands.auto022": "When enabled, checks the server download directory hourly and removes only temporary files older than 10 minutes that are not in the file list.",
-    "commands.auto023": "Task records, indexed files, and cloud files are not deleted.",
-    "commands.auto024": "Keep this disabled if you write directly to the server download directory outside TG Vault.",
-    "commands.auto025": "\u{1F4CC} Use current storage once",
-    "commands.auto026": "\u{1F4CD} Use current storage for this chat",
-    "commands.auto027": "\u{1F9F9} Restore system default",
-    "commands.auto028": "\u{1F3AF} **Storage target for this chat**",
-    "commands.auto029": "System default",
-    "commands.auto031": "System default",
-    "commands.auto033": "System default: {value0}",
-    "commands.auto034": "\u{1F447} Tap a button to set a temporary target using the current system storage.",
-    "commands.auto035": "\u2705 Set {value0} target: {value1} / {value2}\nThis does not change the system-wide default.",
-    "commands.auto036": "\u{1F3AF} **Storage target for this chat**",
-    "commands.auto037": "System default",
-    "commands.auto039": "System default",
-    "commands.auto041": "System default: {value0}",
-    "commands.auto042": "\u{1F447} Tap a button to set a temporary target using the current system storage.",
-    "commands.auto043": "Cleanup confirmation is invalid or expired",
-    "commands.auto044": "Cleanup cancelled. There are no local downloaded files.",
-    "commands.auto045": "Cleanup cancelled. Local downloaded files: {value0}; space used: {value1}.",
-    "commands.auto046": "\u26A0\uFE0F **Delete all local server downloads?**",
-    "commands.auto047": "This will delete **{value0}** files in the local uploads directory, using **{value1}**.",
-    "commands.auto048": "This deletes local files and their local indexes; task history and third-party cloud files are not deleted.",
-    "commands.auto049": "If you are sure, tap the red confirmation button below.",
-    "commands.auto050": "Cleanup confirmation is invalid, expired, or already used",
-    "commands.auto051": "\u2705 **Local server downloads cleaned up**",
-    "commands.auto052": "Deleted: {value0} files",
-    "commands.auto053": "Space freed: {value0}",
-    "commands.auto054": "Local files remaining: {value0}",
-    "commands.auto055": "The old cleanup button has expired. Send /storage again.",
-    "commands.auto056": "Cleanup failed: {value0}",
-    "commands.auto057": "This operation deletes the physical file and its index.",
-    "commands.auto058": "\u26A0\uFE0F **Delete this file?**",
-    "commands.auto059": '\u274C No file starts with ID prefix "{value0}"',
-    "commands.auto060": '\u274C ID prefix "{value0}" matches multiple files. Copy a longer prefix and try again.',
-    "commands.auto061": "\u26A0\uFE0F **Delete this file?**",
-    "commands.auto062": "This removes the database record and attempts to delete the physical file. Confirm only if this is intended.",
-    "commands.auto063": "Deletion cancelled: {value0}",
-    "commands.auto064": "\u274C The file no longer exists or is outside the current storage scope.",
-    "commands.auto065": "\u274C OpenList storage does not support user deletion.",
-    "commands.auto066": "Delete failed: {value0}",
-    "commands.auto067": "Use the existing failed-task retry entry for this channel task.",
-    "commands.auto068": "Task ID prefix is not unique. Refresh the task list.",
-    "commands.auto069": "The task is not currently running.",
-    "commands.auto070": "The task has ended or cannot be paused.",
-    "commands.auto071": "There are no waiting files that can be prioritized.",
-    "commands.auto072": "The task is not in a resumable state.",
-    "commands.auto073": "The task has ended or cannot be cancelled.",
-    "commands.auto074": "Task ID prefix is not unique. Refresh the task list.",
-    "commands.auto075": "The task has ended or cannot be cancelled.",
-    "commands.auto076": "The task has ended or cannot be cancelled.",
-    "commands.auto077": "Task ID prefix is not unique. Refresh the task list.",
-    "commands.auto078": "Task ID prefix is not unique. Refresh the task list.",
-    "commands.auto079": "The task has unfinished reconciliation or cannot currently be retried.",
-    "commands.auto080": "Finishing the current file, then pausing.",
-    "commands.auto081": "Task paused by the user.",
-    "commands.auto082": "\u26A0\uFE0F **Cancel all tasks in this chat?**",
-    "commands.auto083": "Regular downloads: {value0} task(s) ({value1} files active, {value2} waiting)",
-    "commands.auto084": "Channel tasks: {value0}",
-    "commands.auto085": "Total tasks: {value0}",
-    "commands.auto086": "Confirmation will stop running tasks and clean up their temporary files. Tasks in other chats and by other users are not affected.",
-    "commands.auto087": "User confirmed cancellation of all tasks in this chat",
-    "commands.auto088": "\u{1F6D1} **Tasks in this chat cancelled**",
-    "commands.auto089": "Regular downloads: {value0} task(s) ({value1} active / {value2} waiting files)",
-    "commands.auto090": "Channel tasks: {value0}",
-    "commands.auto091": "Total tasks: {value0}",
-    "commands.auto092": "Task paused by the user.",
-    "commands.auto093": "Finishing the current file, then pausing.",
-    "commands.auto094": "\u23F8\uFE0F Task paused",
-    "commands.auto095": "\u23F8\uFE0F Set to pause this task after the current file finishes",
-    "commands.auto096": "\u23F8\uFE0F Channel task {value0} paused\nSource: {value1}",
-    "commands.auto097": "\u{1F4EE} Task not found: {value0}. The current chat download queue was not paused.",
-    "commands.auto098": "\u{1F4EE} Task not found: {value0}. No task in this chat was paused.",
-    "commands.auto099": "\u23F8\uFE0F Regular downloads in this chat paused\n\nActive: {value0}\nWaiting: {value1}\n\nThe current file will finish; new waiting tasks will not start.",
-    "commands.auto100": "\u25B6\uFE0F Task resumed",
-    "commands.auto101": "\u25B6\uFE0F Channel task {value0} resumed\nSource: {value1}",
-    "commands.auto102": "\u{1F4EE} Task not found: {value0}. The current chat download queue was not resumed.",
-    "commands.auto103": "\u{1F4EE} Task not found: {value0}. No task in this chat was resumed.",
-    "commands.auto104": "\u25B6\uFE0F Regular downloads in this chat resumed\n\nActive: {value0}\nWaiting: {value1}",
-    "commands.auto105": "\u{1F6D1} Download task cancelled",
-    "commands.auto106": "\u{1F6D1} Channel task {value0} cancelled\nSource: {value1}",
-    "commands.auto107": "\u{1F4EE} No matching task was found in this chat: {value0}",
-    "commands.auto108": "The old cancel button has expired. Open /tasks again and confirm from the task details.",
-    "commands.auto109": "\u{1F4EE} No matching task was found in this chat: {value0}",
-    "commands.auto110": "The old cancel button has expired. Open /tasks again and confirm from the task details.",
-    "commands.auto111": "Task ID prefix is not unique. Refresh /tasks.",
-    "commands.auto112": "\u{1F4EE} No unique channel task found; no other task was retried.",
-    "commands.auto113": "\u{1F4EE} This channel task has no failed items to retry.",
-    "commands.auto114": "\u{1F504} Requeued {value0} failed items in the channel task\nTask: {value1}",
-    "commands.auto115": "\u{1F4EE} The current chat could not be identified; failed tasks were not retried.",
-    "commands.auto116": "\u{1F4EE} No failed task found in this chat: {value0}",
-    "commands.auto117": "\u{1F4EE} No recently failed tasks can be retried.",
-    "commands.auto119": "\u274C Could not read single-file chunk concurrency. Try again later.",
-    "commands.auto120": "\u274C Could not read file concurrency settings. Try again later.",
-    "commands.auto121": "\u{1F4CC} Next download directory set to: `{value0}`\n{value1}\n\nThis setting expires after the next download flow starts successfully.",
-    "commands.auto122": "\u{1F4CD} This chat\u2019s download directory set to: `{value0}`\n{value1}\n\nFuture downloads in this chat will prefer this directory. Clear it from \u201CSave location\u201D.",
-    "commands.auto123": "To use a directory, choose one-time or chat directory in \u201CSave location\u201D, then send the directory name.",
-    "commands.auto124": "\u{1F558} **Recently used directories**",
-    "commands.auto125": "Set to {value0}",
-    "commands.auto126": "Automatic cleanup disabled",
-    "commands.auto127": "Automatic cleanup enabled",
-    "commands.auto128": "\u26A0\uFE0F **Use {value0} chunks?**",
-    "commands.auto129": "This is an aggressive chunk-concurrency mode and may cause:",
-    "commands.auto130": "- Telegram rate limits or anti-abuse restrictions",
-    "commands.auto131": "- Interrupted downloads and more retries",
-    "commands.auto132": "- Rate limits on Telegram user accounts; in extreme cases, account impact",
-    "commands.auto133": "For routine downloads, 4 or 8 is recommended.",
-    "commands.auto134": "{value0}\n\n\u2705 Switched to {value1} chunks; new downloads use this immediately.",
-    "commands.auto135": "Set to {value0}",
-    "commands.auto136": "{value0}\n\n\u26A0\uFE0F Confirmed and switched to {value1} chunks. If downloads disconnect, slow down, or trigger restrictions, immediately return to 4 or 8.",
-    "commands.auto137": "Confirmed {value0} workers",
-    "commands.auto138": "\u26A0\uFE0F **Download 4 files at the same time?**",
-    "commands.auto139": "This is an aggressive file-concurrency mode and may cause:",
-    "commands.auto140": "- Telegram rate limits or anti-abuse restrictions",
-    "commands.auto141": "- Cloud upload throttling and more retries",
-    "commands.auto142": "- Significant server disk and network load",
-    "commands.auto143": "For routine downloads, 2 or 3 is recommended.",
-    "commands.auto144": "{value0}\n\n\u2705 Switched to downloading {value1} files at the same time.",
-    "commands.auto145": "Set to {value0}",
-    "commands.auto146": "{value0}\n\n\u26A0\uFE0F Confirmed and switched to downloading 4 files at the same time. If rate limits, disconnects, or upload failures occur, immediately return to 2 or 3.",
-    "commands.auto147": "Confirmed 4-file concurrency",
-    "commands.authRequired": "\u{1F510} Send /start and verify your PIN first",
-    "commands.helpUnavailable": "\u274C Help is temporarily unavailable.",
-    "commands.settingsSaved": "\u2705 Settings saved.",
-    "commands.settingsFailed": "Could not save settings: {error}",
-    "commands.notificationsHint": "Send /notifications to view the guide and shortcut buttons again.",
-    "commands.alreadyCurrent": "Already selected",
-    "commands.notificationsUpdated": "Notification settings updated",
-    "commands.settingFailedRetry": "Could not save the setting. Try again later.",
-    "commands.statusFailed": "\u274C Could not read diagnostics. Request ID: {requestId}",
-    "commands.localAccount": "Server local directory",
-    "commands.defaultAccount": "Default account",
-    "commands.unnamedAccount": "Unnamed account",
-    "commands.localStorage": "Local storage",
-    "commands.refreshList": "\u{1F504} Refresh list",
-    "commands.storageSwitchTitle": "\u{1F5C4}\uFE0F **Switch storage source**",
-    "commands.storageSwitchCurrent": "Current: {value}",
-    "commands.storageSwitchHint": "Tap an account configured in the web app to switch to it here.",
-    "commands.storageSwitchOptions": "**Available storage:**",
-    "commands.storageSwitchNote": "Only existing accounts can be selected here. Add OAuth or credential-based accounts in the web app.",
-    "commands.accountUnnamed": "Unnamed account",
-    "commands.storageSwitchFailed": "\u274C Could not load storage sources: {error}",
-    "commands.storageRefreshed": "Refreshed",
-    "commands.storageInvalid": "Invalid storage selection",
-    "commands.storageAlreadyLocal": "Local storage is already active",
-    "commands.storageSwitchedLocal": "Switched to local storage",
-    "commands.storageMissing": "That storage account no longer exists",
-    "commands.storageAlreadyAccount": "That account is already active",
-    "commands.storageSwitched": "Switched to {name}",
-    "commands.storageSwitchError": "Switch failed: {error}",
-    "commands.deleteConfirm": "\u26A0\uFE0F Confirm delete",
-    "commands.bulkConfirm": "\u26A0\uFE0F Cancel all",
-    "commands.confirmCancelAll": "\u26A0\uFE0F Cancel all tasks",
-    "commands.confirmUse": "\u26A0\uFE0F Confirm {count}",
-    "commands.confirmFiles": "\u26A0\uFE0F Confirm {count} files",
-    "commands.clearLocalConfirm": "\u26A0\uFE0F Delete all local downloaded files",
-    "commands.clearLocalButton": "\u{1F9F9} Delete all local downloaded files ({count})",
-    "commands.secondConfirm": "Confirmation required",
-    "commands.cancelled": "Cancelled",
-    "commands.returned": "Back",
-    "commands.deleted": "Deleted",
-    "commands.deletedCount": "Deleted {count} files",
-    "commands.targetNextButton": "\u{1F4CC} Use current storage once",
-    "commands.targetSessionButton": "\u{1F4CD} Use current storage for this chat",
-    "commands.targetClearButton": "\u{1F9F9} Restore system default",
-    "commands.targetTitle": "\u{1F3AF} **Storage target for this chat**",
-    "commands.targetNext": "Next download: {value}",
-    "commands.targetSession": "This chat: {value}",
-    "commands.targetSystem": "System default: {value}",
-    "commands.targetSet": "{value} (set)",
-    "commands.targetDefault": "System default",
-    "commands.targetHint": "\u{1F447} Use the buttons to temporarily target the current system storage.",
-    "commands.targetCleared": "\u2705 Cleared this chat\u2019s storage override. Future tasks use the system default.",
-    "commands.targetRestored": "System default restored",
-    "commands.targetInvalid": "\u274C That storage target is not recognized. Use a button below.",
-    "commands.targetAccountMissing": "\u274C Storage account not found. View all accounts with /storage_switch.",
-    "commands.targetSaved": "\u2705 Set the {scope} target to {provider} / {account}\nThe system-wide default was not changed.",
-    "commands.targetScopeNext": "next-download",
-    "commands.targetScopeSession": "chat-session",
-    "commands.targetNextSet": "Next-download storage set",
-    "commands.targetSessionSet": "This-chat storage set",
-    "commands.fileSearchFailed": "\u274C Search failed: {error}",
-    "commands.fileUnavailable": "The file no longer exists or is outside the current storage scope",
-    "commands.fileDetail": "File details",
-    "commands.confirmRequired": "Second confirmation required",
-    "commands.fileFavorited": "Added to favorites",
-    "commands.fileUnfavorited": "Removed from favorites",
-    "commands.fileShareUnsupported": "This provider cannot create share links. Download it in the web app.",
-    "commands.fileSignedLink": "\u{1F517} Signed link (valid for 1 hour):\n{link}",
-    "commands.fileLinkCreated": "Signed link created",
-    "commands.fileMovePrompt": "Send the destination folder, or \u201CCancel\u201D to exit.",
-    "commands.fileRenamePrompt": "Send the new file name (keep the original extension), or \u201CCancel\u201D to exit.",
-    "commands.fileAwaitFolder": "Waiting for destination folder",
-    "commands.fileAwaitName": "Waiting for new file name",
-    "commands.fileDeleteTitle": "\u26A0\uFE0F **Delete this file?**",
-    "commands.fileDeleteImpact": "This removes the physical file and its index.",
-    "commands.fileMutationExpired": "This operation expired. Open the file details again.",
-    "commands.fileMutationCancelled": "File operation cancelled.",
-    "commands.fileMoved": "\u2705 Moved to: {folder}",
-    "commands.fileRenamed": "\u2705 Renamed to: {name}",
-    "commands.fileDeleteChoose": "Select a file under \u201CSearch and manage files\u201D, then tap Delete.",
-    "commands.fileDeleteNoIndex": "\u274C To prevent mistakes, the Telegram Bot cannot delete by list number. Send /list and copy at least the first 8 characters of the file ID.",
-    "commands.fileIdTooShort": "\u274C The ID prefix must be at least 8 characters. Copy a longer file ID from the web app.",
-    "commands.fileNotFound": '\u274C No file has an ID starting with "{selector}"',
-    "commands.fileAmbiguous": '\u274C The ID prefix "{selector}" matches multiple files. Copy a longer prefix and try again.',
-    "commands.fileOpenListDeleteUnsupported": "OpenList storage does not support user deletion.",
-    "commands.fileDeleteHint": "Deletion removes the database record and attempts to remove the physical file. Check the details, then confirm.",
-    "commands.deleteExpired": "The deletion confirmation is invalid or expired",
-    "commands.deleteNotOwner": "This deletion confirmation is not yours or has expired",
-    "commands.deleteInvalid": "This deletion confirmation is not yours, expired, or already used",
-    "commands.deleteCancelled": "Deletion cancelled: {name}",
-    "commands.fileMissingShort": "File not found",
-    "commands.fileDeleteUnsupportedShort": "This storage does not support user deletion",
-    "commands.deleteFailed": "Delete failed: {error}",
-    "commands.pathOncePrompt": "Send the folder to use for the next download.",
-    "commands.pathSessionPrompt": "Send the folder to use for downloads in this chat.",
-    "commands.pathOnceSaved": "\u{1F4CC} Next-download folder set to `{folder}`\n{preview}\n\nThis setting expires after the next file successfully enters the download workflow.",
-    "commands.pathSessionSaved": "\u{1F4CD} Chat-session folder set to `{folder}`\n{preview}\n\nFuture downloads in this chat prefer this folder. Clear it under \u201CSave location\u201D.",
-    "commands.pathInvalid": "\u274C Invalid path: {error}",
-    "commands.pathCleared": "\u{1F9F9} Cleared custom next-download and chat-session folders. Automatic categorization is active again.",
-    "commands.pathRecentTitle": "\u{1F558} **Recently used folders**",
-    "commands.pathRecentHint": "To reuse one, choose next-download or this-chat folder under \u201CSave location\u201D, then send the folder name.",
-    "commands.pathRecentEmpty": "\u{1F558} No recently used folders. Folders are recorded after you set one.",
-    "commands.pathRecentSent": "Recent folders sent",
-    "commands.pathInputToast": "Send a folder, or \u201CCancel\u201D to exit",
-    "commands.pathUpdated": "Save location updated",
-    "commands.taskInvalidButton": "This task button is invalid or expired",
-    "commands.taskOldCard": "This task card expired. Send /tasks again.",
-    "commands.taskWrongOwner": "This task card is not yours or has expired",
-    "commands.taskRefreshed": "Task list refreshed",
-    "commands.taskEnded": "The task ended or is no longer available",
-    "commands.taskConfirmCancel": "Confirm cancellation",
-    "commands.taskCancelExpired": "The cancellation confirmation expired. Open task details again.",
-    "commands.taskRetryUnsupported": "This task type does not support this retry button",
-    "commands.taskPrioritized": "Moved to the front of the waiting queue",
-    "commands.taskPausing": "Will pause after the current file finishes",
-    "commands.taskPaused": "Task paused",
-    "commands.taskResumed": "Task resumed",
-    "commands.taskCancelled": "Task cancelled",
-    "commands.taskProtected": "System protection paused this task; wait for conditions to recover",
-    "commands.taskForbidden": "This task does not belong to the current chat",
-    "commands.taskOperationFailed": "Operation failed: {error}",
-    "commands.taskPrefixAmbiguous": "The task ID prefix is ambiguous. Refresh the task list.",
-    "commands.bulkInvalidChat": "\u{1F4EE} Could not identify this chat. No tasks were cancelled.",
-    "commands.bulkEmpty": "\u{1F4EE} This chat has no cancellable tasks.",
-    "commands.bulkTitle": "\u26A0\uFE0F **Cancel every task in this chat?**",
-    "commands.bulkOrdinary": "Regular downloads: {tasks} tasks ({active} active files, {pending} waiting files)",
-    "commands.bulkChannels": "Channel tasks: {count}",
-    "commands.bulkWarning": "Running tasks will stop and their temporary files will be removed. Tasks in other chats and tasks owned by other users are unaffected.",
-    "commands.bulkInvalid": "The bulk-cancellation confirmation is invalid or expired",
-    "commands.confirmWrongOwner": "This confirmation is not yours or has expired",
-    "commands.confirmInvalid": "This confirmation is not yours, expired, or already used",
-    "commands.bulkReturned": "Returned without cancelling tasks in this chat.",
-    "commands.bulkDoneTitle": "\u{1F6D1} **Tasks in this chat cancelled**",
-    "commands.bulkDone": "Tasks in this chat cancelled",
-    "commands.bulkFailed": "Cancellation failed: {error}",
-    "commands.stopFailed": "\u274C Could not force-stop tasks: {error}",
-    "commands.cleanupCancelledSummary": "Cleanup cancelled. Local files: {count}, using {size}.",
-    "commands.cleanupCancelledEmpty": "Cleanup cancelled. There are no local download files.",
-    "commands.cleanupConfirmTitle": "\u26A0\uFE0F **Delete all local server download files?**",
-    "commands.cleanupConfirmSummary": "This will delete **{count}** files from the local uploads directory, using **{size}**.",
-    "commands.cleanupConfirmImpact": "This removes local files and their indexes, but not task history or cloud files.",
-    "commands.cleanupConfirmHint": "Click the red confirmation button below to continue.",
-    "commands.cleanupConfirmRequired": "Confirmation required",
-    "commands.cleanupConfirmInvalid": "The cleanup confirmation is invalid, expired, or already used",
-    "commands.cleanupDoneTitle": "\u2705 **Local server download files cleared**",
-    "commands.cleanupDoneSummary": "Deleted: {count} files\nSpace freed: {size}\nRemaining local files: {remaining}",
-    "commands.cleanupDeleted": "Deleted {count} files",
-    "commands.cleanupOldButton": "The old cleanup button expired. Send /storage again.",
-    "commands.cleanupFailed": "Cleanup failed: {error}",
-    "commands.bulkInvalidConfirm": "The bulk-cancellation confirmation is invalid or expired",
-    "commands.bulkNotOwner": "This confirmation is not yours or has expired",
-    "commands.bulkReturnedToast": "Returned",
-    "commands.bulkInvalidUsed": "This confirmation is not yours, expired, or already used",
-    "commands.bulkDoneMessage": "Returned without cancelling tasks in this chat.",
-    "commands.bulkCancelledToast": "Tasks in this chat cancelled",
-    "commands.bulkCancelFailed": "Cancellation failed: {error}",
-    "commands.taskStopFailed": "\u274C Could not force-stop tasks: {error}",
-    "commands.taskPausedChannel": "\u23F8\uFE0F Channel task {task} paused\nSource: {source}",
-    "commands.taskNotFoundPause": "\u{1F4EE} Task {task} was not found. This chat download queue was not paused.",
-    "commands.taskResumedSingle": "\u25B6\uFE0F Task resumed",
-    "commands.taskResumedChannel": "\u25B6\uFE0F Channel task {task} resumed\nSource: {source}",
-    "commands.taskNotFoundResume": "\u{1F4EE} Task {task} was not found. This chat download queue was not resumed.",
-    "commands.taskCancelledSingle": "\u{1F6D1} Download task cancelled",
-    "commands.taskCancelledChannel": "\u{1F6D1} Channel task {task} cancelled\nSource: {source}",
-    "commands.taskNotFound": "\u{1F4EE} No matching task found in this chat: {task}",
-    "commands.taskLegacyCancel": "The old cancel button expired. Use /tasks to open the task details and confirm.",
-    "commands.taskLegacyAmbiguous": "The task ID prefix is not unique. Refresh /tasks.",
-    "commands.taskLegacyEnded": "The task ended or is no longer available",
-    "commands.retryNoUniqueChannel": "\u{1F4EE} No unique channel task found; no other task was retried.",
-    "commands.retryChannelDone": "\u{1F504} Rejoined {count} failed channel-task items\nTask: {task}",
-    "commands.retryChannelEmpty": "\u{1F4EE} This channel task has no failed items to retry",
-    "commands.retryInvalidChat": "\u{1F4EE} Could not identify this chat; no failed task was retried.",
-    "commands.retryTaskMissing": "\u{1F4EE} No failed task found in this chat: {task}",
-    "commands.workerReadFailed": "\u274C Could not read single-file chunk concurrency. Try again later.",
-    "commands.concurrencyReadFailed": "\u274C Could not read file concurrency settings. Try again later.",
-    "commands.pathOncePromptDirect": "Send the folder name for the next download.",
-    "commands.pathOnceSavedDirect": "\u{1F4CC} Next-download folder set to `{folder}`\n{preview}\n\nThis setting expires after the next file enters the download workflow.",
-    "commands.pathSessionPromptDirect": "Send the folder name to use for this chat.",
-    "commands.pathSessionSavedDirect": "\u{1F4CD} Chat-session folder set to `{folder}`\n{preview}\n\nFuture downloads in this chat prefer this folder. Clear it under \u201CSave location\u201D.",
-    "commands.pathInvalidDirect": "\u274C Invalid path: {error}",
-    "commands.pathClearedDirect": "\u{1F9F9} Cleared custom next-download and chat-session folders. Automatic categorization is active again."
-  },
-  ru: telegramRussian_default
-};
-function resolveLocale(value) {
-  const normalized = String(value || "").trim().toLowerCase().replace("_", "-");
-  for (const locale of Object.values(TELEGRAM_LOCALES)) {
-    if (locale.code.toLowerCase() === normalized || locale.aliases.includes(normalized)) return locale.code;
-    if (locale.code === "en" && normalized.startsWith("en-")) return "en";
-    if (locale.code === "zh-CN" && normalized.startsWith("zh-")) return "zh-CN";
-  }
-  return FALLBACK_LOCALE;
-}
-function interpolate(template, values, locale = DEFAULT_LOCALE) {
-  let rendered = template.replace(/\{([A-Za-z0-9_]+),\s*plural,\s*one\s*\{([^{}]*)\}\s*other\s*\{([^{}]*)\}\}/g, (_all, name, one, other) => {
-    if (!(name in values)) throw new Error(`missing interpolation variable: ${name}`);
-    const count = Number(values[name]);
-    return (new Intl.PluralRules(TELEGRAM_LOCALES[locale].intlLocale).select(count) === "one" ? one : other).replace(/#/g, formatNumber(count, locale));
-  });
-  rendered = rendered.replace(/\{([A-Za-z0-9_]+)\}/g, (_all, name) => {
-    if (!(name in values)) throw new Error(`missing interpolation variable: ${name}`);
-    return String(values[name]);
-  });
-  return rendered;
-}
-function t(locale, key, values = {}, options = {}) {
-  const resolved = resolveLocale(locale);
-  const translated = resources[resolved][key] ?? resources[FALLBACK_LOCALE][key];
-  if (translated === void 0) {
-    if (options.strict !== false) throw new Error(`missing Telegram translation: ${key}`);
-    return key;
-  }
-  return interpolate(translated, values, resolved);
-}
-function formatNumber(value, locale = DEFAULT_LOCALE) {
-  return new Intl.NumberFormat(TELEGRAM_LOCALES[locale].intlLocale).format(value);
-}
-function formatDate(value, locale = DEFAULT_LOCALE, options = { dateStyle: "medium", timeStyle: "short" }) {
-  return new Intl.DateTimeFormat(TELEGRAM_LOCALES[locale].intlLocale, options).format(new Date(value));
-}
-function formatBytes2(bytes, locale = DEFAULT_LOCALE) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return `0 B`;
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-  const value = bytes / Math.pow(1024, index);
-  return `${new Intl.NumberFormat(TELEGRAM_LOCALES[locale].intlLocale, { maximumFractionDigits: value < 10 && index > 0 ? 1 : 0 }).format(value)} ${units[index]}`;
-}
-
 // src/utils/telegramMessages.ts
 function buildTaskControlLines(taskId, queuePaused = false, pauseReason, systemPause) {
   if (!taskId) return [];
@@ -9025,16 +9394,16 @@ function buildTaskControlLines(taskId, queuePaused = false, pauseReason, systemP
 }
 function buildTaskControlButtons(taskId, queuePaused = false, systemPause, queuePausing = false, userPaused = queuePaused && !systemPause, failedCount = 0, locale = DEFAULT_LOCALE) {
   if (!taskId) return void 0;
-  const actionButtons = queuePaused || queuePausing ? systemPause && !userPaused ? [] : [new Api4.KeyboardButtonCallback({ text: t(locale, "task.resume"), data: Buffer.from(`tq_resume_${taskId}`) })] : [new Api4.KeyboardButtonCallback({ text: t(locale, "task.pause"), data: Buffer.from(`tq_pause_${taskId}`) })];
-  actionButtons.push(new Api4.KeyboardButtonCallback({ text: t(locale, "task.cancel"), data: Buffer.from(`tq_cancel_${taskId}`) }));
-  const rows = [new Api4.KeyboardButtonRow({ buttons: actionButtons })];
+  const actionButtons = queuePaused || queuePausing ? systemPause && !userPaused ? [] : [new Api5.KeyboardButtonCallback({ text: t(locale, "task.resume"), data: Buffer.from(`tq_resume_${taskId}`) })] : [new Api5.KeyboardButtonCallback({ text: t(locale, "task.pause"), data: Buffer.from(`tq_pause_${taskId}`) })];
+  actionButtons.push(new Api5.KeyboardButtonCallback({ text: t(locale, "task.cancel"), data: Buffer.from(`tq_cancel_${taskId}`) }));
+  const rows = [new Api5.KeyboardButtonRow({ buttons: actionButtons })];
   if (failedCount > 0) {
-    rows.push(new Api4.KeyboardButtonRow({ buttons: [
-      new Api4.KeyboardButtonCallback({ text: t(locale, "task.retryFailed", { count: failedCount }), data: Buffer.from(`receipt_retry_${taskId}`) }),
-      new Api4.KeyboardButtonCallback({ text: t(locale, "task.failureDetails"), data: Buffer.from(`receipt_failures_${taskId}`) })
+    rows.push(new Api5.KeyboardButtonRow({ buttons: [
+      new Api5.KeyboardButtonCallback({ text: t(locale, "task.retryFailed", { count: failedCount }), data: Buffer.from(`receipt_retry_${taskId}`) }),
+      new Api5.KeyboardButtonCallback({ text: t(locale, "task.failureDetails"), data: Buffer.from(`receipt_failures_${taskId}`) })
     ] }));
   }
-  return new Api4.ReplyInlineMarkup({ rows });
+  return new Api5.ReplyInlineMarkup({ rows });
 }
 function collectCompletedFolders(singleFiles, batches) {
   const folders = /* @__PURE__ */ new Set();
@@ -9113,7 +9482,9 @@ function buildStartPrompt(locale = DEFAULT_LOCALE) {
   return t(locale, "auth.startPrompt");
 }
 function buildHelp(locale = DEFAULT_LOCALE) {
-  return t(locale, "help.body");
+  return `${t(locale, "help.body")}
+
+${t(locale, "bot.link.help")}`;
 }
 function build2FASetupCaption() {
   return [
@@ -9467,6 +9838,9 @@ async function buildConsolidatedStatus(singleFiles, batches) {
         lines.push(`    ${progress} (${batch.completed}/${batch.totalFiles})`);
         if (batch.currentFileActive && batch.currentFileName) {
           lines.push(`    \u{1F4C4} \u5F53\u524D: ${batch.currentFileName}`);
+          if (batch.currentTotal && batch.currentDownloaded !== void 0) {
+            lines.push(`    \u2B07\uFE0F ${Math.min(100, Math.round(batch.currentDownloaded / batch.currentTotal * 100))}% \xB7 ${formatBytes(batch.currentDownloaded)} / ${formatBytes(batch.currentTotal)}`);
+          }
         }
       } else {
         lines.push(`    \u2705 ${batch.successful}  \u274C ${batch.failed}`);
@@ -9477,7 +9851,7 @@ async function buildConsolidatedStatus(singleFiles, batches) {
       if (batch.providerName && isDone) {
         lines.push(`    \u{1F4CD} ${getProviderDisplayName(batch.providerName)}`);
       }
-      if (batch.folderPath && isDone) {
+      if (batch.folderPath) {
         lines.push(`    \u{1F4C1} ${batch.folderPath}`);
       }
     });
@@ -9895,230 +10269,6 @@ async function prefetchForwardedSourceMessages(userClient2, messages) {
     }
   }));
   return cache;
-}
-
-// src/utils/telegramPathSettings.ts
-import { Api as Api5 } from "telegram";
-init_settings();
-
-// src/utils/telegramPathStateStore.ts
-init_db();
-var defaultQuery = (sql, params) => query(sql, params);
-async function setTelegramPathStateRow(runQuery = defaultQuery, chatId, mode, folder, expiresAt) {
-  await runQuery(
-    `INSERT INTO telegram_path_states (chat_id, mode, folder, expires_at)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (chat_id, mode)
-         DO UPDATE SET folder = EXCLUDED.folder, expires_at = EXCLUDED.expires_at, updated_at = NOW()`,
-    [chatId, mode, folder, expiresAt]
-  );
-}
-async function consumeTelegramOncePath(runQuery = defaultQuery, chatId) {
-  const result = await runQuery(
-    `DELETE FROM telegram_path_states
-         WHERE chat_id = $1 AND mode = 'once' AND expires_at > NOW()
-         RETURNING folder`,
-    [chatId]
-  );
-  return result.rows[0]?.folder || null;
-}
-async function getTelegramSessionPath(runQuery = defaultQuery, chatId) {
-  const result = await runQuery(
-    `SELECT folder FROM telegram_path_states
-         WHERE chat_id = $1 AND mode = 'session' AND expires_at > NOW()`,
-    [chatId]
-  );
-  return result.rows[0]?.folder || null;
-}
-async function clearTelegramPathStateRows(runQuery = defaultQuery, chatId) {
-  await runQuery("DELETE FROM telegram_path_states WHERE chat_id = $1", [chatId]);
-}
-
-// src/utils/telegramPathSettings.ts
-init_scopedInteractionMap();
-var chatPathState = /* @__PURE__ */ new Map();
-var pendingPathInputState = new ScopedInteractionMap({
-  ttlMs: Math.max(6e4, Number.parseInt(process.env.TELEGRAM_INTERACTION_TTL_MS || "900000", 10) || 9e5),
-  maxEntries: Math.max(10, Number.parseInt(process.env.TELEGRAM_INTERACTION_MAX_ENTRIES || "1000", 10) || 1e3)
-});
-var recentPathState = /* @__PURE__ */ new Map();
-var MAX_RECENT_PATHS = 6;
-var RECENT_PATH_SETTING_PREFIX = "telegram_recent_paths:";
-function pendingPathInputKey(chatId, userId) {
-  return `${chatId}:${userId}`;
-}
-function recentPathSettingKey(chatId) {
-  return `${RECENT_PATH_SETTING_PREFIX}${chatId}`;
-}
-function normalizePathSegment(segment) {
-  return sanitizeFilename(segment.trim()).replace(/^\.+/, "_").replace(/^\.+$/, "_");
-}
-function parseRecentPaths(raw) {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(String(raw));
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean).slice(0, MAX_RECENT_PATHS);
-  } catch {
-    return [];
-  }
-}
-async function loadRecentTelegramPaths(chatId) {
-  const cached = recentPathState.get(chatId);
-  if (cached) return [...cached];
-  const raw = await getSetting(recentPathSettingKey(chatId), "[]");
-  const loaded = parseRecentPaths(raw);
-  recentPathState.set(chatId, loaded);
-  return [...loaded];
-}
-async function persistRecentTelegramPaths(chatId, paths) {
-  recentPathState.set(chatId, paths);
-  await setSetting(recentPathSettingKey(chatId), JSON.stringify(paths));
-}
-function sanitizeCustomStoragePath(input, locale = DEFAULT_LOCALE) {
-  const raw = input.trim().replace(/\\+/g, "/").replace(/\/+/g, "/").replace(/^\/+|\/+$/g, "");
-  if (!raw) throw new Error(t(locale, "path.error.empty"));
-  if (raw.startsWith("~") || raw.includes("\0")) throw new Error(t(locale, "path.error.illegalChars"));
-  const segments = raw.split("/").map((segment) => segment.trim()).filter(Boolean);
-  if (segments.length === 0) throw new Error(t(locale, "path.error.empty"));
-  if (segments.some((segment) => segment === "." || segment === ".." || segment.includes(".."))) {
-    throw new Error(t(locale, "path.error.dotSegments"));
-  }
-  const normalized = segments.map((segment) => normalizePathSegment(segment)).filter(Boolean).join("/");
-  if (!normalized) throw new Error(t(locale, "path.error.invalid"));
-  if (normalized.length > 180) throw new Error(t(locale, "path.error.tooLong"));
-  return normalized;
-}
-async function rememberRecentTelegramPathPersistent(chatId, folder, locale = DEFAULT_LOCALE) {
-  const normalized = sanitizeCustomStoragePath(folder, locale);
-  const current3 = await loadRecentTelegramPaths(chatId);
-  const next = [normalized, ...current3.filter((item) => item !== normalized)].slice(0, MAX_RECENT_PATHS);
-  await persistRecentTelegramPaths(chatId, next);
-  return normalized;
-}
-async function getRecentTelegramPathsPersistent(chatId) {
-  return loadRecentTelegramPaths(chatId);
-}
-function buildPathPreviewLine(folder, locale = DEFAULT_LOCALE) {
-  return t(locale, "path.preview", { folder });
-}
-function getTelegramPathState(chatId) {
-  return { ...chatPathState.get(chatId) || {} };
-}
-async function setNextTelegramPathPersistent(chatId, folder) {
-  const normalized = await rememberRecentTelegramPathPersistent(chatId, folder);
-  await setTelegramPathStateRow(void 0, chatId, "once", normalized, new Date(Date.now() + 24 * 60 * 60 * 1e3));
-  const state = chatPathState.get(chatId) || {};
-  state.nextFolder = normalized;
-  chatPathState.set(chatId, state);
-  return normalized;
-}
-async function setSessionTelegramPathPersistent(chatId, folder) {
-  const normalized = await rememberRecentTelegramPathPersistent(chatId, folder);
-  await setTelegramPathStateRow(void 0, chatId, "session", normalized, new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3));
-  const state = chatPathState.get(chatId) || {};
-  state.sessionFolder = normalized;
-  chatPathState.set(chatId, state);
-  return normalized;
-}
-async function clearTelegramPathStatePersistent(chatId) {
-  clearTelegramPathState(chatId);
-  await clearTelegramPathStateRows(void 0, chatId);
-}
-function clearTelegramPathState(chatId) {
-  chatPathState.delete(chatId);
-}
-function setPendingTelegramPathInput(chatId, userId, mode) {
-  pendingPathInputState.set(pendingPathInputKey(chatId, userId), mode);
-}
-function getPendingTelegramPathInput(chatId, userId) {
-  return pendingPathInputState.get(pendingPathInputKey(chatId, userId));
-}
-function clearPendingTelegramPathInput(chatId, userId) {
-  pendingPathInputState.delete(pendingPathInputKey(chatId, userId));
-}
-async function applyPendingTelegramPathInputPersistent(chatId, userId, folder) {
-  const mode = getPendingTelegramPathInput(chatId, userId);
-  if (!mode) return null;
-  const normalized = mode === "once" ? await setNextTelegramPathPersistent(chatId, folder) : await setSessionTelegramPathPersistent(chatId, folder);
-  clearPendingTelegramPathInput(chatId, userId);
-  return { mode, folder: normalized };
-}
-function renderPendingPathPrompt(mode, recent, locale) {
-  const once = mode === "once";
-  return [
-    t(locale, once ? "path.prompt.onceTitle" : "path.prompt.sessionTitle"),
-    "",
-    t(locale, "path.prompt.sendFolder"),
-    t(locale, once ? "path.prompt.onceExample" : "path.prompt.sessionExample"),
-    ...recent.length > 0 ? ["", t(locale, "path.prompt.recent"), ...recent.slice(0, 4).map((item) => `- ${item}`)] : [],
-    "",
-    t(locale, once ? "path.prompt.onceNote" : "path.prompt.sessionNote"),
-    t(locale, "path.prompt.cancel")
-  ].join("\n");
-}
-async function buildPendingPathPromptPersistent(mode, chatId, locale = DEFAULT_LOCALE) {
-  const recent = chatId ? await getRecentTelegramPathsPersistent(chatId) : [];
-  return renderPendingPathPrompt(mode, recent, locale);
-}
-async function resolveTelegramStorageFolderPersistent(chatId, automaticFolder) {
-  const once = await consumeTelegramOncePath(void 0, chatId);
-  if (once) {
-    const state = chatPathState.get(chatId);
-    if (state) delete state.nextFolder;
-    return once;
-  }
-  const session = await getTelegramSessionPath(void 0, chatId);
-  return session || automaticFolder || null;
-}
-async function resolveTelegramTaskStorageFolderPersistent(chatId, automaticFolder) {
-  const once = await consumeTelegramOncePath(void 0, chatId);
-  if (once) return { folder: once, custom: true };
-  const session = await getTelegramSessionPath(void 0, chatId);
-  return session ? { folder: session, custom: true } : { folder: automaticFolder || null, custom: false };
-}
-function buildTelegramPathStateLines(chatId, locale = DEFAULT_LOCALE) {
-  const state = getTelegramPathState(chatId);
-  const active2 = state.nextFolder || state.sessionFolder;
-  return [
-    t(locale, "path.state.current", { value: active2 ? t(locale, "path.state.custom", { folder: `\`${active2}\`` }) : t(locale, "path.state.automatic") }),
-    active2 ? buildPathPreviewLine(active2, locale) : t(locale, "path.state.defaultExample"),
-    t(locale, "path.state.once", { value: state.nextFolder ? `\`${state.nextFolder}\`` : t(locale, "path.state.unset") }),
-    t(locale, "path.state.session", { value: state.sessionFolder ? `\`${state.sessionFolder}\`` : t(locale, "path.state.unset") })
-  ];
-}
-function buildPathSettingsKeyboard(_state, locale = DEFAULT_LOCALE) {
-  return new Api5.ReplyInlineMarkup({
-    rows: [
-      new Api5.KeyboardButtonRow({
-        buttons: [
-          new Api5.KeyboardButtonCallback({ text: t(locale, "path.button.setOnce"), data: Buffer.from("pr_help_once") }),
-          new Api5.KeyboardButtonCallback({ text: t(locale, "path.button.setSession"), data: Buffer.from("pr_help_session") })
-        ]
-      }),
-      new Api5.KeyboardButtonRow({
-        buttons: [
-          new Api5.KeyboardButtonCallback({ text: t(locale, "path.button.recent"), data: Buffer.from("pr_recent") }),
-          new Api5.KeyboardButtonCallback({ text: t(locale, "path.button.clear"), data: Buffer.from("pr_clear_custom") })
-        ]
-      })
-    ]
-  });
-}
-function buildPathSettingsText(_state, chatId, locale = DEFAULT_LOCALE) {
-  return [
-    t(locale, "path.settings.title"),
-    "",
-    t(locale, "path.settings.defaultLogicTitle"),
-    t(locale, "path.settings.defaultLogic"),
-    t(locale, "path.settings.examples"),
-    t(locale, "path.settings.customLogic"),
-    "",
-    t(locale, "path.settings.currentTitle"),
-    ...buildTelegramPathStateLines(chatId, locale),
-    "",
-    t(locale, "path.settings.choose")
-  ].join("\n");
 }
 
 // src/utils/telegramTargetStateStore.ts
@@ -12688,7 +12838,10 @@ async function processFileUpload(client2, file, queue2, groupId, getExecutionCon
         return { status: "success" };
       }
       file.status = "uploading";
-      const reportProgress = taskId ? (downloaded, total) => downloadQueue.updateProgress(taskId, downloaded, total) : void 0;
+      const reportProgress = (downloaded, total) => {
+        if (taskId) downloadQueue.updateProgress(taskId, downloaded, total);
+        file.onDownloadProgress?.(downloaded, total);
+      };
       const firstAttemptSuccess = await attemptUpload(signal, reportProgress);
       if (!firstAttemptSuccess && !signal.aborted && !file.retried && !file.storageCooldownUntil) {
         file.retried = true;
@@ -12869,13 +13022,7 @@ async function processBatchUploadSnapshot(client2, queueKey, queue2) {
       await finalizeSilentSessionIfDone(batchClient, chatId);
     }
   };
-  let lastTime = 0;
-  const statusUpdater = setInterval(async () => {
-    const now = Date.now();
-    if (now - lastTime < 3e3) return;
-    lastTime = now;
-    await onBatchProgress();
-  }, 3e3);
+  const stopStatusUpdater = startTelegramProgressTicker(onBatchProgress);
   const queuedFilePromises = [];
   try {
     for (let offset = 0; offset < snapshot.length; offset += TG_MEDIA_GROUP_ENQUEUE_BATCH_SIZE) {
@@ -12893,7 +13040,7 @@ async function processBatchUploadSnapshot(client2, queueKey, queue2) {
     await onBatchProgress();
     await finalizeSilentSessionIfDone(batchClient, chatId);
   } finally {
-    clearInterval(statusUpdater);
+    await stopStatusUpdater();
     setTimeout(() => {
       removeBatch(chatId.toString(), batchId);
     }, 8e3);
@@ -13067,7 +13214,10 @@ async function downloadTelegramChannelRange(botClient, requestMessage, source, s
       kind: "channel",
       title: sourceEntity.toString(),
       chatId: chatIdStr,
-      hidden: true,
+      userId: ownerUserId ?? requestMessage.senderId?.toJSNumber(),
+      hidden: Boolean(executionGroupKey),
+      targetProvider: storageTarget.provider.name,
+      targetAccountId: storageTarget.accountId,
       expectedTotal: downloadableRefs.length
     });
     if (downloadableRefs.length > 0) {
@@ -13115,7 +13265,7 @@ async function downloadTelegramChannelRange(botClient, requestMessage, source, s
         successful,
         failed,
         queuePending: stats.pending,
-        currentFileName
+        ...currentFileName ? { currentFileName } : {}
       });
       if (silentSessionMap.has(chatIdStr)) {
         await refreshSilentProgress(botClient, chatId);
@@ -13124,137 +13274,148 @@ async function downloadTelegramChannelRange(botClient, requestMessage, source, s
         await refreshConsolidatedMessage(botClient, chatId);
       }
     };
-    for (let offset = 0; offset < downloadableRefs.length; offset += TG_LARGE_TASK_SEGMENT_SIZE) {
-      const segment = downloadableRefs.slice(offset, offset + TG_LARGE_TASK_SEGMENT_SIZE);
-      const segmentBytes = segment.reduce((sum, item) => sum + (item.totalSize || 0), 0);
-      await waitForDiskWatermark(segmentBytes, taskSignal);
-      const segmentMessagesBySource = /* @__PURE__ */ new Map();
-      const refsBySource = /* @__PURE__ */ new Map();
-      for (const item of segment) {
-        const items = refsBySource.get(item.sourceKey) || [];
-        items.push(item);
-        refsBySource.set(item.sourceKey, items);
-      }
-      for (const [sourceKey, sourceItems] of refsBySource) {
-        const preloadedMessageById = /* @__PURE__ */ new Map();
-        const missingSourceItems = [];
-        for (const sourceItem of sourceItems) {
-          if (sourceItem.message) {
-            preloadedMessageById.set(sourceItem.id, sourceItem.message);
-          } else {
-            missingSourceItems.push(sourceItem);
-          }
+    const stopProgress = startTelegramProgressTicker(() => refreshSegmentStatus(true));
+    try {
+      for (let offset = 0; offset < downloadableRefs.length; offset += TG_LARGE_TASK_SEGMENT_SIZE) {
+        const segment = downloadableRefs.slice(offset, offset + TG_LARGE_TASK_SEGMENT_SIZE);
+        const segmentBytes = segment.reduce((sum, item) => sum + (item.totalSize || 0), 0);
+        await waitForDiskWatermark(segmentBytes, taskSignal);
+        const segmentMessagesBySource = /* @__PURE__ */ new Map();
+        const refsBySource = /* @__PURE__ */ new Map();
+        for (const item of segment) {
+          const items = refsBySource.get(item.sourceKey) || [];
+          items.push(item);
+          refsBySource.set(item.sourceKey, items);
         }
-        if (missingSourceItems.length > 0) {
-          const segmentIds = missingSourceItems.map((item) => item.id);
-          const segmentMessages = await userClient2.getMessages(sourceItems[0].sourceEntity, { ids: segmentIds });
-          for (const segmentMessage of segmentMessages) {
-            if (segmentMessage) preloadedMessageById.set(segmentMessage.id, segmentMessage);
-          }
-        }
-        segmentMessagesBySource.set(sourceKey, preloadedMessageById);
-      }
-      await Promise.all(segment.map(async (item) => {
-        if (getExecutionControlState) {
-          const controlState = await getExecutionControlState();
-          if (controlState !== "run") {
-            if (controlState === "cancelled") {
-              skipped += 1;
-              completed += 1;
-              skippedMessageIds.push(item.id);
-              await onItemSettled?.(item.persistentRef, "skipped", "\u4EFB\u52A1\u5DF2\u53D6\u6D88");
+        for (const [sourceKey, sourceItems] of refsBySource) {
+          const preloadedMessageById = /* @__PURE__ */ new Map();
+          const missingSourceItems = [];
+          for (const sourceItem of sourceItems) {
+            if (sourceItem.message) {
+              preloadedMessageById.set(sourceItem.id, sourceItem.message);
+            } else {
+              missingSourceItems.push(sourceItem);
             }
+          }
+          if (missingSourceItems.length > 0) {
+            const segmentIds = missingSourceItems.map((item) => item.id);
+            const segmentMessages = await userClient2.getMessages(sourceItems[0].sourceEntity, { ids: segmentIds });
+            for (const segmentMessage of segmentMessages) {
+              if (segmentMessage) preloadedMessageById.set(segmentMessage.id, segmentMessage);
+            }
+          }
+          segmentMessagesBySource.set(sourceKey, preloadedMessageById);
+        }
+        await Promise.all(segment.map(async (item) => {
+          if (getExecutionControlState) {
+            const controlState = await getExecutionControlState();
+            if (controlState !== "run") {
+              if (controlState === "cancelled") {
+                skipped += 1;
+                completed += 1;
+                skippedMessageIds.push(item.id);
+                await onItemSettled?.(item.persistentRef, "skipped", "\u4EFB\u52A1\u5DF2\u53D6\u6D88");
+              }
+              return;
+            }
+          }
+          const { fileName, mimeType } = item.fileInfo;
+          const message = segmentMessagesBySource.get(item.sourceKey)?.get(item.id);
+          if (!message) {
+            skipped += 1;
+            failed += 1;
+            completed += 1;
+            failedMessageIds.push(item.id);
+            await refreshSegmentStatus(false, fileName);
+            await onItemSettled?.(item.persistentRef, "failed", "\u6D88\u606F\u4E0D\u5B58\u5728\u6216\u65E0\u6CD5\u91CD\u65B0\u8BFB\u53D6");
             return;
           }
-        }
-        const { fileName, mimeType } = item.fileInfo;
-        const message = segmentMessagesBySource.get(item.sourceKey)?.get(item.id);
-        if (!message) {
-          skipped += 1;
-          failed += 1;
-          completed += 1;
-          failedMessageIds.push(item.id);
-          await refreshSegmentStatus(false, fileName);
-          await onItemSettled?.(item.persistentRef, "failed", "\u6D88\u606F\u4E0D\u5B58\u5728\u6216\u65E0\u6CD5\u91CD\u65B0\u8BFB\u53D6");
-          return;
-        }
-        const uploadItem = {
-          fileName,
-          mimeType,
-          generatedName: item.fileInfo.generatedName,
-          message,
-          status: "pending",
-          sharedCaption: item.sharedCaption,
-          groupIndex: item.groupIndex,
-          groupSize: item.groupSize,
-          storageTarget,
-          persistentRef: item.persistentRef,
-          withLease: withItemLease ? (operation) => withItemLease(item.persistentRef, operation) : void 0
-        };
-        try {
-          if (taskResolvedStorageFolder !== void 0) {
-            updateBatch(chatIdStr, batchId, { folderPath: taskResolvedStorageFolder || void 0 });
-          } else if (!getConsolidatedBatches(chatIdStr).find((batch) => batch.id === batchId)?.folderPath) {
-            const chatName = await getTelegramChatName(message);
-            const storageRules = await getStoragePathRules();
-            const automaticPreview = buildStorageFolderWithRules({
-              source: "telegram",
-              chatName,
-              mimeType,
-              fileName
-            }, storageRules);
-            const resolved = (await resolveTelegramTaskStorageFolderPersistent(chatIdStr, automaticPreview)).folder;
-            taskResolvedStorageFolder = resolved;
-            updateBatch(chatIdStr, batchId, { folderPath: resolved || void 0 });
-          }
-          uploadItem.folderOverride = taskResolvedStorageFolder !== void 0 ? taskResolvedStorageFolder : taskFolderOverride;
-          await refreshSegmentStatus(true, fileName);
-          await processFileUpload(userClient2, uploadItem, void 0, channelGroupId, getExecutionControlState);
-          if (uploadItem.status === "success") {
-            successful += 1;
-            successfulMessageIds.push(item.id);
-            if (!uploadItem.leaseSettled) await onItemSettled?.(item.persistentRef, "success");
-          } else if (uploadItem.storageCooldownUntil) {
-            throw new StorageQuotaCooldownError(uploadItem.error || "Google Drive \u4ECA\u65E5\u4E0A\u4F20\u989D\u5EA6\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u4EFB\u52A1\u5C06\u81EA\u52A8\u6682\u505C 24 \u5C0F\u65F6\u540E\u7EE7\u7EED\u3002", {
-              provider: "google_drive",
-              reason: "daily_upload_limit",
-              storageAccountId: storageManager.getActiveAccountId() || void 0,
-              cooldownUntil: uploadItem.storageCooldownUntil
-            });
-          } else {
+          const uploadItem = {
+            fileName,
+            mimeType,
+            generatedName: item.fileInfo.generatedName,
+            message,
+            status: "pending",
+            sharedCaption: item.sharedCaption,
+            groupIndex: item.groupIndex,
+            groupSize: item.groupSize,
+            storageTarget,
+            persistentRef: item.persistentRef,
+            onDownloadProgress: (downloaded, total) => updateBatch(chatIdStr, batchId, {
+              currentFileName: fileName,
+              currentFileActive: true,
+              currentDownloaded: downloaded,
+              currentTotal: total
+            }),
+            withLease: withItemLease ? (operation) => withItemLease(item.persistentRef, operation) : void 0
+          };
+          try {
+            if (taskResolvedStorageFolder !== void 0) {
+              updateBatch(chatIdStr, batchId, { folderPath: taskResolvedStorageFolder || void 0 });
+            } else if (!getConsolidatedBatches(chatIdStr).find((batch) => batch.id === batchId)?.folderPath) {
+              const chatName = await getTelegramChatName(message);
+              const storageRules = await getStoragePathRules();
+              const automaticPreview = buildStorageFolderWithRules({
+                source: "telegram",
+                chatName,
+                mimeType,
+                fileName
+              }, storageRules);
+              const resolved = (await resolveTelegramTaskStorageFolderPersistent(chatIdStr, automaticPreview)).folder;
+              taskResolvedStorageFolder = resolved;
+              updateBatch(chatIdStr, batchId, { folderPath: resolved || void 0 });
+            }
+            uploadItem.folderOverride = taskResolvedStorageFolder !== void 0 ? taskResolvedStorageFolder : taskFolderOverride;
+            await refreshSegmentStatus(true, fileName);
+            await processFileUpload(userClient2, uploadItem, void 0, channelGroupId, getExecutionControlState);
+            if (uploadItem.status === "success") {
+              successful += 1;
+              successfulMessageIds.push(item.id);
+              if (!uploadItem.leaseSettled) await onItemSettled?.(item.persistentRef, "success");
+            } else if (uploadItem.storageCooldownUntil) {
+              throw new StorageQuotaCooldownError(uploadItem.error || "Google Drive \u4ECA\u65E5\u4E0A\u4F20\u989D\u5EA6\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u4EFB\u52A1\u5C06\u81EA\u52A8\u6682\u505C 24 \u5C0F\u65F6\u540E\u7EE7\u7EED\u3002", {
+                provider: "google_drive",
+                reason: "daily_upload_limit",
+                storageAccountId: storageManager.getActiveAccountId() || void 0,
+                cooldownUntil: uploadItem.storageCooldownUntil
+              });
+            } else {
+              failed += 1;
+              failedMessageIds.push(item.id);
+              await onItemSettled?.(item.persistentRef, "failed", uploadItem.error || "\u4E0B\u8F7D\u5931\u8D25");
+            }
+          } catch (err) {
+            if (err?.name === "TelegramDownloadLeaseLostError") throw err;
+            if (isStorageQuotaCooldownError(err)) {
+              throw err;
+            }
+            const flood = (() => {
+              const anyErr = err;
+              const text = `${anyErr?.message || ""} ${anyErr?.errorMessage || ""}`;
+              const seconds = Number(anyErr?.seconds || anyErr?.value || text.match(/FLOOD_WAIT_?(\d+)/i)?.[1] || 0);
+              return seconds > 0 || /FLOOD|Too many requests/i.test(text) ? Math.max(30, seconds || 60) : 0;
+            })();
+            if (flood > 0) {
+              const floodError = new Error(`Telegram FloodWait ${flood}s`);
+              floodError.seconds = flood;
+              throw floodError;
+            }
+            console.error(`\u{1F916} \u9891\u9053\u5206\u6BB5\u4E0B\u8F7D\u4EFB\u52A1\u5F02\u5E38: ${fileName}`, err);
             failed += 1;
             failedMessageIds.push(item.id);
-            await onItemSettled?.(item.persistentRef, "failed", uploadItem.error || "\u4E0B\u8F7D\u5931\u8D25");
+            await onItemSettled?.(item.persistentRef, "failed", err instanceof Error ? err.message : String(err));
+          } finally {
+            if (!uploadItem.storageCooldownUntil) {
+              completed += 1;
+              found += 1;
+            }
+            await refreshSegmentStatus(false, fileName);
           }
-        } catch (err) {
-          if (err?.name === "TelegramDownloadLeaseLostError") throw err;
-          if (isStorageQuotaCooldownError(err)) {
-            throw err;
-          }
-          const flood = (() => {
-            const anyErr = err;
-            const text = `${anyErr?.message || ""} ${anyErr?.errorMessage || ""}`;
-            const seconds = Number(anyErr?.seconds || anyErr?.value || text.match(/FLOOD_WAIT_?(\d+)/i)?.[1] || 0);
-            return seconds > 0 || /FLOOD|Too many requests/i.test(text) ? Math.max(30, seconds || 60) : 0;
-          })();
-          if (flood > 0) {
-            const floodError = new Error(`Telegram FloodWait ${flood}s`);
-            floodError.seconds = flood;
-            throw floodError;
-          }
-          console.error(`\u{1F916} \u9891\u9053\u5206\u6BB5\u4E0B\u8F7D\u4EFB\u52A1\u5F02\u5E38: ${fileName}`, err);
-          failed += 1;
-          failedMessageIds.push(item.id);
-          await onItemSettled?.(item.persistentRef, "failed", err instanceof Error ? err.message : String(err));
-        } finally {
-          if (!uploadItem.storageCooldownUntil) {
-            completed += 1;
-            found += 1;
-          }
-          await refreshSegmentStatus(false, fileName);
-        }
-      }));
-      await refreshSegmentStatus(true, segment[segment.length - 1]?.fileInfo.fileName);
+        }));
+        await refreshSegmentStatus(true, segment[segment.length - 1]?.fileInfo.fileName);
+      }
+    } finally {
+      await stopProgress();
     }
     if (downloadableRefs.length > 0) {
       updateBatch(chatIdStr, batchId, { completed, successful, failed, queuePending: 0, currentFileName: void 0 });
@@ -13456,8 +13617,9 @@ async function handleFileUpload(client2, event) {
     }
     let lastUpdateTime = 0;
     const onProgress = async (downloaded, total) => {
+      const intervalMs = await getTelegramProgressIntervalMs();
       const now = Date.now();
-      if (now - lastUpdateTime < 3e3) return;
+      if (now - lastUpdateTime < intervalMs) return;
       lastUpdateTime = now;
       updateUploadPhase(chatIdStr, uploadId, { phase: "downloading", downloaded, total });
       if (silentSessionMap.has(chatIdStr)) {
@@ -17623,45 +17785,6 @@ function notificationCallbackArgs(data) {
 
 // src/services/telegramCommands.ts
 import crypto18 from "crypto";
-
-// src/utils/folderPath.ts
-var INVALID_SEGMENT_CHARACTERS = /[\\:*?"<>|\x00-\x1f\x7f]/;
-var MAX_FOLDER_PATH_LENGTH = 255;
-function normalizeFolderPath(value) {
-  if (typeof value !== "string") throw new Error("\u6587\u4EF6\u5939\u8DEF\u5F84\u683C\u5F0F\u9519\u8BEF");
-  const normalized = value.trim().replace(/^\/+|\/+$/g, "");
-  if (!normalized) throw new Error("\u6587\u4EF6\u5939\u8DEF\u5F84\u4E0D\u80FD\u4E3A\u7A7A");
-  if (normalized.length > MAX_FOLDER_PATH_LENGTH) throw new Error(`\u6587\u4EF6\u5939\u8DEF\u5F84\u4E0D\u80FD\u8D85\u8FC7 ${MAX_FOLDER_PATH_LENGTH} \u4E2A\u5B57\u7B26`);
-  const segments = normalized.split("/");
-  if (segments.some((segment) => !segment || segment === "." || segment === "..")) {
-    throw new Error("\u6587\u4EF6\u5939\u8DEF\u5F84\u5305\u542B\u7A7A\u76EE\u5F55\u6216\u76F8\u5BF9\u8DEF\u5F84");
-  }
-  if (segments.some((segment) => segment !== segment.trim() || INVALID_SEGMENT_CHARACTERS.test(segment))) {
-    throw new Error("\u6587\u4EF6\u5939\u8DEF\u5F84\u5305\u542B\u975E\u6CD5\u5B57\u7B26");
-  }
-  return segments.join("/");
-}
-function normalizeFolderName(value) {
-  const name = normalizeFolderPath(value);
-  if (name.includes("/")) throw new Error("\u6587\u4EF6\u5939\u540D\u79F0\u4E0D\u80FD\u5305\u542B\u8DEF\u5F84\u5206\u9694\u7B26");
-  return name;
-}
-function folderBaseName(folder) {
-  const segments = folder.split("/");
-  return segments[segments.length - 1];
-}
-function folderParent(folder) {
-  const segments = folder.split("/");
-  return segments.length > 1 ? segments.slice(0, -1).join("/") : null;
-}
-function joinFolderPath(parent, name) {
-  return normalizeFolderPath(parent ? `${parent}/${name}` : name);
-}
-function isFolderWithin(folder, ancestor) {
-  return folder === ancestor || folder.startsWith(`${ancestor}/`);
-}
-
-// src/services/telegramCommands.ts
 var checkDiskSpace = checkDiskSpaceModule.default || checkDiskSpaceModule;
 var DOWNLOAD_WORKER_OPTIONS = [4, 8, 12, 16];
 var FILE_CONCURRENCY_OPTIONS = [1, 2, 3, 4];
@@ -19353,6 +19476,7 @@ async function handleFileConcurrency(message, locale) {
 }
 async function handlePathRules(message, locale) {
   const pathCenterState = await getPathCenterState();
+  await refreshTelegramPathState(message.chatId?.toString() || "unknown");
   const resolvedLocale = locale || await getTelegramUserLocaleOrDefault(message.senderId?.toJSNumber() || 0);
   await message.reply({
     message: buildPathSettingsText(pathCenterState, message.chatId?.toString() || "unknown", resolvedLocale),
@@ -19375,18 +19499,19 @@ ${buildPathPreviewLine(normalized)}
     await message.reply({ message: `\u274C \u8DEF\u5F84\u65E0\u6548\uFF1A${error.message}` });
   }
 }
-async function handlePathSession(message, args) {
+async function handlePathSession(message, args, ownerUserId) {
   const folder = args.join(" ").trim();
   if (!folder) {
-    await message.reply({ message: "\u8BF7\u76F4\u63A5\u53D1\u9001\u672C\u804A\u5929\u8981\u6301\u7EED\u4F7F\u7528\u7684\u76EE\u5F55\u540D\u79F0\u3002" });
+    setPendingTelegramPathInput(message.chatId?.toString() || "unknown", ownerUserId ?? message.senderId?.toJSNumber() ?? 0, "session");
+    await message.reply({ message: "\u{1F4C1} \u5207\u6362\u9ED8\u8BA4\u4E0B\u8F7D\u6839\u76EE\u5F55\n\n\u8BF7\u53D1\u9001\u76EE\u5F55\uFF0C\u4F8B\u5982 telegram\u3002\u8BBE\u7F6E\u6301\u7EED\u751F\u6548\uFF0C\u91CD\u542F\u540E\u4FDD\u7559\uFF0C\u76F4\u5230\u4F60\u624B\u52A8\u5207\u6362\u6216\u4F7F\u7528 /pc \u6E05\u9664\u3002\n\u94FE\u63A5\u540E\u7684\u540D\u79F0\u6216\u65E5\u671F\u4F1A\u4F5C\u4E3A\u6B64\u76EE\u5F55\u4E0B\u7684\u5B50\u6587\u4EF6\u5939\u3002\n\u53D1\u9001\u201C\u53D6\u6D88\u201D\u9000\u51FA\u3002" });
     return;
   }
   try {
     const normalized = await setSessionTelegramPathPersistent(message.chatId?.toString() || "unknown", folder);
-    await message.reply({ message: `\u{1F4CD} \u5DF2\u8BBE\u7F6E\u672C\u4F1A\u8BDD\u4E0B\u8F7D\u76EE\u5F55\uFF1A\`${normalized}\`
+    await message.reply({ message: `\u{1F4CD} \u9ED8\u8BA4\u4E0B\u8F7D\u6839\u76EE\u5F55\uFF1A\`${normalized}\`
 ${buildPathPreviewLine(normalized)}
 
-\u540E\u7EED\u6B64\u804A\u5929\u4E2D\u7684\u4E0B\u8F7D\u4F1A\u4F18\u5148\u4FDD\u5B58\u5230\u8BE5\u76EE\u5F55\uFF1B\u53EF\u5728\u201C\u4FDD\u5B58\u4F4D\u7F6E\u201D\u4E2D\u6E05\u9664\u3002` });
+\u6301\u7EED\u751F\u6548\uFF0C\u91CD\u542F\u540E\u4FDD\u7559\u3002\u4F7F\u7528 /ps \u5207\u6362\uFF0C/pc \u6E05\u9664\u3002\u94FE\u63A5\u4E0B\u8F7D\u4F1A\u5728\u6B64\u76EE\u5F55\u4E0B\u6309\u540E\u7F00\u540D\u79F0\u6216\u5F53\u5929\u65E5\u671F\u5206\u7C7B\u3002` });
   } catch (error) {
     await message.reply({ message: `\u274C \u8DEF\u5F84\u65E0\u6548\uFF1A${error.message}` });
   }
@@ -19421,6 +19546,7 @@ async function handlePathRulesCallback(client2, update, data) {
       await client2.invoke(new Api8.messages.SetBotCallbackAnswer({ queryId: update.queryId, message: t(locale, "path.toast.sendFolder") }));
       return;
     }
+    await refreshTelegramPathState(chatKey);
     await client2.editMessage(update.peer, {
       message: Number(update.msgId),
       text: buildPathSettingsText(pathCenterState, chatKey, locale),
@@ -19664,6 +19790,7 @@ var BOT_COMMANDS = [
   { command: "storage", description: "\u5B58\u50A8\u72B6\u6001 / \u5220\u9664\u672C\u5730\u5B9E\u4F53\u6587\u4EF6", helpDescription: "\u67E5\u770B\u5B58\u50A8\u72B6\u6001\uFF1B\u53EF\u786E\u8BA4\u5220\u9664\u672C\u5730\u5B9E\u4F53\u6587\u4EF6", category: "main", menu: true, help: true },
   { command: "path_rules", description: "\u4FDD\u5B58\u4F4D\u7F6E / \u81EA\u5B9A\u4E49\u76EE\u5F55", helpDescription: "\u6253\u5F00\u4FDD\u5B58\u4F4D\u7F6E\u4E0E\u81EA\u5B9A\u4E49\u76EE\u5F55\u9762\u677F", category: "main", aliases: ["path", "save_rules"], menu: true, help: true },
   { command: "tg_download", description: "\u6309\u65E5\u671F / \u6807\u7B7E\u4E0B\u8F7D\u9891\u9053\u6587\u4EF6", helpDescription: "\u6253\u5F00\u6309\u65E5\u671F\u6216\u6807\u7B7E\u4E0B\u8F7D\u5411\u5BFC", category: "main", aliases: ["tg_dl"], menu: true, help: true },
+  { command: "tg_link", description: "\u94FE\u63A5\u4E0B\u8F7D / \u540D\u79F0\u6216\u65E5\u671F\u5206\u7C7B", helpDescription: "\u53D1\u9001\u94FE\u63A5\u548C\u53EF\u9009\u6587\u4EF6\u5939\u540D\uFF1B\u7701\u7565\u540D\u79F0\u65F6\u6309\u4E0A\u6D77\u65F6\u533A\u5F53\u5929\u65E5\u671F\u5206\u7C7B", category: "main", usage: "[\u6D88\u606F\u94FE\u63A5] [\u6587\u4EF6\u5939\u540D]", menu: true, help: true },
   { command: "list", description: "\u67E5\u770B\u6700\u8FD1\u6587\u4EF6", helpDescription: "\u67E5\u770B\u6700\u8FD1\u6587\u4EF6\u548C\u53EF\u590D\u5236\u7684\u6587\u4EF6 ID", category: "files", usage: "[\u6570\u91CF] [\u9875\u7801]", menu: true, help: true },
   { command: "find", description: "\u641C\u7D22\u548C\u64CD\u4F5C\u6587\u4EF6", helpDescription: "\u6309\u540D\u79F0\u3001\u7C7B\u578B\u3001\u76EE\u5F55\u3001\u65E5\u671F\u6216\u6536\u85CF\u641C\u7D22\u6587\u4EF6\u5E76\u6253\u5F00\u64CD\u4F5C\u5361", category: "files", usage: "[\u5173\u952E\u8BCD] [type:image|video|audio|document] [folder:\u76EE\u5F55] [after:YYYY-MM-DD] [before:YYYY-MM-DD] [fav]", menu: true, help: true },
   { command: "tg_sub", description: "\u7BA1\u7406\u9891\u9053\u81EA\u52A8\u540C\u6B65", helpDescription: "\u6253\u5F00\u9891\u9053\u8BA2\u9605\u7BA1\u7406\u5411\u5BFC", category: "channels", aliases: ["tg_subscribe"], menu: true, help: true },
@@ -19674,7 +19801,7 @@ var BOT_COMMANDS = [
   { command: "setup_2fa", description: "\u914D\u7F6E\u53CC\u91CD\u9A8C\u8BC1", helpDescription: "\u914D\u7F6E\u53CC\u91CD\u9A8C\u8BC1 (TOTP)", category: "security", aliases: ["setup-2fa"], menu: false, help: true },
   { command: "logout", description: "\u64A4\u9500\u672C\u8BBE\u5907 Bot \u8BA4\u8BC1", helpDescription: "\u7ACB\u5373\u9000\u51FA\u5E76\u64A4\u9500\u5F53\u524D Telegram \u7528\u6237\u7684 Bot \u8BA4\u8BC1", category: "security", menu: false, help: true },
   { command: "p", description: "\u8BBE\u7F6E\u4E0B\u4E00\u6B21\u4FDD\u5B58\u76EE\u5F55", helpDescription: "\u4E0B\u4E00\u6B21\u4E0B\u8F7D\u4FDD\u5B58\u5230\u6307\u5B9A\u76EE\u5F55", category: "files", usage: "<\u76EE\u5F55>", help: true },
-  { command: "ps", description: "\u8BBE\u7F6E\u672C\u4F1A\u8BDD\u4FDD\u5B58\u76EE\u5F55", helpDescription: "\u672C\u4F1A\u8BDD\u6301\u7EED\u4FDD\u5B58\u5230\u6307\u5B9A\u76EE\u5F55", category: "files", usage: "<\u76EE\u5F55>", help: true },
+  { command: "ps", description: "\u5207\u6362\u9ED8\u8BA4\u4E0B\u8F7D\u6839\u76EE\u5F55\uFF08\u957F\u671F\u6709\u6548\uFF09", helpDescription: "\u5207\u6362\u5F53\u524D\u804A\u5929\u9ED8\u8BA4\u6839\u76EE\u5F55\uFF1B\u91CD\u542F\u4FDD\u7559\uFF0C\u76F4\u5230\u624B\u52A8\u66F4\u6539\u6216\u6E05\u9664", category: "files", usage: "[\u76EE\u5F55]", menu: true, help: true },
   { command: "pc", description: "\u6E05\u9664\u81EA\u5B9A\u4E49\u4FDD\u5B58\u76EE\u5F55", helpDescription: "\u6E05\u9664\u4E0B\u4E00\u6B21\u548C\u672C\u4F1A\u8BDD\u81EA\u5B9A\u4E49\u76EE\u5F55", category: "files", help: true },
   { command: "delete", description: "\u5220\u9664\u6307\u5B9A\u6587\u4EF6", helpDescription: "\u6309\u81F3\u5C11 8 \u4F4D\u6587\u4EF6 ID \u524D\u7F00\u5220\u9664\u6587\u4EF6", category: "files", usage: "<\u6587\u4EF6 ID \u524D\u7F00>", help: true },
   { command: "task_pause", description: "\u6682\u505C\u4EFB\u52A1", helpDescription: "\u6682\u505C\u5F53\u524D\u804A\u5929\u4EFB\u52A1\u6216\u6307\u5B9A\u4EFB\u52A1", category: "settings", usage: "[\u4EFB\u52A1 ID]", help: true },
@@ -20011,6 +20138,11 @@ async function handleBotHomeCallback(update, data) {
   if (command === "target") return handleTarget(message, []);
   if (command === "path_rules") return handlePathRules(message, locale);
   if (command === "tg_download") return startTelegramWizard(message, userId, "tg_download");
+  if (command === "tg_link") {
+    await message.reply({ message: t(locale, "bot.link.help"), parseMode: false });
+    return;
+  }
+  if (command === "ps") return handlePathSession(message, [], userId);
   if (command === "tg_sub") return startTelegramWizard(message, userId, "tg_sub_manage");
   if (command === "tg_subs") {
     const rows = await listManageableTelegramSubscriptions(userId);
@@ -20274,7 +20406,8 @@ async function replyWithJobResult(statusMessage, fallbackMessage, promise, kind,
     const cancelled = Boolean(result.cancelled);
     const commentLine = result.commentMediaFound || result.commentMessagesScanned ? `
 ${t(locale, "bot.legacy.commentLine", { scanned: result.commentMessagesScanned || 0, found: result.commentMediaFound || 0 })}` : "";
-    const text = cancelled ? t(locale, "bot.legacy.cancelledResult", { mode: t(locale, kind === "tag" ? "bot.wizard.modeTag" : "bot.wizard.modeDate"), jobId: String(result.jobId).slice(0, 12), successful: result.successful || 0, skipped: result.skipped || 0, commentLine }) : kind === "tag" ? t(locale, "bot.legacy.tagResult", { tag: result.tag, jobId: String(result.jobId).slice(0, 12), found: result.found, skipped: result.skipped, failed: result.failed, commentLine }) : t(locale, "bot.legacy.dateResult", { jobId: String(result.jobId).slice(0, 12), found: result.found, skipped: result.skipped, failed: result.failed, commentLine });
+    const emptyResult = !cancelled && Number(result.found || 0) === 0 && Number(result.skipped || 0) === 0 && Number(result.failed || 0) === 0;
+    const text = emptyResult ? t(locale, "bot.legacy.emptyResult") : cancelled ? t(locale, "bot.legacy.cancelledResult", { mode: t(locale, kind === "tag" ? "bot.wizard.modeTag" : "bot.wizard.modeDate"), jobId: String(result.jobId).slice(0, 12), successful: result.successful || 0, skipped: result.skipped || 0, commentLine }) : kind === "tag" ? t(locale, "bot.legacy.tagResult", { tag: result.tag, jobId: String(result.jobId).slice(0, 12), found: result.found, skipped: result.skipped, failed: result.failed, commentLine }) : t(locale, "bot.legacy.dateResult", { jobId: String(result.jobId).slice(0, 12), found: result.found, skipped: result.skipped, failed: result.failed, commentLine });
     statusMessage.edit({ text }).catch(() => fallbackMessage.reply({ message: text }).catch(() => void 0));
   }).catch((error) => {
     const text = t(locale, "bot.legacy.failed", { mode: kind === "tag" ? t(locale, "bot.wizard.modeTag") : t(locale, "bot.wizard.modeDate"), error: error instanceof Error ? error.message : String(error) });
@@ -21321,6 +21454,15 @@ async function initTelegramBot(credentialsOverride) {
           await startTelegramWizard(message, senderId, "tg_sub_manage");
           return;
         }
+        if (/^\/tg_link(?:\s|$)/.test(text) && !parseTelegramMessageLink(text)) {
+          if (!await isAuthenticatedAsync(senderId)) {
+            await message.reply({ message: MSG.AUTH_REQUIRED });
+            return;
+          }
+          const locale = await getTelegramUserLocaleOrDefault(senderId);
+          await message.reply({ message: t(locale, "bot.link.help"), parseMode: false });
+          return;
+        }
         if (text === "/tg_download" || text === "/tg_dl") {
           if (!await isAuthenticatedAsync(senderId)) {
             await message.reply({ message: MSG.AUTH_REQUIRED });
@@ -21343,6 +21485,49 @@ async function initTelegramBot(credentialsOverride) {
             return;
           }
           await startTelegramWizard(message, senderId, "tg_tag");
+          return;
+        }
+        const messageLink = parseTelegramMessageLink(text);
+        if (messageLink) {
+          if (!await isAuthenticatedAsync(senderId)) {
+            await message.reply({ message: MSG.AUTH_REQUIRED_UPLOAD });
+            return;
+          }
+          telegramWizardStates.delete(senderId, messageChatKey(message, senderId));
+          clearPendingTelegramPathInput(chatId.toString(), senderId);
+          const locale = await getTelegramUserLocaleOrDefault(senderId);
+          try {
+            const result = await runTelegramMessageLinkDownload(messageLink, {
+              assertSourceAllowed: (source) => assertTelegramSourceAllowed(source, [], locale),
+              getBaseFolder: () => resolveTelegramStorageFolderPersistent(chatId.toString(), null),
+              getTarget: async () => {
+                const selected3 = await consumeOrGetTelegramTargetState(chatId.toString());
+                return selected3 ? storageManager.getTarget(selected3.provider, selected3.accountId) : storageManager.getActiveTarget();
+              },
+              download: (source, ids, target, folder) => downloadTelegramChannelRange(
+                client,
+                message,
+                source,
+                ids[0],
+                1,
+                "older",
+                ids,
+                folder,
+                void 0,
+                void 0,
+                void 0,
+                void 0,
+                void 0,
+                senderId,
+                target
+              )
+            });
+            if (!result.successful && !result.failed) {
+              await message.reply({ message: t(locale, "bot.link.empty") });
+            }
+          } catch (error) {
+            await message.reply({ message: t(locale, "bot.link.failed", { error: error instanceof Error ? error.message : String(error) }), parseMode: false });
+          }
           return;
         }
         if (!text.startsWith("/")) {
@@ -21652,7 +21837,7 @@ ${buildPathPreviewLine(appliedPath.folder)}
           await handlePathOnce(message, text.split(/\s+/).slice(1));
           return;
         }
-        if (text.startsWith("/ps ")) {
+        if (text === "/ps" || text.startsWith("/ps ")) {
           if (!await isAuthenticatedAsync(senderId)) {
             await message.reply({ message: MSG.AUTH_REQUIRED });
             return;
@@ -21713,46 +21898,6 @@ ${buildPathPreviewLine(appliedPath.folder)}
               return;
             }
           }
-        }
-        const messageLink = parseTelegramMessageLink(text);
-        if (messageLink) {
-          if (!await isAuthenticatedAsync(senderId)) {
-            await message.reply({ message: MSG.AUTH_REQUIRED_UPLOAD });
-            return;
-          }
-          const locale = await getTelegramUserLocaleOrDefault(senderId);
-          try {
-            const result = await runTelegramMessageLinkDownload(messageLink, {
-              assertSourceAllowed: (source) => assertTelegramSourceAllowed(source, [], locale),
-              getTarget: async () => {
-                const selected3 = await consumeOrGetTelegramTargetState(chatId.toString());
-                return selected3 ? storageManager.getTarget(selected3.provider, selected3.accountId) : storageManager.getActiveTarget();
-              },
-              download: (source, ids, target) => downloadTelegramChannelRange(
-                client,
-                message,
-                source,
-                ids[0],
-                1,
-                "older",
-                ids,
-                void 0,
-                void 0,
-                void 0,
-                void 0,
-                void 0,
-                void 0,
-                senderId,
-                target
-              )
-            });
-            if (!result.successful && !result.failed) {
-              await message.reply({ message: t(locale, "bot.link.empty") });
-            }
-          } catch (error) {
-            await message.reply({ message: t(locale, "bot.link.failed", { error: error instanceof Error ? error.message : String(error) }), parseMode: false });
-          }
-          return;
         }
         if (message.media) {
           await handleFileUpload(client, event);
@@ -24366,6 +24511,7 @@ function buildAdvancedSettings(input) {
   const duplicateMode = input.duplicateMode === "skip" ? "skip" : "copy";
   const telegramDownloadHistoryPolicy = input.telegramDownloadHistoryPolicy === "all" ? "all" : "errors_only";
   return {
+    telegramProgressIntervalSeconds: [3, 5, 10, 15, 30, 60].includes(Number(input.telegramProgressIntervalSeconds)) ? Number(input.telegramProgressIntervalSeconds) : 5,
     telegramDownloadWorkers: WORKERS.has(workers) ? workers : 4,
     telegramFileConcurrency: FILE_CONCURRENCY.has(fileConcurrency) ? fileConcurrency : 2,
     duplicateMode,
@@ -24379,6 +24525,11 @@ function normalizeAdvancedSettingsPatch(input) {
   const entries = Object.entries(input);
   if (entries.length !== 1) throw new Error("\u6BCF\u6B21\u53EA\u5141\u8BB8\u4FEE\u6539\u4E00\u9879\u9AD8\u7EA7\u8BBE\u7F6E");
   const [key, value] = entries[0];
+  if (key === "telegramProgressIntervalSeconds") {
+    const parsed = Number(value);
+    if (![3, 5, 10, 15, 30, 60].includes(parsed)) throw new Error("telegramProgressIntervalSeconds \u5FC5\u987B\u662F 3/5/10/15/30/60");
+    return { telegramProgressIntervalSeconds: parsed, highRisk: false };
+  }
   if (key === "telegramDownloadWorkers") {
     const parsed = Number(value);
     if (!WORKERS.has(parsed)) throw new Error("telegramDownloadWorkers \u5FC5\u987B\u662F 4/8/12/16");
@@ -24621,6 +24772,7 @@ router5.get("/config", requireAuth, async (req, res) => {
 router5.get("/config/advanced-tasks", requireAuth, async (_req, res) => {
   try {
     res.json(buildAdvancedSettings({
+      telegramProgressIntervalSeconds: await getTelegramProgressIntervalMs() / 1e3,
       telegramDownloadWorkers: await getSetting("telegram_download_workers", process.env.TELEGRAM_DOWNLOAD_WORKERS || "4"),
       telegramFileConcurrency: await getSetting("telegram_file_download_concurrency", String(getFileDownloadConcurrency())),
       duplicateMode: await getSetting("duplicate_file_mode", process.env.DUPLICATE_FILE_MODE || "copy"),
@@ -24647,7 +24799,9 @@ router5.patch("/config/advanced-tasks", requireAuth, async (req, res) => {
         code: "CONFIRMATION_REQUIRED"
       });
     }
-    if ("telegramDownloadWorkers" in patch) {
+    if ("telegramProgressIntervalSeconds" in patch) {
+      await setTelegramProgressInterval(patch.telegramProgressIntervalSeconds);
+    } else if ("telegramDownloadWorkers" in patch) {
       await setSetting("telegram_download_workers", String(patch.telegramDownloadWorkers));
       process.env.TELEGRAM_DOWNLOAD_WORKERS = String(patch.telegramDownloadWorkers);
     } else if ("telegramFileConcurrency" in patch) {

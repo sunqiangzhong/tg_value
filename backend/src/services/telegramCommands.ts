@@ -31,6 +31,7 @@ import { DestructiveConfirmationStore } from './destructiveConfirmation.js';
 import {
     buildPathSettingsKeyboard,
     buildPathSettingsText,
+    refreshTelegramPathState,
     buildPendingPathPromptPersistent,
     buildPathPreviewLine,
     clearTelegramPathStatePersistent,
@@ -1968,6 +1969,7 @@ export async function handleFileConcurrency(message: Api.Message, locale?: Teleg
 
 export async function handlePathRules(message: Api.Message, locale?: TelegramLocale): Promise<void> {
     const pathCenterState = await getPathCenterState();
+    await refreshTelegramPathState(message.chatId?.toString() || 'unknown');
     const resolvedLocale = locale || await getTelegramUserLocaleOrDefault(message.senderId?.toJSNumber() || 0);
     await message.reply({
         message: buildPathSettingsText(pathCenterState, message.chatId?.toString() || 'unknown', resolvedLocale),
@@ -1989,15 +1991,16 @@ export async function handlePathOnce(message: Api.Message, args: string[]): Prom
     }
 }
 
-export async function handlePathSession(message: Api.Message, args: string[]): Promise<void> {
+export async function handlePathSession(message: Api.Message, args: string[], ownerUserId?: number): Promise<void> {
     const folder = args.join(' ').trim();
     if (!folder) {
-        await message.reply({ message: '请直接发送本聊天要持续使用的目录名称。' });
+        setPendingTelegramPathInput(message.chatId?.toString() || 'unknown', ownerUserId ?? message.senderId?.toJSNumber() ?? 0, 'session');
+        await message.reply({ message: '📁 切换默认下载根目录\n\n请发送目录，例如 telegram。设置持续生效，重启后保留，直到你手动切换或使用 /pc 清除。\n链接后的名称或日期会作为此目录下的子文件夹。\n发送“取消”退出。' });
         return;
     }
     try {
         const normalized = await setSessionTelegramPathPersistent(message.chatId?.toString() || 'unknown', folder);
-        await message.reply({ message: `📍 已设置本会话下载目录：\`${normalized}\`\n${buildPathPreviewLine(normalized)}\n\n后续此聊天中的下载会优先保存到该目录；可在“保存位置”中清除。` });
+        await message.reply({ message: `📍 默认下载根目录：\`${normalized}\`\n${buildPathPreviewLine(normalized)}\n\n持续生效，重启后保留。使用 /ps 切换，/pc 清除。链接下载会在此目录下按后缀名称或当天日期分类。` });
     } catch (error) {
         await message.reply({ message: `❌ 路径无效：${(error as Error).message}` });
     }
@@ -2038,6 +2041,7 @@ export async function handlePathRulesCallback(client: TelegramClient, update: Ap
             return;
         }
 
+        await refreshTelegramPathState(chatKey);
         await client.editMessage(update.peer, {
             message: Number(update.msgId),
             text: buildPathSettingsText(pathCenterState, chatKey, locale),

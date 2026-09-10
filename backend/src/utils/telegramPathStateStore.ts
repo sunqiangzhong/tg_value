@@ -9,14 +9,14 @@ export async function setTelegramPathStateRow(
     chatId: string,
     mode: TelegramPathMode,
     folder: string,
-    expiresAt: Date,
+    expiresAt: Date | 'infinity',
 ): Promise<void> {
     await runQuery(
         `INSERT INTO telegram_path_states (chat_id, mode, folder, expires_at)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (chat_id, mode)
          DO UPDATE SET folder = EXCLUDED.folder, expires_at = EXCLUDED.expires_at, updated_at = NOW()`,
-        [chatId, mode, folder, expiresAt],
+        [chatId, mode, folder, mode === 'session' ? 'infinity' : expiresAt],
     );
 }
 
@@ -33,7 +33,7 @@ export async function consumeTelegramOncePath(runQuery: QueryLike = defaultQuery
 export async function getTelegramSessionPath(runQuery: QueryLike = defaultQuery, chatId: string): Promise<string | null> {
     const result = await runQuery(
         `SELECT folder FROM telegram_path_states
-         WHERE chat_id = $1 AND mode = 'session' AND expires_at > NOW()`,
+         WHERE chat_id = $1 AND mode = 'session'`,
         [chatId],
     );
     return result.rows[0]?.folder || null;
@@ -42,7 +42,7 @@ export async function getTelegramSessionPath(runQuery: QueryLike = defaultQuery,
 export async function previewTelegramPersistentPath(chatId: string): Promise<{ once: string | null; session: string | null }> {
     const result = await defaultQuery(
         `SELECT mode, folder FROM telegram_path_states
-         WHERE chat_id = $1 AND expires_at > NOW()`,
+         WHERE chat_id = $1 AND (mode = 'session' OR expires_at > NOW())`,
         [chatId],
     );
     return {

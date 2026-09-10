@@ -1,5 +1,6 @@
 import { TelegramClient, Api } from 'telegram';
 import { parseTelegramMessageLink, runTelegramMessageLinkDownload } from './telegramMessageLink.js';
+import { resolveTelegramStorageFolderPersistent } from '../utils/telegramPathSettings.js';
 import { downloadTelegramChannelRange } from './telegramUpload.js';
 import { assertTelegramSourceAllowed } from './telegramChannelJobs.js';
 import { StringSession } from 'telegram/sessions/index.js';
@@ -163,6 +164,11 @@ async function handleBotHomeCallback(update: Api.UpdateBotCallbackQuery, data: s
     if (command === 'target') return handleTarget(message, []);
     if (command === 'path_rules') return handlePathRules(message, locale);
     if (command === 'tg_download') return startTelegramWizard(message, userId, 'tg_download');
+    if (command === 'tg_link') {
+        await message.reply({ message: t(locale, 'bot.link.help'), parseMode: false });
+        return;
+    }
+    if (command === 'ps') return handlePathSession(message, [], userId);
     if (command === 'tg_sub') return startTelegramWizard(message, userId, 'tg_sub_manage');
     if (command === 'tg_subs') {
         const rows = await listManageableTelegramSubscriptions(userId);
@@ -552,7 +558,10 @@ async function replyWithJobResult(statusMessage: Api.Message, fallbackMessage: A
             const commentLine = result.commentMediaFound || result.commentMessagesScanned
                 ? `\n${t(locale, 'bot.legacy.commentLine', { scanned: result.commentMessagesScanned || 0, found: result.commentMediaFound || 0 })}`
                 : '';
-            const text = cancelled
+            const emptyResult = !cancelled && Number(result.found || 0) === 0 && Number(result.skipped || 0) === 0 && Number(result.failed || 0) === 0;
+            const text = emptyResult
+                ? t(locale, 'bot.legacy.emptyResult')
+                : cancelled
                 ? t(locale, 'bot.legacy.cancelledResult', { mode: t(locale, kind === 'tag' ? 'bot.wizard.modeTag' : 'bot.wizard.modeDate'), jobId: String(result.jobId).slice(0, 12), successful: result.successful || 0, skipped: result.skipped || 0, commentLine })
                 : kind === 'tag'
                     ? t(locale, 'bot.legacy.tagResult', { tag: result.tag, jobId: String(result.jobId).slice(0, 12), found: result.found, skipped: result.skipped, failed: result.failed, commentLine })
@@ -1713,6 +1722,16 @@ export async function initTelegramBot(credentialsOverride?: TelegramBotCredentia
                     return;
                 }
 
+                if (/^\/tg_link(?:\s|$)/.test(text) && !parseTelegramMessageLink(text)) {
+                    if (!(await isAuthenticatedAsync(senderId))) {
+                        await message.reply({ message: MSG.AUTH_REQUIRED });
+                        return;
+                    }
+                    const locale = await getTelegramUserLocaleOrDefault(senderId);
+                    await message.reply({ message: t(locale, 'bot.link.help'), parseMode: false });
+                    return;
+                }
+
                 if (text === '/tg_download' || text === '/tg_dl') {
                     if (!(await isAuthenticatedAsync(senderId))) {
                         await message.reply({ message: MSG.AUTH_REQUIRED });
@@ -1738,6 +1757,37 @@ export async function initTelegramBot(credentialsOverride?: TelegramBotCredentia
                         return;
                     }
                     await startTelegramWizard(message, senderId, 'tg_tag');
+                    return;
+                }
+
+                const messageLink = parseTelegramMessageLink(text);
+                if (messageLink) {
+                    if (!(await isAuthenticatedAsync(senderId))) {
+                        await message.reply({ message: MSG.AUTH_REQUIRED_UPLOAD });
+                        return;
+                    }
+                    telegramWizardStates.delete(senderId, messageChatKey(message, senderId));
+                    clearPendingTelegramPathInput(chatId.toString(), senderId);
+                    const locale = await getTelegramUserLocaleOrDefault(senderId);
+                    try {
+                        const result = await runTelegramMessageLinkDownload(messageLink, {
+                            assertSourceAllowed: source => assertTelegramSourceAllowed(source, [], locale),
+                            getBaseFolder: () => resolveTelegramStorageFolderPersistent(chatId.toString(), null),
+                            getTarget: async () => {
+                                const selected = await consumeOrGetTelegramTargetState(chatId.toString());
+                                return selected ? storageManager.getTarget(selected.provider, selected.accountId) : storageManager.getActiveTarget();
+                            },
+                            download: (source, ids, target, folder) => downloadTelegramChannelRange(
+                                client!, message, source, ids[0], 1, 'older', ids,
+                                folder, undefined, undefined, undefined, undefined, undefined, senderId, target,
+                            ),
+                        });
+                        if (!result.successful && !result.failed) {
+                            await message.reply({ message: t(locale, 'bot.link.empty') });
+                        }
+                    } catch (error) {
+                        await message.reply({ message: t(locale, 'bot.link.failed', { error: error instanceof Error ? error.message : String(error) }), parseMode: false });
+                    }
                     return;
                 }
 
@@ -2067,7 +2117,7 @@ export async function initTelegramBot(credentialsOverride?: TelegramBotCredentia
                     return;
                 }
 
-                if (text.startsWith('/ps ')) {
+                if (text === '/ps' || text.startsWith('/ps ')) {
                     if (!(await isAuthenticatedAsync(senderId))) {
                         await message.reply({ message: MSG.AUTH_REQUIRED });
                         return;
@@ -2140,34 +2190,6 @@ export async function initTelegramBot(credentialsOverride?: TelegramBotCredentia
                             return;
                         }
                     }
-                }
-
-                const messageLink = parseTelegramMessageLink(text);
-                if (messageLink) {
-                    if (!(await isAuthenticatedAsync(senderId))) {
-                        await message.reply({ message: MSG.AUTH_REQUIRED_UPLOAD });
-                        return;
-                    }
-                    const locale = await getTelegramUserLocaleOrDefault(senderId);
-                    try {
-                        const result = await runTelegramMessageLinkDownload(messageLink, {
-                            assertSourceAllowed: source => assertTelegramSourceAllowed(source, [], locale),
-                            getTarget: async () => {
-                                const selected = await consumeOrGetTelegramTargetState(chatId.toString());
-                                return selected ? storageManager.getTarget(selected.provider, selected.accountId) : storageManager.getActiveTarget();
-                            },
-                            download: (source, ids, target) => downloadTelegramChannelRange(
-                                client!, message, source, ids[0], 1, 'older', ids,
-                                undefined, undefined, undefined, undefined, undefined, undefined, senderId, target,
-                            ),
-                        });
-                        if (!result.successful && !result.failed) {
-                            await message.reply({ message: t(locale, 'bot.link.empty') });
-                        }
-                    } catch (error) {
-                        await message.reply({ message: t(locale, 'bot.link.failed', { error: error instanceof Error ? error.message : String(error) }), parseMode: false });
-                    }
-                    return;
                 }
 
                 // File Handling

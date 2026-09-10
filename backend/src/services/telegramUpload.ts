@@ -13,6 +13,7 @@ import { assertStorageTargetWritable, formatStorageCooldownNotice } from './stor
 import { markStorageAccountCooldown } from './storageCooldown.js';
 import { getTelegramUserClient, isTelegramUserClientReady } from './telegramUserClient.js';
 import { getSetting } from '../utils/settings.js';
+import { getTelegramProgressIntervalMs, startTelegramProgressTicker } from './telegramProgressSettings.js';
 import { isAuthenticatedAsync } from './telegramState.js';
 import { formatBytes, getTypeEmoji, getFileType, sanitizeFilename } from '../utils/telegramUtils.js';
 import { extractFileInfo, getDownloadableMedia, getEstimatedFileSize, isTelegramPhotoMedia, type TelegramFileInfo } from '../utils/telegramMedia.js';
@@ -1350,6 +1351,7 @@ export function retryFailedDownloadTasks(limit = 10, taskId?: string, chatId?: s
 
 // 多文件上传队列管理
 interface FileUploadItem {
+    onDownloadProgress?: (downloaded: number, total: number) => void;
     fileName: string;
     mimeType: string;
     generatedName?: boolean;
@@ -1870,9 +1872,10 @@ async function processFileUpload(
                 return { status: 'success' as const };
             }
             file.status = 'uploading';
-            const reportProgress = taskId
-                ? (downloaded: number, total: number) => downloadQueue.updateProgress(taskId, downloaded, total)
-                : undefined;
+            const reportProgress = (downloaded: number, total: number) => {
+                if (taskId) downloadQueue.updateProgress(taskId, downloaded, total);
+                file.onDownloadProgress?.(downloaded, total);
+            };
             // 不再单独更新 msg，由外部轮询或回调处理
             // if (queue && queue.statusMsgId && queue.chatId) ...
 
@@ -2095,13 +2098,7 @@ async function processBatchUploadSnapshot(client: TelegramClient | undefined, qu
     };
 
     // 定时更新状态（作为补充，防止回调太频繁或丢失）
-    let lastTime = 0;
-    const statusUpdater = setInterval(async () => {
-        const now = Date.now();
-        if (now - lastTime < 3000) return;
-        lastTime = now;
-        await onBatchProgress();
-    }, 3000);
+    const stopStatusUpdater = startTelegramProgressTicker(onBatchProgress);
 
     const queuedFilePromises: Promise<void>[] = [];
     try {
@@ -2124,7 +2121,7 @@ async function processBatchUploadSnapshot(client: TelegramClient | undefined, qu
         await finalizeSilentSessionIfDone(batchClient, chatId);
 
     } finally {
-        clearInterval(statusUpdater);
+        await stopStatusUpdater();
 
         // 任务完成后延迟清理追踪器条目
         // 只有当所有关联的 batch 都完成了，最后的消息才会被保留
@@ -2388,7 +2385,10 @@ export async function downloadTelegramChannelRange(
         kind: 'channel',
         title: sourceEntity.toString(),
         chatId: chatIdStr,
-        hidden: true,
+        userId: ownerUserId ?? requestMessage.senderId?.toJSNumber(),
+        hidden: Boolean(executionGroupKey),
+        targetProvider: storageTarget.provider.name,
+        targetAccountId: storageTarget.accountId,
         expectedTotal: downloadableRefs.length,
     });
     if (downloadableRefs.length > 0) {
@@ -2438,7 +2438,7 @@ export async function downloadTelegramChannelRange(
             successful,
             failed,
             queuePending: stats.pending,
-            currentFileName,
+            ...(currentFileName ? { currentFileName } : {}),
         });
         if (silentSessionMap.has(chatIdStr)) {
             await refreshSilentProgress(botClient, chatId);
@@ -2448,6 +2448,8 @@ export async function downloadTelegramChannelRange(
         }
     };
 
+    const stopProgress = startTelegramProgressTicker(() => refreshSegmentStatus(true));
+    try {
     for (let offset = 0; offset < downloadableRefs.length; offset += TG_LARGE_TASK_SEGMENT_SIZE) {
         const segment = downloadableRefs.slice(offset, offset + TG_LARGE_TASK_SEGMENT_SIZE);
         const segmentBytes = segment.reduce((sum, item) => sum + (item.totalSize || 0), 0);
@@ -2514,6 +2516,9 @@ export async function downloadTelegramChannelRange(
                 groupSize: item.groupSize,
                 storageTarget,
                 persistentRef: item.persistentRef,
+                onDownloadProgress: (downloaded, total) => updateBatch(chatIdStr, batchId, {
+                    currentFileName: fileName, currentFileActive: true, currentDownloaded: downloaded, currentTotal: total,
+                }),
                 withLease: withItemLease ? operation => withItemLease(item.persistentRef, operation) : undefined,
             };
             try {
@@ -2580,6 +2585,9 @@ export async function downloadTelegramChannelRange(
             }
         }));
         await refreshSegmentStatus(true, segment[segment.length - 1]?.fileInfo.fileName);
+    }
+    } finally {
+        await stopProgress();
     }
 
     if (downloadableRefs.length > 0) {
@@ -2804,8 +2812,9 @@ export async function handleFileUpload(client: TelegramClient, event: NewMessage
 
         let lastUpdateTime = 0;
         const onProgress = async (downloaded: number, total: number) => {
+            const intervalMs = await getTelegramProgressIntervalMs();
             const now = Date.now();
-            if (now - lastUpdateTime < 3000) return;
+            if (now - lastUpdateTime < intervalMs) return;
             lastUpdateTime = now;
 
             updateUploadPhase(chatIdStr, uploadId, { phase: 'downloading', downloaded, total });

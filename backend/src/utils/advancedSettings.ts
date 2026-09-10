@@ -2,6 +2,7 @@ export type DuplicateModeSetting = 'copy' | 'skip';
 export type TelegramDownloadHistoryPolicySetting = 'errors_only' | 'all';
 
 export interface AdvancedSettings {
+    telegramProgressIntervalSeconds: number;
     telegramDownloadWorkers: number;
     telegramFileConcurrency: number;
     duplicateMode: DuplicateModeSetting;
@@ -20,6 +21,7 @@ function booleanValue(value: unknown, fallback: boolean): boolean {
 }
 
 export function buildAdvancedSettings(input: {
+    telegramProgressIntervalSeconds?: unknown;
     telegramDownloadWorkers: unknown;
     telegramFileConcurrency: unknown;
     duplicateMode: unknown;
@@ -32,6 +34,7 @@ export function buildAdvancedSettings(input: {
     const duplicateMode: DuplicateModeSetting = input.duplicateMode === 'skip' ? 'skip' : 'copy';
     const telegramDownloadHistoryPolicy: TelegramDownloadHistoryPolicySetting = input.telegramDownloadHistoryPolicy === 'all' ? 'all' : 'errors_only';
     return {
+        telegramProgressIntervalSeconds: [3, 5, 10, 15, 30, 60].includes(Number(input.telegramProgressIntervalSeconds)) ? Number(input.telegramProgressIntervalSeconds) : 5,
         telegramDownloadWorkers: WORKERS.has(workers) ? workers : 4,
         telegramFileConcurrency: FILE_CONCURRENCY.has(fileConcurrency) ? fileConcurrency : 2,
         duplicateMode,
@@ -46,6 +49,11 @@ export function normalizeAdvancedSettingsPatch(input: Record<string, unknown>): 
     const entries = Object.entries(input);
     if (entries.length !== 1) throw new Error('每次只允许修改一项高级设置');
     const [key, value] = entries[0];
+    if (key === 'telegramProgressIntervalSeconds') {
+        const parsed = Number(value);
+        if (![3, 5, 10, 15, 30, 60].includes(parsed)) throw new Error('telegramProgressIntervalSeconds 必须是 3/5/10/15/30/60');
+        return { telegramProgressIntervalSeconds: parsed, highRisk: false };
+    }
     if (key === 'telegramDownloadWorkers') {
         const parsed = Number(value);
         if (!WORKERS.has(parsed)) throw new Error('telegramDownloadWorkers 必须是 4/8/12/16');

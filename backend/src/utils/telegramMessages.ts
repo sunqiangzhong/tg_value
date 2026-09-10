@@ -182,7 +182,7 @@ export function buildStartPrompt(locale: TelegramLocale = DEFAULT_LOCALE): strin
 
 /** /help 简洁入口 */
 export function buildHelp(locale: TelegramLocale = DEFAULT_LOCALE): string {
-    return t(locale, 'help.body');
+    return `${t(locale, 'help.body')}\n\n${t(locale, 'bot.link.help')}`;
 }
 
 /** 2FA 设置 QR 码的 caption */
@@ -614,6 +614,8 @@ export interface ConsolidatedUploadFile {
 }
 
 export interface ConsolidatedBatchEntry {
+    currentDownloaded?: number;
+    currentTotal?: number;
     id: string;
     folderName: string;
     folderPath?: string;
@@ -790,6 +792,9 @@ export async function buildConsolidatedStatus(
                 lines.push(`    ${progress} (${batch.completed}/${batch.totalFiles})`);
                 if (batch.currentFileActive && batch.currentFileName) {
                     lines.push(`    📄 当前: ${batch.currentFileName}`);
+                    if (batch.currentTotal && batch.currentDownloaded !== undefined) {
+                        lines.push(`    ⬇️ ${Math.min(100, Math.round(batch.currentDownloaded / batch.currentTotal * 100))}% · ${formatBytes(batch.currentDownloaded)} / ${formatBytes(batch.currentTotal)}`);
+                    }
                 }
             } else {
                 lines.push(`    ✅ ${batch.successful}  ❌ ${batch.failed}`);
@@ -801,7 +806,7 @@ export async function buildConsolidatedStatus(
             if (batch.providerName && isDone) {
                 lines.push(`    📍 ${getProviderDisplayName(batch.providerName)}`);
             }
-            if (batch.folderPath && isDone) {
+            if (batch.folderPath) {
                 lines.push(`    📁 ${batch.folderPath}`);
             }
         });

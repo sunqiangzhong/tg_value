@@ -47,6 +47,7 @@ import { withTelegramBotLifecycle } from '../services/telegramBot.js';
 import { maintenanceImpact } from '../utils/maintenanceActions.js';
 import { buildStorageCapabilities, buildStorageScopeForTarget, buildStorageStatsPayload } from '../utils/storageProductContract.js';
 import { buildAdvancedSettings, normalizeAdvancedSettingsPatch } from '../utils/advancedSettings.js';
+import { getTelegramProgressIntervalMs, setTelegramProgressInterval } from '../services/telegramProgressSettings.js';
 import { getFileDownloadConcurrency, setFileDownloadConcurrency } from '../services/telegramUpload.js';
 import { startPeriodicCleanup, stopPeriodicCleanup } from '../services/orphanCleanup.js';
 import {
@@ -292,6 +293,7 @@ router.get('/config', requireAuth, async (req: Request, res: Response) => {
 router.get('/config/advanced-tasks', requireAuth, async (_req: Request, res: Response) => {
     try {
         res.json(buildAdvancedSettings({
+            telegramProgressIntervalSeconds: (await getTelegramProgressIntervalMs()) / 1000,
             telegramDownloadWorkers: await getSetting('telegram_download_workers', process.env.TELEGRAM_DOWNLOAD_WORKERS || '4'),
             telegramFileConcurrency: await getSetting('telegram_file_download_concurrency', String(getFileDownloadConcurrency())),
             duplicateMode: await getSetting('duplicate_file_mode', process.env.DUPLICATE_FILE_MODE || 'copy'),
@@ -319,7 +321,9 @@ router.patch('/config/advanced-tasks', requireAuth, async (req: Request, res: Re
                 code: 'CONFIRMATION_REQUIRED',
             });
         }
-        if ('telegramDownloadWorkers' in patch) {
+        if ('telegramProgressIntervalSeconds' in patch) {
+            await setTelegramProgressInterval(patch.telegramProgressIntervalSeconds);
+        } else if ('telegramDownloadWorkers' in patch) {
             await setSetting('telegram_download_workers', String(patch.telegramDownloadWorkers));
             process.env.TELEGRAM_DOWNLOAD_WORKERS = String(patch.telegramDownloadWorkers);
         } else if ('telegramFileConcurrency' in patch) {

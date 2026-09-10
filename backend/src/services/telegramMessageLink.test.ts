@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseTelegramMessageLink, runTelegramMessageLinkDownload } from './telegramMessageLink.js';
+import { parseTelegramMessageLink, runTelegramMessageLinkDownload, telegramMessageLinkFolderName } from './telegramMessageLink.js';
 
 test('parses a single public post, including Markdown and web previews', () => {
     for (const link of ['https://t.me/lspyanxi/4375', '[视频](https://t.me/lspyanxi/4375)', ' t.me/lspyanxi/4375 ', 'https://t.me/s/lspyanxi/4375?single', 'https://telegram.me/lspyanxi/4375']) {
@@ -20,13 +20,15 @@ test('downloads only the requested message with the selected chat target', async
     const result = await runTelegramMessageLinkDownload({ source: '@lspyanxi', messageId: 4375 }, {
         assertSourceAllowed: async source => { assert.equal(source, '@lspyanxi'); },
         getTarget: async () => target,
-        download: async (source, ids, actualTarget) => {
+        getBaseFolder: async () => 'telegram',
+        download: async (source, ids, actualTarget, folder) => {
             assert.equal(source, '@lspyanxi');
             assert.deepEqual(ids, [4375]);
             assert.equal(actualTarget, target);
+            assert.equal(folder, 'telegram/2026-09-10');
             return { successful: 1, failed: 0 };
         },
-    });
+    }, new Date('2026-09-09T16:00:00Z'));
     assert.equal(result.successful, 1);
 });
 
@@ -34,6 +36,53 @@ test('denied sources cannot consume a target or start a download', async () => {
     await assert.rejects(runTelegramMessageLinkDownload({ source: '@blocked', messageId: 1 }, {
         assertSourceAllowed: async () => { throw new Error('denied'); },
         getTarget: async () => { assert.fail('target consumed'); },
+        getBaseFolder: async () => { assert.fail('path consumed'); },
         download: async () => { assert.fail('download started'); },
     }), /denied/);
+});
+
+test('folder suffixes and tg_link use the same leading-link syntax', () => {
+    for (const prefix of ['https://t.me/lspyanxi/4375', '[视频](https://t.me/lspyanxi/4375)', '/tg_link https://t.me/lspyanxi/4375']) {
+        for (const folderName of ['视频1', '2026-09-09', '我的 视频']) {
+            assert.deepEqual(parseTelegramMessageLink(`${prefix}   ${folderName}  `), { source: '@lspyanxi', messageId: 4375, folderName });
+        }
+    }
+});
+
+test('default date changes at Shanghai midnight, independent of server timezone', () => {
+    const link = { source: '@channel', messageId: 1 };
+    assert.equal(telegramMessageLinkFolderName(link, new Date('2026-09-09T15:59:59Z')), '2026-09-09');
+    assert.equal(telegramMessageLinkFolderName(link, new Date('2026-09-09T16:00:00Z')), '2026-09-10');
+    assert.equal(telegramMessageLinkFolderName(link, new Date('2026-12-31T16:00:00Z')), '2027-01-01');
+});
+
+test('appends explicit suffixes to the base folder and resolves settings only once', async () => {
+    for (const base of ['telegram', null]) {
+        for (const folderName of ['视频1', '2026-09-09']) {
+            let reads = 0;
+            await runTelegramMessageLinkDownload({ source: '@channel', messageId: 1, folderName }, {
+                assertSourceAllowed: async () => {},
+                getBaseFolder: async () => { reads++; return base; },
+                getTarget: async () => 'local',
+                download: async (_source, _ids, _target, folder) => {
+                    assert.equal(folder, base ? `${base}/${folderName}` : folderName);
+                    return { successful: 1, failed: 0 };
+                },
+            });
+            assert.equal(reads, 1);
+        }
+    }
+});
+
+test('unsafe suffixes fail before consuming settings or downloading', async () => {
+    for (const folderName of ['..', '.', '../other', '/absolute', 'a/b', 'a\\b', 'C:\\data', 'bad:name', 'line\nbreak', 'x'.repeat(256)]) {
+        let sourceAccessed = false;
+        await assert.rejects(runTelegramMessageLinkDownload({ source: '@channel', messageId: 1, folderName }, {
+            assertSourceAllowed: async () => { sourceAccessed = true; },
+            getBaseFolder: async () => { assert.fail('path consumed'); },
+            getTarget: async () => { assert.fail('target consumed'); },
+            download: async () => { assert.fail('download started'); },
+        }));
+        assert.equal(sourceAccessed, false, folderName);
+    }
 });

@@ -24,6 +24,7 @@ export const securityCards = {
 } as const;
 
 export const maintenanceCards = {
+  progressInterval: { title: 'Telegram 下载进度刷新间隔', description: '自动更新原进度消息，不重复发送。修改后正在运行的任务也会使用新间隔。', seconds: '{{count}} 秒' },
   chunkConcurrency: { title: '单文件分片并发', description: '与 Bot /download_workers 共用；12/16 需要二次确认。' },
   fileConcurrency: { title: '同时下载文件数', description: '与 Bot /file_concurrency 共用；4 需要二次确认。' },
   duplicateMode: { title: '重复文件处理', description: '同名、同目录、同大小文件的统一策略。', copy: '生成副本', skip: '跳过重复' },

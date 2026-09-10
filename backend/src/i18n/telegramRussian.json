@@ -1,4 +1,9 @@
 {
+  "bot.wizard.confirmSource": "📌 Канал: {source}",
+  "bot.wizard.confirmComments": "💬 Комментарии: {value}",
+  "bot.wizard.folder.defaultValue": "Автоматическая организация по умолчанию",
+  "bot.wizard.storage.current": "Текущее хранилище",
+  "bot.wizard.storage.currentAccount": "Текущий аккаунт",
   "bot.wizard.confirmTitle": "Пожалуйста, подтвердите объем задачи:",
   "bot.wizard.confirmTagRange": "Тег: #{tag}",
   "bot.wizard.confirmDateRange": "Даты: {startDate} → {endDate}",

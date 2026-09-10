@@ -15,6 +15,19 @@ import {
 import { buildBotCommandMenu } from '../utils/telegramCommandRegistry.js';
 
 const bot = fs.readFileSync(new URL('../services/telegramBot.ts', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+
+test('every wizard confirmation translation renders in all supported locales', () => {
+    const start = bot.indexOf('function buildTelegramWizardPrompt(');
+    const confirm = bot.indexOf("if (state.step === 'confirm')", start);
+    const end = bot.indexOf("if (state.step === 'tag')", confirm);
+    const prompt = bot.slice(confirm, end);
+    const keys = [...new Set([...prompt.matchAll(/['"](bot\.wizard\.[\w.]+)['"]/g)].map(match => match[1]))];
+    assert.ok(keys.includes('bot.wizard.confirmSource'));
+    const values = { source: 'https://t.me/example/2104', startDate: '2026-09-10', endDate: '2026-09-10', days: 1, count: 200, folder: 'downloads', provider: 'local', account: 'local', tag: 'video', title: 'Download', value: 'included' };
+    for (const locale of ['zh-CN', 'en', 'ru'] as const) {
+        for (const key of keys) assert.doesNotThrow(() => t(locale, key, values, { strict: true }), `${locale}:${key}`);
+    }
+});
 const schema = fs.readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('../db/migrations/2026090101_telegram_user_locale.sql', import.meta.url), 'utf8');
 const russianMigration = fs.readFileSync(new URL('../db/migrations/2026090201_add_russian_locale.sql', import.meta.url), 'utf8');

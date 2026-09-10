@@ -32,6 +32,18 @@ export function getOAuthRouteConfig(
     };
 }
 
+// Settings can be read before OAuth is configured; authorization routes remain strict.
+export function getOAuthDisplayConfig(env: NodeJS.ProcessEnv = process.env) {
+    try {
+        return {
+            redirectUri: getOAuthRouteConfig('onedrive', env).redirectUri,
+            googleDriveRedirectUri: getOAuthRouteConfig('google_drive', env).redirectUri,
+        };
+    } catch {
+        return { redirectUri: '', googleDriveRedirectUri: '' };
+    }
+}
+
 function escapeHtml(value: string): string {
     return value.replace(/[&<>"']/g, char => ({
         '&': '&amp;',

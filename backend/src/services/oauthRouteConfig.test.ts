@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getOAuthRouteConfig, renderOAuthFailurePage, renderOAuthSuccessPage } from './oauthRouteConfig.js';
+import { getOAuthDisplayConfig, getOAuthRouteConfig, renderOAuthFailurePage, renderOAuthSuccessPage } from './oauthRouteConfig.js';
+
+test('settings display tolerates missing and wildcard OAuth origins without weakening authorization', () => {
+    for (const env of [{}, { CORS_ORIGIN: '*' }, { OAUTH_CALLBACK_BASE_URL: 'https://nas.example', CORS_ORIGIN: '*' }]) {
+        assert.deepEqual(getOAuthDisplayConfig(env), { redirectUri: '', googleDriveRedirectUri: '' });
+        assert.throws(() => getOAuthRouteConfig('onedrive', env));
+    }
+    assert.deepEqual(getOAuthDisplayConfig({ OAUTH_CALLBACK_BASE_URL: 'https://nas.example', OAUTH_FRONTEND_ORIGIN: 'https://nas.example' }), {
+        redirectUri: 'https://nas.example/api/storage/onedrive/callback',
+        googleDriveRedirectUri: 'https://nas.example/api/storage/google-drive/callback',
+    });
+});
 
 test('OAuth redirect URI is derived only from configured API origin and ignores request override/Host', () => {
     const config = getOAuthRouteConfig('google_drive', {

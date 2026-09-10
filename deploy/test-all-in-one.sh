@@ -31,6 +31,25 @@ docker exec -w /app "$container" node --input-type=module -e '
     if (metadata.width !== 4 || metadata.format !== "webp") throw new Error("Image processing failed");
     google.drive({ version: "v3", auth: new google.auth.OAuth2() });
 '
+# Settings refresh must work without configuring optional cloud OAuth providers.
+docker exec "$container" node --input-type=module -e '
+    const base = "http://127.0.0.1:51947/api";
+    const setup = await fetch(base + "/auth/setup", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ webPassword: "Smoke-test-password-392!" }),
+    });
+    if (!setup.ok) throw new Error("Admin setup failed");
+    const cookie = setup.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+    const saved = await fetch(base + "/storage/config/telegram-allowed-users", {
+        method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+        body: JSON.stringify({ userIds: [123456789] }),
+    });
+    if (!saved.ok) throw new Error("Allowlist save failed");
+    const response = await fetch(base + "/storage/config", { headers: { Cookie: cookie } });
+    if (!response.ok) throw new Error("Settings refresh failed: " + response.status);
+    const config = await response.json();
+    if (!config.telegramAllowedUserIds.includes(123456789)) throw new Error("Saved allowlist missing");
+'
 curl -fsS http://127.0.0.1:18080/ | grep -q '<html'
 curl -fsS http://127.0.0.1:18080/settings | grep -q '<html'
 [[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/api/not-a-route)" == 404 ]]

@@ -19,7 +19,7 @@ import { assertPublicStorageEndpoint, assertStorageEndpoint } from '../utils/net
 import { getCurrentStorageScope } from '../utils/fileScope.js';
 import { getAuthToken } from './auth.js';
 import { oauthFlowStore, OAuthFlowError, type OAuthProvider } from '../services/oauthFlowStore.js';
-import { getOAuthRouteConfig, renderOAuthFailurePage, renderOAuthSuccessPage } from '../services/oauthRouteConfig.js';
+import { getOAuthDisplayConfig, getOAuthRouteConfig, renderOAuthFailurePage, renderOAuthSuccessPage } from '../services/oauthRouteConfig.js';
 import { deleteStorageAccountWithClient, StorageAccountConflictError, StorageAccountNotFoundError } from '../services/storageAccountLifecycle.js';
 import { logOperationalEvent } from '../services/operationalEvents.js';
 import { webDestructiveConfirmationStore } from '../services/webDestructiveConfirmation.js';
@@ -266,8 +266,7 @@ router.get('/config', requireAuth, async (req: Request, res: Response) => {
         const telegramAllowedUserIdsFromEnv = parseTelegramAllowedUserIds(process.env.TELEGRAM_ALLOWED_USER_IDS || '').length > 0;
         const telegramUserSessionReady = isTelegramUserClientReady();
 
-        const oneDriveOAuth = getOAuthRouteConfig('onedrive');
-        const googleDriveOAuth = getOAuthRouteConfig('google_drive');
+        const oauthConfig = getOAuthDisplayConfig();
 
         res.json({
             provider: provider.name,
@@ -275,8 +274,7 @@ router.get('/config', requireAuth, async (req: Request, res: Response) => {
             activeAccountName: activeAccount?.name || (provider.name === 'local' ? '服务器本地目录' : undefined),
             capabilities: buildStorageCapabilities(provider.name),
             accounts: accounts.map(account => ({ ...account, capabilities: buildStorageCapabilities(String(account.type)) })),
-            redirectUri: oneDriveOAuth.redirectUri,
-            googleDriveRedirectUri: googleDriveOAuth.redirectUri,
+            ...oauthConfig,
             telegramUserDownloadEnabled: telegramUserDownloadEnabled === 'true',
             allowUnsafeWebdavEndpoints: allowUnsafeWebdavEndpoints === 'true',
             telegramUserSessionReady,

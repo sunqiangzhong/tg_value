@@ -12,7 +12,7 @@ assert.doesNotMatch(source, /class BetterDownloadQueue/);
 assert.match(source, /const downloadQueue = new DownloadTaskQueue/);
 assert.match(source, /ensureGroup\(\{[\s\S]*kind: 'single'/);
 assert.match(source, /ensureGroup\(\{[\s\S]*kind: 'album'/);
-assert.match(source, /hidden: true/);
+assert.match(source, /hidden: Boolean\(executionGroupKey\)/);
 assert.match(source, /downloadQueue\.add\(groupId, taskDisplayName, queueTask/);
 assert.match(source, /downloadQueue\.add\(singleGroupId, finalFileName, singleUploadTask/);
 assert.match(source, /downloadQueue\.updateProgress\(taskId, downloaded, total\)/);

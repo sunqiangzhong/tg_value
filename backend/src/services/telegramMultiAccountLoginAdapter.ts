@@ -39,9 +39,7 @@ export function createTelegramMultiAccountAuthorizedAdapter(deps: {
             });
             const accountId = String((persisted as { id?: unknown } | null)?.id || '');
             if (accountId) await deps.pool.activateAccount(accountId, 'login_complete', credentials);
-            if (accountId && deps.accessSweep) {
-                await deps.accessSweep.trigger({ accountIds: [accountId], reason: 'account_created' });
-            }
+            // Permission discovery is an explicit action, never a login side effect.
         },
     };
 }

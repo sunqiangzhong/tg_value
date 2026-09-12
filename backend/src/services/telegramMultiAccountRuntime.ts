@@ -1,4 +1,5 @@
 import type { TelegramClient } from 'telegram';
+import { telegramAccountStopReason } from './telegramAccountSafety.js';
 import { telegramAccountRepository } from './telegramAccountRepository.js';
 import {
     initializeTelegramUserClientPool,
@@ -9,7 +10,6 @@ import {
 } from './telegramUserClientPool.js';
 import { registerTelegramMultiAccountAuthorizedAdapter } from './telegramMultiAccountLogin.js';
 import { createTelegramMultiAccountAuthorizedAdapter } from './telegramMultiAccountLoginAdapter.js';
-import { triggerTelegramAccountAccessSweep } from './telegramAccountAccessSweep.js';
 import { installTelegramAccountAccessSweep } from './telegramAccountAccessSweepAdapter.js';
 
 let installed = false;
@@ -17,13 +17,12 @@ let initializationPromise: Promise<void> | null = null;
 
 export async function installTelegramMultiAccountRuntimeAdapters(): Promise<void> {
     if (installed) return;
-    installTelegramAccountAccessSweep({ clientPool: telegramUserClientPool });
+    installTelegramAccountAccessSweep({ clientPool: telegramUserClientPool, onAccountError: stopTelegramAccountForError });
     registerTelegramMultiAccountAuthorizedAdapter(createTelegramMultiAccountAuthorizedAdapter({
         repository: telegramAccountRepository,
         pool: {
             activateAccount: (accountId, reason, credentials) => telegramUserClientPool.activateAccount(accountId, reason, credentials),
         },
-        accessSweep: { trigger: options => triggerTelegramAccountAccessSweep(options) },
     }));
     installed = true;
 }
@@ -70,8 +69,20 @@ export async function markTelegramAccountSourceAccess(
 }
 
 export async function markTelegramAccountSessionExpired(accountId: string, error: string | null = null): Promise<void> {
-    await telegramAccountRepository.markSessionExpired(accountId, error);
     await telegramUserClientPool.expireAccount(accountId);
+    await telegramAccountRepository.markSessionExpired(accountId, error);
+}
+
+export async function stopTelegramAccountForError(accountId: string, error: unknown): Promise<void> {
+    const reason = telegramAccountStopReason(error);
+    if (!reason) return;
+    const value = error as { errorCode?: string; errorMessage?: string; message?: string };
+    const message = value?.errorCode || value?.errorMessage || value?.message || reason.kind;
+    if (reason.kind === 'expired') await markTelegramAccountSessionExpired(accountId, message);
+    else {
+        telegramUserClientPool.updateCooldown(accountId, new Date(Date.now() + reason.seconds * 1000), message);
+        await telegramAccountRepository.markCooldown(accountId, reason.seconds, message);
+    }
 }
 
 export function classifyTelegramDownloadAccountError(error: unknown): 'session_expired' | 'permission_denied' | 'flood_wait' | 'retryable' {

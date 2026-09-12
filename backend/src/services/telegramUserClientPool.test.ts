@@ -2,6 +2,36 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { TelegramUserClientPool } from './telegramUserClientPool.js';
 
+test('restart does not reconnect an account before its persisted cooldown expires', async () => {
+    const pool = createPool([account('a', { cooldownUntil: new Date(Date.now() + 60_000) })], () => {
+        assert.fail('must not create a client during persisted cooldown');
+    });
+    await pool.initialize({ apiId: 1, apiHash: 'fake' });
+    assert.equal(pool.getDefaultClient(), null);
+});
+
+test('cooldown and expired accounts cannot be selected by default, direct access or leases', async () => {
+    const rows = [account('a')];
+    const pool = createPool(rows, () => ({
+        connected: true, async connect() {}, async checkAuthorization() { return true; },
+        async getMe() { return {}; }, async disconnect() {}, async destroy() {},
+    }));
+    await pool.initialize({ apiId: 1, apiHash: 'fake' });
+    const lease = pool.acquireAccount('a');
+    assert.ok(lease);
+    lease.release(); lease.release();
+    assert.equal(pool.getActiveConnections('a'), 0);
+    pool.updateCooldown('a', new Date(Date.now() + 60_000), 'FLOOD_WAIT_60');
+    assert.equal(pool.getDefaultClient(), null);
+    assert.equal(pool.getAccountClient('a'), null);
+    assert.equal(pool.acquireAccount('a'), null);
+    assert.equal(await pool.select('@source'), null);
+    pool.updateCooldown('a', new Date(Date.now() - 1), null);
+    assert.ok(pool.getDefaultClient());
+    await pool.expireAccount('a');
+    assert.equal(pool.getDefaultClient(), null);
+});
+
 function account(id: string, overrides: Record<string, unknown> = {}) {
     return {
         id, telegramUserId: id, username: null, displayName: null, session: `session-${id}`,

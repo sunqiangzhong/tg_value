@@ -153,7 +153,7 @@ test('sweep probes the enabled account x subscription scopes with bounded concur
     assert.equal(summary.status, 'completed');
     assert.deepEqual(summary.counts, { accounts: 2, sources: 2, probes: 6, allowed: 6, denied: 0, error: 0 });
     assert.equal(maxActive, 2);
-    assert.deepEqual(runtimeLookups.sort(), ['a', 'b']);
+    assert.deepEqual(runtimeLookups.sort(), ['a', 'a', 'a', 'b', 'b', 'b']);
     assert.equal(persisted.length, 6);
     assert.deepEqual(
         persisted.map(result => `${result.accountId}:${result.sourceId}:${result.scope}`).sort(),
@@ -177,9 +177,8 @@ test('runtime lookup failures become structured per-source errors instead of abo
     };
 
     const summary = await runTelegramAccountAccessSweep(dependencies);
-    assert.deepEqual(summary.counts, { accounts: 1, sources: 1, probes: 2, allowed: 0, denied: 0, error: 2 });
+    assert.deepEqual(summary.counts, { accounts: 1, sources: 1, probes: 1, allowed: 0, denied: 0, error: 1 });
     assert.deepEqual(persisted.map(result => ({ state: result.state, errorCode: result.errorCode })), [
-        { state: 'error', errorCode: 'AUTH_KEY_UNREGISTERED' },
         { state: 'error', errorCode: 'AUTH_KEY_UNREGISTERED' },
     ]);
 });

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { closeTelegramLoginForHandoff } from './telegramAccountSafety.js';
 
 export interface TelegramUserLoginAccount {
     userId: string;
@@ -358,7 +359,11 @@ export class TelegramMultiAccountLoginFlows<C extends TelegramMultiAccountLoginC
         const client = this.requireClient(flow);
         const account = normalizeAccount(await client.getMe());
         if (!account.userId) throw new TelegramUserLoginFlowError('TELEGRAM_ERROR', 'Telegram 登录未返回用户身份');
-        await this.deps.onAuthorized({ session: client.saveSession(), credentials: flow.credentials, account });
+        const session = client.saveSession();
+        if (flow.kind === 'qr') client.setQrLoginTokenHandler(null);
+        await closeTelegramLoginForHandoff(client);
+        flow.client = null;
+        await this.deps.onAuthorized({ session, credentials: flow.credentials, account });
         return account;
     }
 

@@ -20,6 +20,7 @@ interface SweepAccountRepository {
 
 interface SweepAccountClientPool {
     getAccountClient(accountId: string): TelegramAccessClient | null;
+    acquireAccount?(accountId: string): { client: TelegramAccessClient; release(): void } | null;
 }
 
 interface SweepQueryResult {
@@ -31,6 +32,7 @@ export interface TelegramAccountAccessSweepAdapterOptions {
     clientPool: SweepAccountClientPool;
     querySubscriptions?: (text: string, params?: readonly unknown[]) => Promise<SweepQueryResult>;
     now?: () => Date;
+    onAccountError?(accountId: string, error: unknown): Promise<void>;
 }
 
 /**
@@ -63,6 +65,7 @@ export function createTelegramAccountAccessSweepDependencies(
             }));
         },
         async getTelegramAccountRuntime(accountId) {
+            if (options.clientPool.acquireAccount) return options.clientPool.acquireAccount(accountId);
             const client = options.clientPool.getAccountClient(accountId);
             return client ? { client } : null;
         },
@@ -76,6 +79,7 @@ export function createTelegramAccountAccessSweepDependencies(
             }
         },
         now: options.now,
+        onAccountError: options.onAccountError,
     };
 }
 

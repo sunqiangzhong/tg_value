@@ -9,6 +9,7 @@ import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import { decryptCredential } from '../utils/credentialCrypto.js';
 import { getTelegramProxy } from './telegramProxy.js';
+import { telegramAccountStopReason } from './telegramAccountSafety.js';
 import {
     selectWeightedLeastConnectedTelegramAccount,
     type TelegramAccountSchedulingOptions,
@@ -66,7 +67,7 @@ function errorName(error: unknown): string {
 }
 
 export function isTelegramSessionExpiredError(error: unknown): boolean {
-    return /(AUTH_KEY_UNREGISTERED|SESSION_(REVOKED|EXPIRED)|USER_DEACTIVATED|SESSION_EXPIRED)/i.test(errorName(error));
+    return telegramAccountStopReason(error)?.kind === 'expired';
 }
 
 export type TelegramUserActivationReason = 'login_complete' | 'explicit_enable';
@@ -125,6 +126,8 @@ export class TelegramUserClientPool<C extends TelegramPooledClient = TelegramPoo
 
     private async connectAccount(account: TelegramUserAccountRecord): Promise<void> {
         if (!this.credentials || !account.enabled || account.healthState === 'session_expired') return;
+        // A restart or explicit enable must not bypass a server-mandated wait.
+        if (account.cooldownUntil && new Date(account.cooldownUntil).getTime() > Date.now()) return;
         let client: C | null = null;
         try {
             const session = this.deps.decryptSession(account.session);
@@ -154,7 +157,7 @@ export class TelegramUserClientPool<C extends TelegramPooledClient = TelegramPoo
         const accessByAccount = new Map<string, TelegramAccountSourceAccessRecord>(access.map(row => [row.accountId, row]));
         const selected = selectWeightedLeastConnectedTelegramAccount([...this.entries.values()].map(entry => ({
             accountId: entry.account.id,
-            enabled: entry.account.enabled,
+            enabled: this.isRunnable(entry),
             healthState: entry.account.healthState,
             cooldownUntil: entry.account.cooldownUntil,
             weight: entry.account.weight,
@@ -181,11 +184,31 @@ export class TelegramUserClientPool<C extends TelegramPooledClient = TelegramPoo
 
     getDefaultClient(): C | null {
         return [...this.entries.values()]
+            .filter(entry => this.isRunnable(entry))
             .sort((left, right) => right.account.priority - left.account.priority || left.account.id.localeCompare(right.account.id))[0]?.client || null;
     }
 
     getAccountClient(accountId: string): C | null {
-        return this.entries.get(accountId)?.client || null;
+        const entry = this.entries.get(accountId);
+        return entry && this.isRunnable(entry) ? entry.client : null;
+    }
+
+    acquireAccount(accountId: string): SelectedTelegramDownloadAccount<C> | null {
+        const entry = this.entries.get(accountId);
+        if (!entry || !this.isRunnable(entry) || entry.activeConnections >= entry.account.maxConnections) return null;
+        entry.activeConnections += 1;
+        let released = false;
+        return { accountId, client: entry.client, release: () => {
+            if (released) return;
+            released = true;
+            entry.activeConnections = Math.max(0, entry.activeConnections - 1);
+        } };
+    }
+
+    private isRunnable(entry: PoolEntry<C>): boolean {
+        return entry.account.enabled && entry.account.healthState !== 'session_expired'
+            && entry.client.connected !== false
+            && (!entry.account.cooldownUntil || new Date(entry.account.cooldownUntil).getTime() <= Date.now());
     }
 
     getActiveConnections(accountId: string): number {
@@ -252,7 +275,7 @@ export const telegramUserClientPool = new TelegramUserClientPool<TelegramClient>
         new StringSession(session), credentials.apiId, credentials.apiHash, {
             proxy: getTelegramProxy(),
             connectionRetries: 15, retryDelay: 2000, useWSS: false,
-            deviceModel: 'TG Vault User Downloader', systemVersion: '1.0.0', appVersion: '1.0.0', floodSleepThreshold: 120,
+            deviceModel: 'TG Vault User Downloader', systemVersion: '1.0.0', appVersion: '1.0.0', floodSleepThreshold: 0,
         },
     ),
     saveSession: client => client.session.save() as unknown as string,

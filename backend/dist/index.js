@@ -6904,6 +6904,27 @@ function buildPathSettingsText(_state, chatId, locale = DEFAULT_LOCALE) {
 // src/services/telegramUpload.ts
 import { Api as Api6 } from "telegram";
 
+// src/services/telegramAccountSafety.ts
+function telegramAccountStopReason(error) {
+  const value = error;
+  const text = typeof error === "string" ? error : `${value?.errorMessage || ""} ${value?.errorCode || ""} ${value?.message || ""}`;
+  if (/AUTH_KEY_(DUPLICATED|UNREGISTERED|INVALID)|SESSION_(REVOKED|EXPIRED)|USER_DEACTIVATED|PHONE_NUMBER_BANNED/i.test(text)) {
+    return { kind: "expired", seconds: 0 };
+  }
+  if (/FLOOD|Too many requests|Too many attempts/i.test(text)) {
+    const seconds = Number(value?.seconds || value?.value || text.match(/(?:FLOOD(?:_PREMIUM)?_WAIT|FLOOD_TEST_PHONE_WAIT)_?(\d+)/i)?.[1] || 300);
+    return { kind: "cooldown", seconds: Number.isFinite(seconds) ? Math.max(1, seconds) : 300 };
+  }
+  return null;
+}
+async function closeTelegramLoginForHandoff(client2) {
+  try {
+    await client2.disconnect();
+  } finally {
+    await client2.destroy();
+  }
+}
+
 // src/services/telegramAccountRepository.ts
 init_db();
 init_credentialCrypto();
@@ -7198,7 +7219,7 @@ function errorName(error) {
   return String(value?.errorMessage || value?.message || error || "Telegram account connection failed");
 }
 function isTelegramSessionExpiredError(error) {
-  return /(AUTH_KEY_UNREGISTERED|SESSION_(REVOKED|EXPIRED)|USER_DEACTIVATED|SESSION_EXPIRED)/i.test(errorName(error));
+  return telegramAccountStopReason(error)?.kind === "expired";
 }
 var TelegramUserClientPool = class {
   constructor(deps) {
@@ -7239,6 +7260,7 @@ var TelegramUserClientPool = class {
   }
   async connectAccount(account) {
     if (!this.credentials || !account.enabled || account.healthState === "session_expired") return;
+    if (account.cooldownUntil && new Date(account.cooldownUntil).getTime() > Date.now()) return;
     let client2 = null;
     try {
       const session = this.deps.decryptSession(account.session);
@@ -7267,7 +7289,7 @@ var TelegramUserClientPool = class {
     const accessByAccount = new Map(access.map((row) => [row.accountId, row]));
     const selected3 = selectWeightedLeastConnectedTelegramAccount([...this.entries.values()].map((entry2) => ({
       accountId: entry2.account.id,
-      enabled: entry2.account.enabled,
+      enabled: this.isRunnable(entry2),
       healthState: entry2.account.healthState,
       cooldownUntil: entry2.account.cooldownUntil,
       weight: entry2.account.weight,
@@ -7292,10 +7314,25 @@ var TelegramUserClientPool = class {
     };
   }
   getDefaultClient() {
-    return [...this.entries.values()].sort((left, right) => right.account.priority - left.account.priority || left.account.id.localeCompare(right.account.id))[0]?.client || null;
+    return [...this.entries.values()].filter((entry) => this.isRunnable(entry)).sort((left, right) => right.account.priority - left.account.priority || left.account.id.localeCompare(right.account.id))[0]?.client || null;
   }
   getAccountClient(accountId) {
-    return this.entries.get(accountId)?.client || null;
+    const entry = this.entries.get(accountId);
+    return entry && this.isRunnable(entry) ? entry.client : null;
+  }
+  acquireAccount(accountId) {
+    const entry = this.entries.get(accountId);
+    if (!entry || !this.isRunnable(entry) || entry.activeConnections >= entry.account.maxConnections) return null;
+    entry.activeConnections += 1;
+    let released = false;
+    return { accountId, client: entry.client, release: () => {
+      if (released) return;
+      released = true;
+      entry.activeConnections = Math.max(0, entry.activeConnections - 1);
+    } };
+  }
+  isRunnable(entry) {
+    return entry.account.enabled && entry.account.healthState !== "session_expired" && entry.client.connected !== false && (!entry.account.cooldownUntil || new Date(entry.account.cooldownUntil).getTime() <= Date.now());
   }
   getActiveConnections(accountId) {
     return this.entries.get(accountId)?.activeConnections || 0;
@@ -7363,7 +7400,7 @@ var telegramUserClientPool = new TelegramUserClientPool({
       deviceModel: "TG Vault User Downloader",
       systemVersion: "1.0.0",
       appVersion: "1.0.0",
-      floodSleepThreshold: 120
+      floodSleepThreshold: 0
     }
   ),
   saveSession: (client2) => client2.session.save()
@@ -7896,7 +7933,11 @@ var TelegramMultiAccountLoginFlows = class {
     const client2 = this.requireClient(flow);
     const account = normalizeAccount(await client2.getMe());
     if (!account.userId) throw new TelegramUserLoginFlowError("TELEGRAM_ERROR", "Telegram \u767B\u5F55\u672A\u8FD4\u56DE\u7528\u6237\u8EAB\u4EFD");
-    await this.deps.onAuthorized({ session: client2.saveSession(), credentials: flow.credentials, account });
+    const session = client2.saveSession();
+    if (flow.kind === "qr") client2.setQrLoginTokenHandler(null);
+    await closeTelegramLoginForHandoff(client2);
+    flow.client = null;
+    await this.deps.onAuthorized({ session, credentials: flow.credentials, account });
     return account;
   }
   qrResponse(flow) {
@@ -8158,12 +8199,12 @@ function createTelegramMultiAccountAuthorizedAdapter(deps) {
       });
       const accountId = String(persisted?.id || "");
       if (accountId) await deps.pool.activateAccount(accountId, "login_complete", credentials);
-      if (accountId && deps.accessSweep) {
-        await deps.accessSweep.trigger({ accountIds: [accountId], reason: "account_created" });
-      }
     }
   };
 }
+
+// src/services/telegramAccountAccessSweepAdapter.ts
+init_db();
 
 // src/services/telegramAccountAccessSweep.ts
 var DENIED_ERROR_CODES = /* @__PURE__ */ new Set([
@@ -8219,10 +8260,12 @@ function getTelegramAccessErrorCode(error) {
   return tokens?.at(-1) || "UNKNOWN_ERROR";
 }
 function classifyTelegramAccessError(error) {
+  if (telegramAccountStopReason(error)) return "error";
   const code = getTelegramAccessErrorCode(error);
   return DENIED_ERROR_CODES.has(code) || /(?:PRIVATE|FORBIDDEN|NOT_PARTICIPANT|BANNED)/.test(code) ? "denied" : "error";
 }
 function failureResult(input, error, now) {
+  const stop = telegramAccountStopReason(error);
   return {
     accountId: input.accountId,
     sourceId: input.sourceId,
@@ -8231,7 +8274,7 @@ function failureResult(input, error, now) {
     state: classifyTelegramAccessError(error),
     checkedAt: now().toISOString(),
     latestMessageId: null,
-    errorCode: getTelegramAccessErrorCode(error),
+    errorCode: stop?.kind === "cooldown" ? `FLOOD_WAIT_${stop.seconds}` : getTelegramAccessErrorCode(error),
     errorMessage: errorText(error)
   };
 }
@@ -8310,41 +8353,47 @@ async function runTelegramAccountAccessSweep(dependencies, options = {}) {
         for (const scope of normalizeScopes(source)) work.push({ account, source, scope });
       }
     }
-    summary.counts.probes = work.length;
-    const runtimePromises = /* @__PURE__ */ new Map();
-    const getRuntime = (accountId) => {
-      let runtime = runtimePromises.get(accountId);
-      if (!runtime) {
-        runtime = dependencies.getTelegramAccountRuntime(accountId);
-        runtimePromises.set(accountId, runtime);
+    summary.counts.probes = 0;
+    await mapWithConcurrency(accounts, options.concurrency ?? 2, async (account) => {
+      for (const item of work.filter((item2) => item2.account.accountId === account.accountId)) {
+        let result;
+        let runtime = null;
+        try {
+          summary.counts.probes += 1;
+          runtime = await dependencies.getTelegramAccountRuntime(item.account.accountId);
+          if (!runtime?.client) {
+            summary.counts.probes -= 1;
+            break;
+          }
+          result = await probeTelegramAccountSource({
+            accountId: item.account.accountId,
+            sourceId: item.source.sourceId,
+            source: item.source.source,
+            scope: item.scope,
+            client: runtime.client,
+            now
+          });
+        } catch (error) {
+          result = failureResult({
+            accountId: item.account.accountId,
+            sourceId: item.source.sourceId,
+            source: item.source.source,
+            scope: item.scope
+          }, error, now);
+        } finally {
+          runtime?.release?.();
+        }
+        summary.counts[result.state] += 1;
+        if (telegramAccountStopReason(result)) {
+          summary.lastError = result.errorCode || "TELEGRAM_ACCOUNT_STOPPED";
+          await dependencies.onAccountError?.(account.accountId, result);
+          await dependencies.markTelegramAccountSourceAccess(result);
+          break;
+        }
+        await dependencies.markTelegramAccountSourceAccess(result);
       }
-      return runtime;
-    };
-    await mapWithConcurrency(work, options.concurrency ?? 2, async (item) => {
-      let result;
-      try {
-        const runtime = await getRuntime(item.account.accountId);
-        if (!runtime?.client) throw new Error("TELEGRAM_ACCOUNT_RUNTIME_UNAVAILABLE");
-        result = await probeTelegramAccountSource({
-          accountId: item.account.accountId,
-          sourceId: item.source.sourceId,
-          source: item.source.source,
-          scope: item.scope,
-          client: runtime.client,
-          now
-        });
-      } catch (error) {
-        result = failureResult({
-          accountId: item.account.accountId,
-          sourceId: item.source.sourceId,
-          source: item.source.source,
-          scope: item.scope
-        }, error, now);
-      }
-      summary.counts[result.state] += 1;
-      await dependencies.markTelegramAccountSourceAccess(result);
     });
-    summary.status = "completed";
+    summary.status = summary.lastError ? "failed" : "completed";
     summary.completedAt = now().toISOString();
     currentSummary = summary;
     return summary;
@@ -8386,7 +8435,6 @@ function getTelegramAccountAccessSweepSummary() {
 }
 
 // src/services/telegramAccountAccessSweepAdapter.ts
-init_db();
 function createTelegramAccountAccessSweepDependencies(options) {
   const repository = options.repository || telegramAccountRepository;
   const querySubscriptions = options.querySubscriptions || query;
@@ -8410,6 +8458,7 @@ function createTelegramAccountAccessSweepDependencies(options) {
       }));
     },
     async getTelegramAccountRuntime(accountId) {
+      if (options.clientPool.acquireAccount) return options.clientPool.acquireAccount(accountId);
       const client2 = options.clientPool.getAccountClient(accountId);
       return client2 ? { client: client2 } : null;
     },
@@ -8422,7 +8471,8 @@ function createTelegramAccountAccessSweepDependencies(options) {
         await repository.markSourceAccess(result.accountId, result.source, "download", state, error);
       }
     },
-    now: options.now
+    now: options.now,
+    onAccountError: options.onAccountError
   };
 }
 function installTelegramAccountAccessSweep(options) {
@@ -8436,13 +8486,12 @@ var installed = false;
 var initializationPromise2 = null;
 async function installTelegramMultiAccountRuntimeAdapters() {
   if (installed) return;
-  installTelegramAccountAccessSweep({ clientPool: telegramUserClientPool });
+  installTelegramAccountAccessSweep({ clientPool: telegramUserClientPool, onAccountError: stopTelegramAccountForError });
   registerTelegramMultiAccountAuthorizedAdapter(createTelegramMultiAccountAuthorizedAdapter({
     repository: telegramAccountRepository,
     pool: {
       activateAccount: (accountId, reason, credentials) => telegramUserClientPool.activateAccount(accountId, reason, credentials)
-    },
-    accessSweep: { trigger: (options) => triggerTelegramAccountAccessSweep(options) }
+    }
   }));
   installed = true;
 }
@@ -8473,8 +8522,19 @@ async function markTelegramAccountSourceAccess(accountId, sourceKey, scope, stat
   telegramUserClientPool.updateSourceAccess(accountId, sourceKey, scope, state);
 }
 async function markTelegramAccountSessionExpired(accountId, error = null) {
-  await telegramAccountRepository.markSessionExpired(accountId, error);
   await telegramUserClientPool.expireAccount(accountId);
+  await telegramAccountRepository.markSessionExpired(accountId, error);
+}
+async function stopTelegramAccountForError(accountId, error) {
+  const reason = telegramAccountStopReason(error);
+  if (!reason) return;
+  const value = error;
+  const message = value?.errorCode || value?.errorMessage || value?.message || reason.kind;
+  if (reason.kind === "expired") await markTelegramAccountSessionExpired(accountId, message);
+  else {
+    telegramUserClientPool.updateCooldown(accountId, new Date(Date.now() + reason.seconds * 1e3), message);
+    await telegramAccountRepository.markCooldown(accountId, reason.seconds, message);
+  }
 }
 function classifyTelegramDownloadAccountError(error) {
   const value = error;
@@ -8847,13 +8907,17 @@ var TelegramUserWebLoginFlows = class {
     }
   }
   async complete(flow) {
+    let closed = false;
     try {
       const account = normalizeAccount2(await flow.client.getMe());
-      await this.deps.persistAndActivate(flow.client.saveSession(), account, flow.credentials);
+      const session = flow.client.saveSession();
+      await closeTelegramLoginForHandoff(flow.client);
+      closed = true;
+      await this.deps.persistAndActivate(session, account, flow.credentials);
       this.flows.delete(flow.id);
       return { step: "complete", account };
     } finally {
-      await this.closeClient(flow.client);
+      if (!closed) await this.closeClient(flow.client);
     }
   }
   async requireFlow(owner, id, step) {
@@ -15175,9 +15239,6 @@ async function subscribeTelegramChannel(userId, chatId, sourceInput, folderOverr
     [userId, chatId || null, resolved.source, resolved.originalSource, resolved.sourceType, title, latestMessageId, folderOverride || null]
   );
   const subscription = result.rows[0];
-  if (subscription?.id) {
-    void triggerTelegramAccountAccessSweep({ sourceIds: [String(subscription.id)], reason: "subscription_created" }).catch((error) => console.error("Telegram \u65B0\u8BA2\u9605\u6743\u9650\u68C0\u6D4B\u5931\u8D25:", error));
-  }
   return subscription;
 }
 async function listTelegramSubscriptions(userId, includeDisabled = false) {
@@ -16234,10 +16295,14 @@ async function runSubscriptionScan(botClient) {
          ORDER BY updated_at ASC`
     );
     for (const row of result.rows) {
+      const selectedAccount = await selectTelegramDownloadAccount(row.source, { scope: "scan" });
+      if (!selectedAccount) continue;
+      const userClient3 = selectedAccount.client;
+      let scanComplete = false;
       try {
         const locale = await getTelegramUserLocaleOrDefault(Number(row.user_id));
         await assertTelegramSourceAllowed(row.source, row.source_original ? [row.source_original] : row.source_type === "private_invite" ? ["private_invite"] : [], locale);
-        const latestMessageId = await getLatestMessageId(userClient2, row.source);
+        const latestMessageId = await getLatestMessageId(userClient3, row.source);
         const lastMessageId = Number(row.last_message_id || 0);
         await query(`UPDATE telegram_channel_subscriptions
                          SET last_scan_at = NOW(), next_scan_at = NOW() + ($4::int * INTERVAL '1 millisecond'), last_error = NULL,
@@ -16261,7 +16326,7 @@ async function runSubscriptionScan(botClient) {
           params: { subscriptionId: String(row.id), fromId: lastMessageId + 1, toId: latestMessageId, targetMode: row.target_mode || "follow_global" }
         });
         const batchMessages = await filterConfiguredTelegramBatchMessages(
-          await expandMessagesWithMediaGroups(userClient2, row.source, (await userClient2.getMessages(row.source, { ids })).filter(Boolean))
+          await expandMessagesWithMediaGroups(userClient3, row.source, (await userClient3.getMessages(row.source, { ids })).filter(Boolean))
         );
         const adFilter = await filterTelegramSubscriptionAdvertisements({
           subscriptionId: String(row.id),
@@ -16278,6 +16343,8 @@ async function runSubscriptionScan(botClient) {
         propagateTelegramDownloadGroupContext(subscriptionRefs);
         const downloadableMessageIds = new Set(subscriptionRefs.map((ref) => ref.id));
         const nonDownloadableMessageIds = ids.filter((id) => !downloadableMessageIds.has(id) && !adFilter.blockedMessageIds.includes(id));
+        selectedAccount.release();
+        scanComplete = true;
         const downloadResult = await downloadPendingForJob(
           botClient,
           requestMessage,
@@ -16337,6 +16404,7 @@ async function runSubscriptionScan(botClient) {
         }
       } catch (error) {
         console.error("\u{1F916} Telegram \u8BA2\u9605\u540C\u6B65\u5931\u8D25:", error);
+        if (!scanComplete) await stopTelegramAccountForError(selectedAccount.accountId, error);
         const safeError = error instanceof Error ? error.message.slice(0, 500) : "\u8BA2\u9605\u540C\u6B65\u5931\u8D25";
         await query(`UPDATE telegram_channel_subscriptions
                          SET last_scan_at = NOW(), last_error = $2,
@@ -16362,6 +16430,8 @@ async function runSubscriptionScan(botClient) {
             }
           }).catch(() => void 0);
         }
+      } finally {
+        selectedAccount.release();
       }
     }
   } finally {

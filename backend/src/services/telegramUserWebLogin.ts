@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { closeTelegramLoginForHandoff } from './telegramAccountSafety.js';
 
 export interface TelegramUserLoginAccount {
     userId: string;
@@ -137,13 +138,17 @@ export class TelegramUserWebLoginFlows<C extends TelegramUserLoginClient> {
     }
 
     private async complete(flow: Flow<C>): Promise<{ step: 'complete'; account: TelegramUserLoginAccount }> {
+        let closed = false;
         try {
             const account = normalizeAccount(await flow.client.getMe());
-            await this.deps.persistAndActivate(flow.client.saveSession(), account, flow.credentials);
+            const session = flow.client.saveSession();
+            await closeTelegramLoginForHandoff(flow.client);
+            closed = true;
+            await this.deps.persistAndActivate(session, account, flow.credentials);
             this.flows.delete(flow.id);
             return { step: 'complete', account };
         } finally {
-            await this.closeClient(flow.client);
+            if (!closed) await this.closeClient(flow.client);
         }
     }
 

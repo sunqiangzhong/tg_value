@@ -1,3 +1,4 @@
+import { telegramAccountStopReason } from './telegramAccountSafety.js';
 export type TelegramAccessScope = 'channel' | 'comments';
 export type TelegramAccessState = 'allowed' | 'denied' | 'error';
 export type TelegramAccessSweepReason = 'automatic' | 'manual' | 'account_created' | 'subscription_created' | string;
@@ -21,6 +22,7 @@ export interface TelegramAccessSweepSource {
 
 export interface TelegramAccountRuntime {
     client: TelegramAccessClient;
+    release?(): void;
 }
 
 export interface TelegramAccountSourceAccessResult {
@@ -40,6 +42,7 @@ export interface TelegramAccountAccessSweepDependencies {
     listTelegramChannelSubscriptions(): Promise<readonly TelegramAccessSweepSource[]>;
     getTelegramAccountRuntime(accountId: string): Promise<TelegramAccountRuntime | null>;
     markTelegramAccountSourceAccess(result: TelegramAccountSourceAccessResult): Promise<void>;
+    onAccountError?(accountId: string, error: unknown): Promise<void>;
     now?: () => Date;
 }
 
@@ -133,6 +136,7 @@ export function getTelegramAccessErrorCode(error: unknown): string {
 }
 
 export function classifyTelegramAccessError(error: unknown): 'denied' | 'error' {
+    if (telegramAccountStopReason(error)) return 'error';
     const code = getTelegramAccessErrorCode(error);
     return DENIED_ERROR_CODES.has(code) || /(?:PRIVATE|FORBIDDEN|NOT_PARTICIPANT|BANNED)/.test(code)
         ? 'denied'
@@ -144,6 +148,7 @@ function failureResult(
     error: unknown,
     now: () => Date,
 ): TelegramAccountSourceAccessResult {
+    const stop = telegramAccountStopReason(error);
     return {
         accountId: input.accountId,
         sourceId: input.sourceId,
@@ -152,7 +157,7 @@ function failureResult(
         state: classifyTelegramAccessError(error),
         checkedAt: now().toISOString(),
         latestMessageId: null,
-        errorCode: getTelegramAccessErrorCode(error),
+        errorCode: stop?.kind === 'cooldown' ? `FLOOD_WAIT_${stop.seconds}` : getTelegramAccessErrorCode(error),
         errorMessage: errorText(error),
     };
 }
@@ -226,8 +231,8 @@ function runId(now: Date): string {
 
 /**
  * Probe enabled account x enabled subscription scopes at bounded concurrency.
- * Runtime lookup is once per account; persistence is once per structured probe
- * result, including denied/error outcomes.
+ * Reacquire a runtime lease for each probe so cooldown/disable takes effect.
+ * Probes for one account are sequential; account-wide errors stop that account.
  */
 export async function runTelegramAccountAccessSweep(
     dependencies: TelegramAccountAccessSweepDependencies,
@@ -267,23 +272,17 @@ export async function runTelegramAccountAccessSweep(
                 for (const scope of normalizeScopes(source)) work.push({ account, source, scope });
             }
         }
-        summary.counts.probes = work.length;
+        summary.counts.probes = 0;
 
-        const runtimePromises = new Map<string, Promise<TelegramAccountRuntime | null>>();
-        const getRuntime = (accountId: string): Promise<TelegramAccountRuntime | null> => {
-            let runtime = runtimePromises.get(accountId);
-            if (!runtime) {
-                runtime = dependencies.getTelegramAccountRuntime(accountId);
-                runtimePromises.set(accountId, runtime);
-            }
-            return runtime;
-        };
-
-        await mapWithConcurrency(work, options.concurrency ?? 2, async item => {
+        // Parallelize accounts, never scopes on the same authorization.
+        await mapWithConcurrency(accounts, options.concurrency ?? 2, async account => {
+          for (const item of work.filter(item => item.account.accountId === account.accountId)) {
             let result: TelegramAccountSourceAccessResult;
+            let runtime: TelegramAccountRuntime | null = null;
             try {
-                const runtime = await getRuntime(item.account.accountId);
-                if (!runtime?.client) throw new Error('TELEGRAM_ACCOUNT_RUNTIME_UNAVAILABLE');
+                summary.counts.probes += 1;
+                runtime = await dependencies.getTelegramAccountRuntime(item.account.accountId);
+                if (!runtime?.client) { summary.counts.probes -= 1; break; }
                 result = await probeTelegramAccountSource({
                     accountId: item.account.accountId,
                     sourceId: item.source.sourceId,
@@ -299,12 +298,21 @@ export async function runTelegramAccountAccessSweep(
                     source: item.source.source,
                     scope: item.scope,
                 }, error, now);
+            } finally {
+                runtime?.release?.();
             }
             summary.counts[result.state] += 1;
+            if (telegramAccountStopReason(result)) {
+                summary.lastError = result.errorCode || 'TELEGRAM_ACCOUNT_STOPPED';
+                await dependencies.onAccountError?.(account.accountId, result);
+                await dependencies.markTelegramAccountSourceAccess(result);
+                break;
+            }
             await dependencies.markTelegramAccountSourceAccess(result);
+          }
         });
 
-        summary.status = 'completed';
+        summary.status = summary.lastError ? 'failed' : 'completed';
         summary.completedAt = now().toISOString();
         currentSummary = summary;
         return summary;

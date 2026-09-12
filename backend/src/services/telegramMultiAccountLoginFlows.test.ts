@@ -9,6 +9,15 @@ import {
 
 type QrHandler = () => void | Promise<void>;
 
+test('failed login disconnect never hands the authorization to the runtime', async () => {
+    const fx = fixture();
+    const started = await fx.flows.startPhone('admin', '+8613800138000');
+    fx.clients[0].disconnect = async () => { throw new Error('disconnect failed'); };
+    await assert.rejects(fx.flows.submitCode('admin', started.flowId, '12345'));
+    assert.deepEqual(fx.authorized, []);
+    await fx.flows.cancel('admin', started.flowId);
+});
+
 class FakeClient implements TelegramMultiAccountLoginClient {
     disconnects = 0;
     destroys = 0;
@@ -64,6 +73,8 @@ function fixture() {
             return client;
         },
         onAuthorized: async ({ session, credentials, account }) => {
+            assert.equal(clients.at(-1)?.disconnects, 1, 'login must disconnect before runtime activation');
+            assert.equal(clients.at(-1)?.destroys, 1);
             // A repository/pool adapter upserts by Telegram identity; repeat login is valid.
             const existing = authorized.find(item => item.userId === account.userId);
             if (existing) {

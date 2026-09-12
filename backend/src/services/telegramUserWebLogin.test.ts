@@ -2,6 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { TelegramUserWebLoginFlows, TelegramUserLoginFlowError } from './telegramUserWebLogin.js';
 
+test('legacy handoff never activates after failed disconnect', async () => {
+    const fx = fixture();
+    const started = await fx.flows.start('admin', '+8613800138000');
+    fx.clients[0].disconnect = async () => { throw new Error('disconnect failed'); };
+    await assert.rejects(fx.flows.submitCode('admin', started.flowId, '12345'));
+    assert.deepEqual(fx.saved, []);
+});
+
 type FakeClient = {
     disconnects: number;
     destroyCount: number;
@@ -49,6 +57,8 @@ function fixture(now = 1_000) {
             return client;
         },
         persistAndActivate: async (session, account) => {
+            assert.equal(clients.at(-1)?.disconnects, 1);
+            assert.equal(clients.at(-1)?.destroyCount, 1);
             assert.equal(account.userId, '42');
             saved.push({ session, enabled: true });
         },

@@ -12,6 +12,7 @@ test('authorized adapter upserts by Telegram user id then activates only that ac
             },
         },
         pool: { async activateAccount(accountId, reason, credentials) { calls.push(`activate:${accountId}:${reason}:${credentials.apiId}:${credentials.apiHash}`); } },
+        accessSweep: { async trigger() { assert.fail('login must not scan subscriptions'); } },
     });
     await adapter.upsertByTelegramUserId({
         session: 'secret-session',

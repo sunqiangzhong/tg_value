@@ -13,8 +13,7 @@ import {
     type StorageAccountCooldown,
 } from './storageCooldown.js';
 import { getTelegramUserClient, isTelegramUserClientReady } from './telegramUserClient.js';
-import { classifyTelegramDownloadAccountError } from './telegramMultiAccountRuntime.js';
-import { triggerTelegramAccountAccessSweep } from './telegramAccountAccessSweep.js';
+import { classifyTelegramDownloadAccountError, selectTelegramDownloadAccount, stopTelegramAccountForError } from './telegramMultiAccountRuntime.js';
 import { abortChannelExecutionForLeaseLoss, downloadTelegramChannelRange, getTelegramDownloadPreview, getChannelTaskAbortSignal, releaseChannelTaskAbortSignal, type TelegramDownloadMessageRef } from './telegramUpload.js';
 import { getSetting } from '../utils/settings.js';
 import { extractFileInfo, getEstimatedFileSize, type TelegramFileInfo } from '../utils/telegramMedia.js';
@@ -853,10 +852,6 @@ export async function subscribeTelegramChannel(userId: number, chatId: string | 
         [userId, chatId || null, resolved.source, resolved.originalSource, resolved.sourceType, title, latestMessageId, folderOverride || null]
     );
     const subscription = result.rows[0];
-    if (subscription?.id) {
-        void triggerTelegramAccountAccessSweep({ sourceIds: [String(subscription.id)], reason: 'subscription_created' })
-            .catch(error => console.error('Telegram 新订阅权限检测失败:', error));
-    }
     return subscription;
 }
 
@@ -2041,6 +2036,10 @@ async function runSubscriptionScan(botClient: TelegramClient) {
     );
 
     for (const row of result.rows) {
+        const selectedAccount = await selectTelegramDownloadAccount(row.source, { scope: 'scan' });
+        if (!selectedAccount) continue;
+        const userClient = selectedAccount.client;
+        let scanComplete = false;
         try {
             const locale = await getTelegramUserLocaleOrDefault(Number(row.user_id));
             await assertTelegramSourceAllowed(row.source, row.source_original ? [row.source_original] : (row.source_type === 'private_invite' ? ['private_invite'] : []), locale);
@@ -2089,6 +2088,9 @@ async function runSubscriptionScan(botClient: TelegramClient) {
             propagateTelegramDownloadGroupContext(subscriptionRefs);
             const downloadableMessageIds = new Set(subscriptionRefs.map(ref => ref.id));
             const nonDownloadableMessageIds = ids.filter(id => !downloadableMessageIds.has(id) && !adFilter.blockedMessageIds.includes(id));
+            // Downloads acquire their own account leases, including when maxConnections is 1.
+            selectedAccount.release();
+            scanComplete = true;
             const downloadResult = await downloadPendingForJob(
                 botClient,
                 requestMessage,
@@ -2148,6 +2150,7 @@ async function runSubscriptionScan(botClient: TelegramClient) {
             }
         } catch (error) {
             console.error('🤖 Telegram 订阅同步失败:', error);
+            if (!scanComplete) await stopTelegramAccountForError(selectedAccount.accountId, error);
             const safeError = error instanceof Error ? error.message.slice(0, 500) : '订阅同步失败';
             await query(`UPDATE telegram_channel_subscriptions
                          SET last_scan_at = NOW(), last_error = $2,
@@ -2173,6 +2176,8 @@ async function runSubscriptionScan(botClient: TelegramClient) {
                     send: async (chatId, message) => { await botClient.sendMessage(chatId, { message }); },
                 }).catch(() => undefined);
             }
+        } finally {
+            selectedAccount.release();
         }
         }
     } finally {

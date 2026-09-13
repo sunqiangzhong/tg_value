@@ -1,18 +1,13 @@
 /**
  * 孤儿文件清理服务
  *
- * 以异步流式方式扫描 uploads，删除未被数据库索引且超过保护期的文件。
+ * 共享下载目录中的未索引文件不代表临时文件，禁止自动删除。
  */
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { query } from '../db/index.js';
-import { getRelativeStoragePath, safeUnlink } from '../utils/localPath.js';
-import { formatBytes } from '../utils/fileMetadata.js';
 import { getSetting } from '../utils/settings.js';
 
-const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || './data/uploads');
-const ORPHAN_MIN_AGE_MS = Math.max(60_000, parseInt(process.env.ORPHAN_CLEANUP_MIN_AGE_MS || '600000', 10) || 600_000);
 const YIELD_EVERY = Math.max(25, parseInt(process.env.ORPHAN_CLEANUP_YIELD_EVERY || '250', 10) || 250);
 
 export interface ScannedFile {
@@ -31,12 +26,12 @@ export function isReservedTransientUploadPath(filePath: string, reservedDirs: st
 }
 
 export function isAutoCleanupEnabled(): boolean {
-    return ['1', 'true', 'yes', 'on'].includes((process.env.AUTO_CLEANUP_ORPHANS || 'true').toLowerCase());
+    return ['1', 'true', 'yes', 'on'].includes((process.env.AUTO_CLEANUP_ORPHANS || 'false').toLowerCase());
 }
 
 export async function applyPersistedOrphanCleanupSetting(): Promise<boolean> {
-    const configured = await getSetting('auto_cleanup_orphans', process.env.AUTO_CLEANUP_ORPHANS || 'true');
-    const enabled = ['1', 'true', 'yes', 'on'].includes(String(configured ?? 'true').toLowerCase());
+    const configured = await getSetting('auto_cleanup_orphans', process.env.AUTO_CLEANUP_ORPHANS || 'false');
+    const enabled = ['1', 'true', 'yes', 'on'].includes(String(configured ?? 'false').toLowerCase());
     process.env.AUTO_CLEANUP_ORPHANS = String(enabled);
     return enabled;
 }
@@ -101,81 +96,12 @@ export async function getAllFiles(dirPath: string, reservedDirs: string[] = []):
     return files;
 }
 
-async function removeEmptyDirectories(dirPath: string, reservedDirs: string[] = []): Promise<void> {
-    if (isReservedTransientUploadPath(dirPath, reservedDirs)) return;
-    let entries;
-    try {
-        entries = await fs.readdir(dirPath, { withFileTypes: true });
-    } catch (error: any) {
-        if (error?.code !== 'ENOENT') console.warn(`🧹 无法读取待清理目录: ${dirPath}`, error);
-        return;
-    }
-
-    for (const entry of entries) {
-        const fullPath = path.join(dirPath, entry.name);
-        if (isReservedTransientUploadPath(fullPath, reservedDirs) || entry.isSymbolicLink()) continue;
-        if (entry.isDirectory()) await removeEmptyDirectories(fullPath, reservedDirs);
-    }
-
-    if (path.resolve(dirPath) === UPLOAD_DIR) return;
-    try {
-        const remaining = await fs.readdir(dirPath);
-        if (remaining.length === 0) {
-            await fs.rmdir(dirPath);
-            console.log(`🧹 删除空文件夹: ${dirPath}`);
-        }
-    } catch (error: any) {
-        if (!['ENOENT', 'ENOTEMPTY'].includes(error?.code)) console.warn(`🧹 删除空文件夹失败: ${dirPath}`, error);
-    }
-}
-
 async function runCleanup(): Promise<CleanupStats> {
-    const stats: CleanupStats = { deletedCount: 0, freedBytes: 0, freedSpace: '0 B', deletedFiles: [] };
-    console.log('🧹 开始扫描孤儿文件...');
-
-    const dbResult = await query(`
-        SELECT stored_name, folder, path
-        FROM files
-        WHERE storage_account_id IS NULL
-          AND mime_type IS DISTINCT FROM 'application/x-directory'
-    `);
-    const dbFileSet = new Set<string>();
-    for (const row of dbResult.rows) {
-        if (row.path) {
-            const relativePath = getRelativeStoragePath(UPLOAD_DIR, row.path);
-            if (relativePath) dbFileSet.add(relativePath);
-        }
-        if (row.stored_name) {
-            const key = [row.folder, row.stored_name].filter(Boolean).join('/');
-            if (key) dbFileSet.add(key);
-        }
-    }
-    console.log(`🧹 数据库中已注册文件数: ${dbFileSet.size}`);
-
-    let scannedCount = 0;
-    const now = Date.now();
-    for await (const file of walkFiles(UPLOAD_DIR)) {
-        scannedCount += 1;
-        const relativePath = getRelativeStoragePath(UPLOAD_DIR, file.path);
-        if (!relativePath || dbFileSet.has(relativePath) || now - file.mtimeMs < ORPHAN_MIN_AGE_MS) continue;
-        try {
-            await safeUnlink(file.path, UPLOAD_DIR);
-            stats.deletedCount += 1;
-            stats.freedBytes += file.size;
-            stats.deletedFiles.push(relativePath);
-            console.log(`🧹 删除孤儿文件: ${file.path} (${formatBytes(file.size)})`);
-        } catch (error) {
-            console.error(`🧹 删除文件失败: ${file.path}`, error);
-        }
-    }
-    console.log(`🧹 磁盘上文件数: ${scannedCount}`);
-
-    await removeEmptyDirectories(UPLOAD_DIR);
-    stats.freedSpace = formatBytes(stats.freedBytes);
-    console.log(stats.deletedCount > 0
-        ? `🧹 清理完成: 删除 ${stats.deletedCount} 个孤儿文件，释放 ${stats.freedSpace}`
-        : '🧹 扫描完成: 没有发现孤儿文件');
-    return stats;
+    // Shared downloads (for example qBittorrent) and lost indexes are not garbage.
+    // Keep legacy callers and persisted opt-ins non-destructive until cleanup can
+    // prove ownership of disposable temporary files in a dedicated workspace.
+    console.log('🧹 已跳过孤儿文件删除：保留共享下载目录中的未索引文件及文件夹');
+    return { deletedCount: 0, freedBytes: 0, freedSpace: '0 B', deletedFiles: [] };
 }
 
 let cleanupInFlight: Promise<CleanupStats> | null = null;

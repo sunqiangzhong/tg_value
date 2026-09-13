@@ -297,7 +297,7 @@ router.get('/config/advanced-tasks', requireAuth, async (_req: Request, res: Res
             telegramDownloadWorkers: await getSetting('telegram_download_workers', process.env.TELEGRAM_DOWNLOAD_WORKERS || '4'),
             telegramFileConcurrency: await getSetting('telegram_file_download_concurrency', String(getFileDownloadConcurrency())),
             duplicateMode: await getSetting('duplicate_file_mode', process.env.DUPLICATE_FILE_MODE || 'copy'),
-            autoCleanupOrphans: await getSetting('auto_cleanup_orphans', process.env.AUTO_CLEANUP_ORPHANS || 'true'),
+            autoCleanupOrphans: await getSetting('auto_cleanup_orphans', process.env.AUTO_CLEANUP_ORPHANS || 'false'),
             skipTelegramPhotosInBatch: await getSetting('skip_telegram_photos_in_batch', 'false'),
             telegramDownloadHistoryPolicy: await getSetting(
                 TELEGRAM_DOWNLOAD_HISTORY_POLICY_SETTING,

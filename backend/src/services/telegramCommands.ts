@@ -473,8 +473,8 @@ function buildDuplicateModeText(mode: DuplicateMode, locale: TelegramLocale = DE
 }
 
 async function getCleanupEnabledSetting(): Promise<boolean> {
-    const value = await getSetting('auto_cleanup_orphans', process.env.AUTO_CLEANUP_ORPHANS || 'true');
-    return isOn(value, true);
+    const value = await getSetting('auto_cleanup_orphans', process.env.AUTO_CLEANUP_ORPHANS || 'false');
+    return isOn(value, false);
 }
 
 function buildCleanupSettingsKeyboard(enabled: boolean, locale: TelegramLocale = DEFAULT_LOCALE): Api.ReplyInlineMarkup {

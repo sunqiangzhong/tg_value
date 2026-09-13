@@ -117,7 +117,7 @@ export function validateRuntimeConfig(env: RuntimeEnv = process.env): RuntimeCon
     const numbers = parseNumbers(env, errors);
     const cookieSecure = validateEnum(env, errors, 'COOKIE_SECURE', ['true', 'false'], env.NODE_ENV === 'production' ? 'true' : 'false') === 'true';
     const duplicateMode = validateEnum(env, errors, 'DUPLICATE_FILE_MODE', ['copy', 'skip'], 'copy');
-    const autoCleanup = validateEnum(env, errors, 'AUTO_CLEANUP_ORPHANS', ['true', 'false'], 'true') === 'true';
+    const autoCleanup = validateEnum(env, errors, 'AUTO_CLEANUP_ORPHANS', ['true', 'false'], 'false') === 'true';
     const allowInsecureEndpoints = validateEnum(env, errors, 'ALLOW_INSECURE_STORAGE_ENDPOINTS', ['true', 'false'], 'false') === 'true';
     const debugStatus = validateEnum(env, errors, 'TG_STATUS_DEBUG', ['0', '1'], '0') === '1';
     const jsonBodyLimit = env.JSON_BODY_LIMIT?.trim() || '2mb';
